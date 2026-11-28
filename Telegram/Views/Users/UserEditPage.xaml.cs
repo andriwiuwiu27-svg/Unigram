@@ -9,6 +9,7 @@ using System;
 using Telegram.Common;
 using Telegram.Controls;
 using Telegram.Converters;
+using Telegram.Navigation;
 using Telegram.Td.Api;
 using Telegram.ViewModels.Delegates;
 using Telegram.ViewModels.Drawers;
@@ -26,6 +27,7 @@ namespace Telegram.Views.Users
         public UserEditPage()
         {
             InitializeComponent();
+            Transition = PageTransition.Entrance;
         }
 
         #region Delegate

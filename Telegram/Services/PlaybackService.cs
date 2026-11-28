@@ -552,7 +552,7 @@ namespace Telegram.Services
         {
             try
             {
-                var file = await StorageFile.GetFileFromPathAsync(path);
+                var file = await FileItem.GetFileFromPathAsync(path);
 
                 // The track can have moved on while the file was being opened, and the transport
                 // would then be left showing the cover of a track that is no longer playing.
@@ -561,7 +561,7 @@ namespace Telegram.Services
                     return;
                 }
 
-                _transport.DisplayUpdater.Thumbnail = RandomAccessStreamReference.CreateFromFile(file);
+                _transport.DisplayUpdater.Thumbnail = RandomAccessStreamReference.CreateFromFile(await file.ToStorageFileAsync());
                 _transport.DisplayUpdater.Update();
             }
             catch
@@ -1312,6 +1312,14 @@ namespace Telegram.Services
         private void Handle(UpdateMessageContent update)
         {
             if (_source is not ChatPlaybackSource source || source.ChatId != update.ChatId)
+            {
+                return;
+            }
+
+            // A poll's audio plays under the poll's id, and the poll's content is updated with every
+            // vote. Its media is never edited, so none of these updates concern what is playing,
+            // and taking them for an edit would drop the track.
+            if (update.NewContent is MessagePoll)
             {
                 return;
             }

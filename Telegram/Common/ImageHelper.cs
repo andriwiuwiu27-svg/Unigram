@@ -464,9 +464,11 @@ namespace Telegram.Common
 
         public static async Task<ImageSource> CropAndPreviewAsync(StorageMedia source, ImageGeneration generation, int maxSize = 1280)
         {
+            // Opened off the UI thread: callers start this from XAML callbacks, and a brokered
+            // file's first call is a blocking cross-process COM call that pumps input there.
             if (source is StorageVideo)
             {
-                using var videoStream = await source.File.OpenReadAsync();
+                using var videoStream = await Task.Run(async () => await source.File.OpenReadAsync());
                 // preview is false on purpose. It sets AVFMT_FLAG_NOBUFFER, which the header-only
                 // probe in StorageVideo.CreateAsync wants -- but unbuffered often fails to grab the
                 // first frame, which is the whole point here.
@@ -496,7 +498,7 @@ namespace Telegram.Common
             }
             else
             {
-                using var imageStream = await source.File.OpenReadAsync();
+                using var imageStream = await Task.Run(async () => await source.File.OpenReadAsync());
                 return await CropAndPreviewAsync(imageStream, generation, maxSize);
             }
         }
@@ -662,7 +664,7 @@ namespace Telegram.Common
 
             var mirrored = !generation.HasFrame && generation.Flip != ImageFlip.None;
 
-            var device = ElementComposition.GetSharedDevice();
+            var device = ElementComposition.GetBackgroundDevice();
             var target = new CanvasRenderTarget(device, outputWidth, outputHeight, 96);
 
             // Win2D sizes the bitmap by the file's DPI. Scaling it back up at draw time is not
@@ -851,7 +853,7 @@ namespace Telegram.Common
 
         public static async Task<IRandomAccessStream> DrawStrokesAsync(SoftwareBitmap file, IReadOnlyList<SmoothPathBuilder> strokes, Rect rectangle, ImageRotation rotation, ImageFlip flip)
         {
-            var device = ElementComposition.GetSharedDevice();
+            var device = ElementComposition.GetBackgroundDevice();
 
             using var bitmap = CanvasBitmap.CreateFromSoftwareBitmap(device, file);
             using var target = DrawStrokes(device, bitmap, strokes, rectangle, rotation, flip);
@@ -875,7 +877,7 @@ namespace Telegram.Common
 
         public static async Task<FileItem> DrawStrokesAsync(FileItem file, IReadOnlyList<SmoothPathBuilder> strokes, Rect rectangle, ImageRotation rotation, ImageFlip flip)
         {
-            var device = ElementComposition.GetSharedDevice();
+            var device = ElementComposition.GetBackgroundDevice();
 
             CanvasRenderTarget target;
 

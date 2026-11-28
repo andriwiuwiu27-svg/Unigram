@@ -32,10 +32,30 @@ using Windows.UI.Xaml.Shapes;
 
 namespace Telegram.Controls
 {
-    public enum ContentPopupButtonsLayout
+    public enum ModalPopupButtonsLayout
     {
         Horizontal,
         Vertical
+    }
+
+    public enum ModalPopupButton
+    {
+        None,
+        Primary,
+        Secondary,
+        Close
+    }
+
+    /// <summary>
+    /// None is a dismissal - Escape, the back gesture, a click outside, <see cref="ModalPopup.Hide()"/> -
+    /// and never a button: the close button reports Close.
+    /// </summary>
+    public enum ModalPopupResult
+    {
+        None,
+        Primary,
+        Secondary,
+        Close
     }
 
     /// <summary>
@@ -100,34 +120,33 @@ namespace Telegram.Controls
 
     public partial class ModalPopupClosingEventArgs : ModalPopupDeferrableEventArgs
     {
-        public ModalPopupClosingEventArgs(ContentDialogResult result)
+        public ModalPopupClosingEventArgs(ModalPopupResult result)
         {
             Result = result;
         }
 
-        public ContentDialogResult Result { get; }
+        public ModalPopupResult Result { get; }
 
         public bool Cancel { get; set; }
     }
 
     public partial class ModalPopupClosedEventArgs
     {
-        public ModalPopupClosedEventArgs(ContentDialogResult result)
+        public ModalPopupClosedEventArgs(ModalPopupResult result)
         {
             Result = result;
         }
 
-        public ContentDialogResult Result { get; }
+        public ModalPopupResult Result { get; }
     }
 
     /// <summary>
-    /// The one queue <see cref="ContentPopup.ShowQueuedAsync"/> and
-    /// <see cref="ModalPopup.ShowQueuedAsync"/> share, so that the two kinds wait for each other
-    /// while callers are moved from one to the other.
+    /// The per-window queue <see cref="ModalPopup.ShowQueuedAsync"/> waits on, so that queued
+    /// popups open one after another.
     /// </summary>
     internal static class PopupQueue
     {
-        private static readonly ConditionalWeakTable<XamlRoot, TaskCompletionSource<ContentDialogResult>> _requests = new();
+        private static readonly ConditionalWeakTable<XamlRoot, TaskCompletionSource<ModalPopupResult>> _requests = new();
 
         public static async Task WaitAsync(XamlRoot xamlRoot)
         {
@@ -137,7 +156,7 @@ namespace Telegram.Controls
             }
         }
 
-        public static void Enqueue(XamlRoot xamlRoot, TaskCompletionSource<ContentDialogResult> tsc)
+        public static void Enqueue(XamlRoot xamlRoot, TaskCompletionSource<ModalPopupResult> tsc)
         {
             _requests.AddOrUpdate(xamlRoot, tsc);
         }
@@ -161,11 +180,6 @@ namespace Telegram.Controls
     /// Nothing that survived the conversion pointed at anything: of the twenty tips, four set a
     /// Target and all four are as good centred, so the tail, its band in the template and the
     /// placement arithmetic are all gone with it.
-    ///
-    /// Shaped after <see cref="ContentPopup"/> - the three buttons, the deferrals, the sizing
-    /// properties, the navigation contract, a <see cref="ContentDialogResult"/>, ShowQueuedAsync
-    /// and Hide - so that it can take that over as well, and a caller moving between the two has
-    /// nothing to relearn.
     ///
     /// The popup fills the window rather than being centred by offsets: the smoke, the pinned
     /// button row and keeping focus inside all want a root that owns the whole surface.
@@ -232,13 +246,13 @@ namespace Telegram.Controls
         private long _fillToken;
         private long _strokeToken;
 
-        private TaskCompletionSource<ContentDialogResult> _tsc;
+        private TaskCompletionSource<ModalPopupResult> _tsc;
 
-        // Two results, as ContentPopup has them: _closingResult is whatever closed the popup and
+        // Two results: _closingResult is whatever closed the popup and
         // is what ShowAsync completes with, _result is what a subclass named through SetResult
         // and is what OpenAsync returns.
-        private ContentDialogResult _closingResult = ContentDialogResult.None;
-        private ContentDialogResult _result = ContentDialogResult.None;
+        private ModalPopupResult _closingResult = ModalPopupResult.None;
+        private ModalPopupResult _result = ModalPopupResult.None;
 
         private bool _isOpen;
         private bool _isClosing;
@@ -282,12 +296,6 @@ namespace Telegram.Controls
         /// </summary>
         public bool FocusPrimaryButton { get; set; } = true;
 
-        /// <summary>
-        /// Cleared by a popup that hides itself only to come back, so that the navigation service
-        /// does not tear its view model down. Terrible name, inherited from ContentPopup.
-        /// </summary>
-        public bool IsFinalized { get; set; } = true;
-
         public bool IsOpen => _isOpen;
 
         public event EventHandler<ModalPopup, ModalPopupOpenedEventArgs> Opened;
@@ -321,38 +329,37 @@ namespace Telegram.Controls
         /// <summary>
         /// Opens the popup and completes when it is closed, with whatever closed it.
         /// </summary>
-        public Task<ContentDialogResult> ShowAsync(XamlRoot xamlRoot)
+        public Task<ModalPopupResult> ShowAsync(XamlRoot xamlRoot)
         {
             if (xamlRoot == null || _isOpen)
             {
-                return Task.FromResult(ContentDialogResult.None);
+                return Task.FromResult(ModalPopupResult.None);
             }
 
             XamlRoot = xamlRoot;
             ApplyTheme(xamlRoot);
 
-            _tsc = new TaskCompletionSource<ContentDialogResult>();
+            _tsc = new TaskCompletionSource<ModalPopupResult>();
             Open();
 
             // Open bails when there is no root to open on, and a caller awaiting a popup that
             // never appeared would wait for good.
             if (!_isOpen)
             {
-                return Task.FromResult(ContentDialogResult.None);
+                return Task.FromResult(ModalPopupResult.None);
             }
 
             return _tsc.Task;
         }
 
         /// <summary>
-        /// Opens the popup once whatever is already queued on the same window has closed, the way
-        /// <see cref="ContentPopup.ShowQueuedAsync"/> does, and against the same queue.
+        /// Opens the popup once whatever is already queued on the same window has closed.
         /// </summary>
-        public async Task<ContentDialogResult> ShowQueuedAsync(XamlRoot xamlRoot)
+        public async Task<ModalPopupResult> ShowQueuedAsync(XamlRoot xamlRoot)
         {
             if (xamlRoot == null)
             {
-                return ContentDialogResult.None;
+                return ModalPopupResult.None;
             }
 
             await PopupQueue.WaitAsync(xamlRoot);
@@ -361,7 +368,7 @@ namespace Telegram.Controls
 
             ApplyTheme(xamlRoot);
 
-            var queued = new TaskCompletionSource<ContentDialogResult>();
+            var queued = new TaskCompletionSource<ModalPopupResult>();
             PopupQueue.Enqueue(xamlRoot, queued);
 
             var result = await ShowAsync(xamlRoot);
@@ -378,7 +385,7 @@ namespace Telegram.Controls
         /// Opens the popup and completes with the result <see cref="SetResult"/> was given,
         /// rather than the one that closed it.
         /// </summary>
-        public async Task<ContentDialogResult> OpenAsync(XamlRoot xamlRoot)
+        public async Task<ModalPopupResult> OpenAsync(XamlRoot xamlRoot)
         {
             await ShowQueuedAsync(xamlRoot);
             return _result;
@@ -414,7 +421,7 @@ namespace Telegram.Controls
             this.ApplyChatTheme(xamlRoot);
         }
 
-        protected void SetResult(ContentDialogResult result)
+        protected void SetResult(ModalPopupResult result)
         {
             _result = result;
         }
@@ -426,32 +433,37 @@ namespace Telegram.Controls
 
         /// <summary>
         /// Closes the popup, and completes <see cref="ShowAsync"/> with
-        /// <see cref="ContentDialogResult.None"/>.
+        /// <see cref="ModalPopupResult.None"/>.
         /// </summary>
         public void Hide()
         {
-            HideCore(ContentDialogResult.None);
+            HideCore(ModalPopupResult.None);
         }
 
         /// <summary>
         /// Closes the popup with <paramref name="result"/>, running the matching button's handler
         /// on the way out - so that hiding with Primary gets the validation a click would have
-        /// got. A button that is present but disabled refuses, as it does in ContentPopup.
+        /// got. A button that is present but disabled refuses.
         /// </summary>
-        public void Hide(ContentDialogResult result)
+        public void Hide(ModalPopupResult result)
         {
             _result = result;
 
             if (!_raising)
             {
-                if (result == ContentDialogResult.Primary)
+                if (result == ModalPopupResult.Primary)
                 {
-                    InvokeButton(ContentDialogButton.Primary);
+                    InvokeButton(ModalPopupButton.Primary);
                     return;
                 }
-                else if (result == ContentDialogResult.Secondary)
+                else if (result == ModalPopupResult.Secondary)
                 {
-                    InvokeButton(ContentDialogButton.Secondary);
+                    InvokeButton(ModalPopupButton.Secondary);
+                    return;
+                }
+                else if (result == ModalPopupResult.Close)
+                {
+                    InvokeButton(ModalPopupButton.Close);
                     return;
                 }
             }
@@ -461,12 +473,12 @@ namespace Telegram.Controls
 
         // async void rather than a discarded Task: a handler that throws must still reach the
         // UI thread's unhandled hook, the way it did when the Click event ran it.
-        private async void HideCore(ContentDialogResult result)
+        private async void HideCore(ModalPopupResult result)
         {
             await HideCoreAsync(result);
         }
 
-        private async Task HideCoreAsync(ContentDialogResult result)
+        private async Task HideCoreAsync(ModalPopupResult result)
         {
             if (!_isOpen || _isClosing)
             {
@@ -489,7 +501,7 @@ namespace Telegram.Controls
             }
 
             _closingResult = result;
-            Close(true);
+            CloseCore(true);
         }
 
         #endregion
@@ -686,18 +698,16 @@ namespace Telegram.Controls
 
             _popup.IsOpen = true;
 
-            // What tells the window a popup is up, the way ContentPopup does from
-            // ShowQueuedAsync: it pauses the animations behind it, and the page under it gets to
-            // put itself away. A TeachingTip never said anything, so none of that used to happen
-            // for one of these. Dismiss is the other half, and the two are paired - Close returns
-            // early unless Open got this far.
+            // What tells the window a popup is up: it pauses the animations behind it, and the
+            // page under it gets to put itself away. Dismiss is the other half, and the two are
+            // paired - Close returns early unless Open got this far.
             if (_xamlRoot.TryGetContent(out IPopupHost host))
             {
                 host.PopupOpened();
             }
         }
 
-        private void Close(bool animate)
+        private void CloseCore(bool animate)
         {
             if (!_isOpen)
             {
@@ -740,8 +750,8 @@ namespace Telegram.Controls
                 _popup = null;
             }
 
-            // Resolved again rather than held from Open: ContentPopup does the same, and the
-            // content of a window can have been swapped while the popup was up.
+            // Resolved again rather than held from Open: the content of a window can have been
+            // swapped while the popup was up.
             if (_xamlRoot != null && _xamlRoot.TryGetContent(out IPopupHost host))
             {
                 host.PopupClosed();
@@ -844,7 +854,6 @@ namespace Telegram.Controls
         /// Before the popup closes, never after. ContentDialog::HideInternal puts it in the same
         /// order and says why: as the popup goes away the FocusManager moves focus to the first
         /// focusable element of the page, and anything done after that has already been undone.
-        /// That is what sent focus to the window when a ModalPopup closed over a ContentPopup.
         ///
         /// Focus is not always on a Control - a Hyperlink is a TextElement, and ContentDialog
         /// carries its own special case for exactly that.
@@ -930,18 +939,17 @@ namespace Telegram.Controls
                 return;
             }
 
-            // Enter confirms, as it does in a ContentPopup: ContentDialog invokes the default
-            // button itself, and ContentPopup adds the same for when that button is not the
-            // primary one, so between them Enter always presses primary. DefaultButton is not
-            // consulted - callers set it for the accent colour, not for this.
+            // Enter presses primary, whichever button is the default: callers set DefaultButton
+            // for the accent colour. Only when that is not primary does a focused control that
+            // makes its own use of the key keep it.
             if (args.Key == VirtualKey.Enter)
             {
                 // A control that makes its own use of Enter keeps it.
                 var focused = FocusManagerEx.TryGetFocusedElement(XamlRoot);
-                if (DefaultButton == ContentDialogButton.Primary
+                if (DefaultButton == ModalPopupButton.Primary
                     || focused is null or (not TextBox and not RichEditBox and not RichEditorView and not Button and not MenuFlyoutItem))
                 {
-                    InvokeButton(ContentDialogButton.Primary);
+                    InvokeButton(ModalPopupButton.Primary);
                     args.Handled = true;
                 }
             }
@@ -952,11 +960,11 @@ namespace Telegram.Controls
         /// windows that take the key before an accelerator scope can see it.
         /// </summary>
         /// <remarks>
-        /// ContentDialog::ExecuteCloseAction: the close button if it has something to say and is
-        /// enabled, a plain None close otherwise - and it always closes, and always reports the
-        /// key handled. <see cref="IsLightDismissEnabled"/> has no say here; it governs a click
-        /// outside the card and nothing else, exactly as it does on a ContentPopup. A popup that
-        /// must not go away this way cancels <see cref="Closing"/>, the way Block does.
+        /// A plain None close, never the close button: that button is often an action of its own
+        /// (banning a member, scheduling), which a dismissal must not take. It always closes and
+        /// always reports the key handled. <see cref="IsLightDismissEnabled"/> has no say here; it
+        /// governs a click outside the card and nothing else. A popup that must not go away this
+        /// way cancels <see cref="Closing"/>, the way Block does.
         /// </remarks>
         public bool CancelRequested()
         {
@@ -965,22 +973,14 @@ namespace Telegram.Controls
                 return false;
             }
 
-            if (HasContent(CloseButtonContent) && CloseButton?.IsEnabled != false)
-            {
-                InvokeButton(ContentDialogButton.Close);
-            }
-            else
-            {
-                Hide();
-            }
-
+            Hide();
             return true;
         }
 
         /// <summary>
         /// A spinner that owns the window until the caller clears <see cref="FrameworkElement.Tag"/>
-        /// and hides it. ContentPopup's version leaves hit testing off and relies on the dialog's
-        /// own smoke to block; here the smoke is inside the popup, so it stays hit-testable.
+        /// and hides it. The smoke is inside the popup, so it stays hit-testable and does the
+        /// blocking.
         /// </summary>
         public static ModalPopup Block(XamlRoot xamlRoot)
         {
@@ -1026,7 +1026,7 @@ namespace Telegram.Controls
 
             foreach (var popup in VisualTreeHelper.GetOpenPopupsForXamlRoot(xamlRoot))
             {
-                if (popup.Child is ContentDialog or ModalPopup)
+                if (popup.Child is ModalPopup)
                 {
                     return true;
                 }
@@ -1199,8 +1199,7 @@ namespace Telegram.Controls
             UpdateCardGeometry(next, next.Y);
 
             // Nothing to grow from on the way in, nothing to grow to on the way out, and a card
-            // told to fill the window never changes height by itself. ContentPopup guards the
-            // same three.
+            // told to fill the window never changes height by itself.
             if (previous.Y == 0 || next.Y == 0 || previous.Y == next.Y
                 || VerticalContentAlignment == VerticalAlignment.Stretch)
             {
@@ -1301,8 +1300,7 @@ namespace Telegram.Controls
         /// geometry is animated is exact at every size, where scaling a Border turns its corners
         /// into ellipses and its stroke into an uneven one. That also lets it paint outside the
         /// element's own bounds, which is what a shrink needs - a clip cannot do it, because a
-        /// clip only ever hides what is already laid out. ContentPopup scales instead, and pays
-        /// for it in squashed corners plus an offscreen surface for the command row it redirects.
+        /// clip only ever hides what is already laid out.
         ///
         /// Two rectangles animate together: the painted one, whose path is inset by a stroke's
         /// width, and the clip on ClipRoot, which hides the content a growing card has not reached
@@ -1737,10 +1735,9 @@ namespace Telegram.Controls
             ((ModalPopup)d).UpdateButtons();
         }
 
-        // The three text properties are ContentDialog's spelling of the same thing, kept so that a
-        // caller moving off ContentPopup does not have to be rewritten - dependency properties
-        // rather than plain ones because four popups bind to them. Each writes through to the
-        // content the template binds, which stays the one source of truth.
+        // The three text properties are ContentDialog's spelling of the same thing - dependency
+        // properties rather than plain ones because four popups bind to them. Each writes
+        // through to the content the template binds, which stays the one source of truth.
         public string PrimaryButtonText
         {
             get => (string)GetValue(PrimaryButtonTextProperty);
@@ -1832,36 +1829,23 @@ namespace Telegram.Controls
         /// Carried for the callers that set it, which do so to give the primary button the accent
         /// colour rather than to say anything about Enter.
         /// </summary>
-        public ContentDialogButton DefaultButton
+        public ModalPopupButton DefaultButton
         {
-            get => (ContentDialogButton)GetValue(DefaultButtonProperty);
+            get => (ModalPopupButton)GetValue(DefaultButtonProperty);
             set => SetValue(DefaultButtonProperty, value);
         }
 
         public static readonly DependencyProperty DefaultButtonProperty =
-            DependencyProperty.Register("DefaultButton", typeof(ContentDialogButton), typeof(ModalPopup), new PropertyMetadata(ContentDialogButton.Primary));
+            DependencyProperty.Register("DefaultButton", typeof(ModalPopupButton), typeof(ModalPopup), new PropertyMetadata(ModalPopupButton.Primary));
 
-        /// <summary>
-        /// What the close button resolves to. ContentDialogResult has no Close member, so a
-        /// caller that needs to tell it apart from a dismissal names one here.
-        /// </summary>
-        public ContentDialogResult CloseButtonResult
+        public ModalPopupButtonsLayout ButtonsLayout
         {
-            get => (ContentDialogResult)GetValue(CloseButtonResultProperty);
-            set => SetValue(CloseButtonResultProperty, value);
-        }
-
-        public static readonly DependencyProperty CloseButtonResultProperty =
-            DependencyProperty.Register("CloseButtonResult", typeof(ContentDialogResult), typeof(ModalPopup), new PropertyMetadata(ContentDialogResult.None));
-
-        public ContentPopupButtonsLayout ButtonsLayout
-        {
-            get => (ContentPopupButtonsLayout)GetValue(ButtonsLayoutProperty);
+            get => (ModalPopupButtonsLayout)GetValue(ButtonsLayoutProperty);
             set => SetValue(ButtonsLayoutProperty, value);
         }
 
         public static readonly DependencyProperty ButtonsLayoutProperty =
-            DependencyProperty.Register("ButtonsLayout", typeof(ContentPopupButtonsLayout), typeof(ModalPopup), new PropertyMetadata(ContentPopupButtonsLayout.Horizontal, OnButtonContentChanged));
+            DependencyProperty.Register("ButtonsLayout", typeof(ModalPopupButtonsLayout), typeof(ModalPopup), new PropertyMetadata(ModalPopupButtonsLayout.Horizontal, OnButtonContentChanged));
 
         public bool IsPrimaryButtonSplit
         {
@@ -1903,25 +1887,25 @@ namespace Telegram.Controls
 
         private void OnPrimaryButtonClick(object sender, RoutedEventArgs e)
         {
-            InvokeButton(ContentDialogButton.Primary);
+            InvokeButton(ModalPopupButton.Primary);
         }
 
         private void OnSecondaryButtonClick(object sender, RoutedEventArgs e)
         {
-            InvokeButton(ContentDialogButton.Secondary);
+            InvokeButton(ModalPopupButton.Secondary);
         }
 
         private void OnCloseButtonClick(object sender, RoutedEventArgs e)
         {
-            InvokeButton(ContentDialogButton.Close);
+            InvokeButton(ModalPopupButton.Close);
         }
 
-        private async void InvokeButton(ContentDialogButton button)
+        private async void InvokeButton(ModalPopupButton button)
         {
             await InvokeButtonAsync(button);
         }
 
-        private async Task InvokeButtonAsync(ContentDialogButton button)
+        private async Task InvokeButtonAsync(ModalPopupButton button)
         {
             // The buttons and Enter stay live through Closing and the close animation, and a
             // handler completing a one-shot result would run a second time.
@@ -1931,31 +1915,31 @@ namespace Telegram.Controls
             }
 
             EventHandler<ModalPopup, ModalPopupButtonClickEventArgs> handler;
-            ContentDialogResult result;
+            ModalPopupResult result;
 
             switch (button)
             {
-                case ContentDialogButton.Primary:
+                case ModalPopupButton.Primary:
                     if (!IsPrimaryButtonEnabled)
                     {
                         return;
                     }
 
                     handler = PrimaryButtonClick;
-                    result = ContentDialogResult.Primary;
+                    result = ModalPopupResult.Primary;
                     break;
-                case ContentDialogButton.Secondary:
+                case ModalPopupButton.Secondary:
                     if (!IsSecondaryButtonEnabled)
                     {
                         return;
                     }
 
                     handler = SecondaryButtonClick;
-                    result = ContentDialogResult.Secondary;
+                    result = ModalPopupResult.Secondary;
                     break;
-                case ContentDialogButton.Close:
+                case ModalPopupButton.Close:
                     handler = CloseButtonClick;
-                    result = CloseButtonResult;
+                    result = ModalPopupResult.Close;
                     break;
                 default:
                     return;
@@ -1985,18 +1969,17 @@ namespace Telegram.Controls
             return content is string text ? text.Length > 0 : content != null;
         }
 
-        // The gaps ContentPopup carries in its visual states. Applied here rather than in the
-        // template because which margin a button wants depends on which of its neighbours are
-        // there at all. The close button's -12 pulls it back into CommandSpace's own padding.
+        // The gaps between the buttons. Applied here rather than in the template because which
+        // margin a button wants depends on which of its neighbours are there at all. The close button's -12 pulls it back into CommandSpace's own padding.
         private static readonly Thickness NoMargin = new Thickness(0, 0, 0, 0);
         private static readonly Thickness LeftButtonMargin = new Thickness(0, 0, 4, 0);
         private static readonly Thickness RightButtonMargin = new Thickness(4, 0, 0, 0);
         private static readonly Thickness CloseButtonMargin = new Thickness(0, 8, 0, -12);
 
         /// <summary>
-        /// Places the three buttons in the four-column, two-row command grid, the way
-        /// ContentPopup's fourteen visual states do: a button with nothing to say is not in the
-        /// layout at all, and the survivors spread into the room it leaves.
+        /// Places the three buttons in the four-column, two-row command grid: a button with
+        /// nothing to say is not in the layout at all, and the survivors spread into the room it
+        /// leaves.
         /// </summary>
         private void UpdateButtons()
         {
@@ -2013,7 +1996,7 @@ namespace Telegram.Controls
 
             // A lone button sits in the right half when the row is horizontal and spans it when
             // it is vertical. Two of them always share it.
-            var lonely = ButtonsLayout == ContentPopupButtonsLayout.Vertical || close
+            var lonely = ButtonsLayout == ModalPopupButtonsLayout.Vertical || close
                 ? (column: 0, span: 4, margin: NoMargin)
                 : (column: 2, span: 2, margin: RightButtonMargin);
 

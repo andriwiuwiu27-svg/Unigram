@@ -25,7 +25,7 @@ using Windows.UI.Xaml.Media;
 
 namespace Telegram.Views.Stars.Popups
 {
-    public sealed partial class ReceiptPopup : ContentPopup
+    public sealed partial class ReceiptPopup : ModalPopup
     {
         private readonly IClientService _clientService;
         private readonly INavigationService _navigationService;
@@ -80,7 +80,7 @@ namespace Telegram.Views.Stars.Popups
             Identifier.Text = transaction.Id;
             Date.Content = Formatter.DateAt(transaction.Date);
 
-            StarCount.Text = transaction.StarAmount.ToValue(true);
+            StarCount.Text = transaction.StarAmount.ToValue(true) + " " + Icons.PremiumStar;
             StarCount.Foreground = BootStrapper.Current.Resources[transaction.StarAmount.IsNegative() ? "SystemFillColorCriticalBrush" : "SystemFillColorSuccessBrush"] as Brush;
 
             Refund.Visibility = transaction.IsRefund
@@ -335,7 +335,7 @@ namespace Telegram.Views.Stars.Popups
             Identifier.Text = stars.TransactionId;
             Date.Content = Formatter.DateAt(receipt.Date);
 
-            StarCount.Text = (stars.StarCount < 0 ? string.Empty : "+") + stars.StarCount.ToString("N0");
+            StarCount.Text = (stars.StarCount < 0 ? string.Empty : "+") + stars.StarCount.ToString("N0") + " " + Icons.PremiumStar;
             StarCount.Foreground = BootStrapper.Current.Resources[stars.StarCount < 0 ? "SystemFillColorCriticalBrush" : "SystemFillColorSuccessBrush"] as Brush;
 
             Refund.Visibility = Visibility.Collapsed;
@@ -343,7 +343,7 @@ namespace Telegram.Views.Stars.Popups
 
         private void Purchase_Click(object sender, RoutedEventArgs e)
         {
-            Hide(ContentDialogResult.Primary);
+            Hide(ModalPopupResult.Primary);
         }
 
         private void SettingsFooter_Click(object sender, TextUrlClickEventArgs e)

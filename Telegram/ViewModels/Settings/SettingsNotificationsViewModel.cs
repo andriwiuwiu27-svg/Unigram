@@ -9,6 +9,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Telegram.Collections;
 using Telegram.Common;
+using Telegram.Controls;
 using Telegram.Controls.Media;
 using Telegram.Navigation;
 using Telegram.Navigation.Services;
@@ -242,7 +243,7 @@ namespace Telegram.ViewModels.Settings
         public async void Reset()
         {
             var confirm = await ShowPopupAsync(Strings.ResetNotificationsAlert, Strings.AppName, Strings.OK, Strings.Cancel);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 foreach (var scope in Scopes)
                 {

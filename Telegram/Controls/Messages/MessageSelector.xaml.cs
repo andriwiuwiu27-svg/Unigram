@@ -30,6 +30,7 @@ using Windows.UI.Xaml;
 using Windows.UI.Xaml.Automation.Peers;
 using Windows.UI.Xaml.Automation.Provider;
 using Windows.UI.Xaml.Controls;
+using Windows.UI.Xaml.Controls.Primitives;
 using Windows.UI.Xaml.Hosting;
 using Windows.UI.Xaml.Input;
 using Windows.UI.Xaml.Media;
@@ -41,8 +42,13 @@ namespace Telegram.Controls.Messages
     {
         private Border Header;
         private Border Footer;
-        private Border Icon;
         private ContentPresenter Presenter;
+
+        // Presenter's child visual, sized to it; _icon is placed in it by RelativeOffsetAdjustment
+        // plus _iconOffset, with Offset.X left free for the slide-in.
+        private ContainerVisual _iconHost;
+        private ContainerVisual _icon;
+        private Vector2 _iconOffset;
 
         private bool _templateApplied;
 
@@ -238,39 +244,85 @@ namespace Telegram.Controls.Messages
 
         private void CreateIcon()
         {
-            if (Icon != null || !_selectionEnabled)
+            if (_icon != null || !_selectionEnabled)
             {
                 return;
             }
 
-            var visual = GetVisual(BootStrapper.Current.Compositor, out var source, out _props);
+            var compositor = BootStrapper.Current.Compositor;
+            var visual = GetVisual(compositor, out var source, out _props);
 
             _source = source;
             _previous = visual;
 
-            Icon = GetTemplateChild(nameof(Icon)) as Border;
-            ElementCompositionPreview.SetIsTranslationEnabled(Icon, true);
-            ElementCompositionPreview.SetElementChildVisual(Icon, visual?.RootVisual);
+            _icon = compositor.CreateContainerVisual();
+            _icon.Size = new Vector2(24, 24);
+            _icon.CenterPoint = new Vector3(12, 12, 0);
+
+            if (visual != null)
+            {
+                _icon.Children.InsertAtTop(visual.RootVisual);
+            }
+
+            if (IsAlbumChild && _message.Content is MessagePhoto or MessageVideo)
+            {
+                // Top right, 4 down and 6 in.
+                _icon.RelativeOffsetAdjustment = new Vector3(1, 0, 0);
+                _iconOffset = new Vector2(-30, 4);
+            }
+            else if (IsAlbumChild)
+            {
+                // Bottom left, 38 in and 4 up.
+                _icon.RelativeOffsetAdjustment = new Vector3(0, 1, 0);
+                _iconOffset = new Vector2(38, -28);
+            }
+            else
+            {
+                // 12 in, centred on the bubble less 3 at the bottom.
+                _icon.RelativeOffsetAdjustment = new Vector3(0, 0.5f, 0);
+                _iconOffset = new Vector2(12, -13.5f);
+            }
+
+            _iconHost = compositor.CreateContainerVisual();
+            _iconHost.Children.InsertAtTop(_icon);
+
+            if (_requiresArrange)
+            {
+                _iconHost.Size = Presenter.ActualSize;
+            }
+            else
+            {
+                _iconHost.RelativeSizeAdjustment = Vector2.One;
+            }
+
+            ElementCompositionPreview.SetElementChildVisual(Presenter, _iconHost);
 
             RegisterPropertyChangedCallback(BackgroundProperty, OnBackgroundChanged);
             OnBackgroundChanged(this, BackgroundProperty);
+        }
 
-            if (IsAlbumChild)
+        private void UpdateIconOffset(bool value, bool outgoing, bool animate)
+        {
+            // The icon rides on the presenter, so where an incoming bubble slides 36 aside the
+            // icon comes in with it from a fixed offset, and only elsewhere does it slide itself.
+            var slides = outgoing && !IsAlbumChild;
+            var x = outgoing || IsAlbumChild ? _iconOffset.X : _iconOffset.X - 36;
+
+            _icon.StopAnimation("Offset.X");
+
+            if (slides && animate)
             {
-                if (_message.Content is MessagePhoto or MessageVideo)
-                {
-                    Icon.VerticalAlignment = VerticalAlignment.Top;
-                    Icon.HorizontalAlignment = HorizontalAlignment.Right;
-                    Icon.Margin = new Thickness(0, 4, 6, 0);
-                }
-                else
-                {
-                    Icon.VerticalAlignment = VerticalAlignment.Bottom;
-                    Icon.HorizontalAlignment = HorizontalAlignment.Left;
-                    Icon.Margin = new Thickness(38, 0, 0, 4);
-                }
+                _icon.Offset = new Vector3(x + (value ? -36 : 0), _iconOffset.Y, 0);
 
-                Grid.SetColumn(Icon, 1);
+                var offset = _icon.Compositor.CreateScalarKeyFrameAnimation();
+                offset.InsertKeyFrame(0, x + (value ? -36 : 0));
+                offset.InsertKeyFrame(1, x + (value ? 0 : -36));
+
+                _icon.StartAnimation("Offset.X", offset);
+            }
+            else
+            {
+                _icon.Offset = new Vector3(x + (slides && !value ? -36 : 0), _iconOffset.Y, 0);
             }
         }
 
@@ -331,6 +383,32 @@ namespace Telegram.Controls.Messages
                     message.Delegate.Unselect(message, true);
                 }
             }
+        }
+
+        // Space toggles the selector only while selecting messages; otherwise it clicks the media, once per press. An
+        // album item's selector holds its media directly rather than in a bubble.
+        protected override void OnKeyDown(KeyRoutedEventArgs e)
+        {
+            if (e.Key == VirtualKey.Space && !_selectionEnabled && e.OriginalSource == this)
+            {
+                var media = Content is MessageBubble bubble
+                    ? bubble.MediaTemplateRoot
+                    : Content as UIElement;
+
+                if (media is ButtonBase { IsEnabled: true } button
+                    && FrameworkElementAutomationPeer.CreatePeerForElement(button)?.GetPattern(PatternInterface.Invoke) is IInvokeProvider provider)
+                {
+                    if (!e.KeyStatus.WasKeyDown)
+                    {
+                        provider.Invoke();
+                    }
+
+                    e.Handled = true;
+                    return;
+                }
+            }
+
+            base.OnKeyDown(e);
         }
 
         // Swipe to reply, for a touch press; from PointerPressed only. Content that handles its presses calls it for the ones
@@ -515,11 +593,7 @@ namespace Telegram.Controls.Messages
 
                 if (animate)
                 {
-                    var offset = BootStrapper.Current.Compositor.CreateScalarKeyFrameAnimation();
-                    offset.InsertKeyFrame(0, value ? -36 : 0);
-                    offset.InsertKeyFrame(1, value ? 0 : -36);
-
-                    if (Icon != null)
+                    if (_icon != null)
                     {
                         UpdateIcon(IsChecked is true, true);
 
@@ -527,22 +601,13 @@ namespace Telegram.Controls.Messages
                         scale.InsertKeyFrame(0, value ? Vector3.Zero : Vector3.One);
                         scale.InsertKeyFrame(1, value ? Vector3.One : Vector3.Zero);
 
-                        var icon = ElementComposition.GetElementVisual(Icon);
-                        icon.CenterPoint = new Vector3(12, 12, 0);
-                        icon.StartAnimation("Scale", scale);
-
-                        if (IsAlbumChild)
-                        {
-                            icon.Properties.InsertVector3("Translation", new Vector3());
-                        }
-                        else
-                        {
-                            icon.StartAnimation("Translation.X", offset);
-                        }
+                        _icon.StartAnimation("Scale", scale);
+                        UpdateIconOffset(value, outgoing, true);
                     }
 
                     if (!outgoing && !IsAlbumChild)
                     {
+                        var offset = BootStrapper.Current.Compositor.CreateScalarKeyFrameAnimation();
                         offset.InsertKeyFrame(0, value ? 0 : 36);
                         offset.InsertKeyFrame(1, value ? 36 : 0);
 
@@ -555,21 +620,13 @@ namespace Telegram.Controls.Messages
                 }
                 else
                 {
-                    if (Icon != null)
+                    if (_icon != null)
                     {
                         UpdateIcon(IsChecked is true, false);
 
-                        var icon = ElementComposition.GetElementVisual(Icon);
-                        icon.Scale = value ? Vector3.One : Vector3.Zero;
-
-                        if (IsAlbumChild)
-                        {
-                            icon.Properties.InsertVector3("Translation", new Vector3());
-                        }
-                        else
-                        {
-                            icon.Properties.InsertVector3("Translation", new Vector3(value ? 0 : -36, 0, 0));
-                        }
+                        _icon.StopAnimation("Scale");
+                        _icon.Scale = value ? Vector3.One : Vector3.Zero;
+                        UpdateIconOffset(value, outgoing, false);
                     }
 
                     if (!outgoing && !IsAlbumChild)
@@ -735,7 +792,15 @@ namespace Telegram.Controls.Messages
                 _container.Size = finalSize.ToVector2();
             }
 
-            return base.ArrangeOverride(finalSize);
+            var size = base.ArrangeOverride(finalSize);
+
+            // After the base: the presenter is arranged there.
+            if (_iconHost != null && _requiresArrange)
+            {
+                _iconHost.Size = Presenter.ActualSize;
+            }
+
+            return size;
         }
 
         private void ConfigureInteractionTracker()

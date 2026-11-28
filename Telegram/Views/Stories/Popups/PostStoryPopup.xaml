@@ -44,60 +44,94 @@
                       VerticalScrollMode="Auto"
                       Padding="24,0">
             <StackPanel Margin="0,0,0,16">
-                <TextBlock Text="{CustomResource StoryPrivacyWhoCanView}"
-                           Style="{StaticResource BaseTextBlockStyle}"
-                           Margin="0,0,0,4" />
+                <!-- Only where there is another chat to post as, or the story is a chat's. -->
+                <StackPanel x:Name="PublishAsRoot"
+                            Visibility="Collapsed"
+                            Margin="0,0,0,16">
+                    <TextBlock Text="{CustomResource StoryPrivacyPublishAs}"
+                               Style="{StaticResource BaseTextBlockStyle}"
+                               Margin="0,0,0,8" />
 
-                <RadioButton x:Name="Everyone"
-                             Content="{CustomResource StoryPrivacyOptionEveryone}"
-                             GroupName="StoryPrivacy" />
+                    <ComboBox x:Name="PublishAs"
+                              SelectionChanged="PublishAs_SelectionChanged"
+                              HorizontalAlignment="Stretch"
+                              Padding="8,4,0,4" />
+                </StackPanel>
 
-                <!-- Lined up under the option's text, past its 20 pixel glyph and 8 pixel gap. -->
-                <HyperlinkButton x:Name="EveryoneList"
-                                 Click="List_Click"
-                                 Padding="0"
-                                 Margin="28,-6,0,4"
-                                 Template="{StaticResource HyperlinkButtonTemplate}">
-                </HyperlinkButton>
+                <!-- A chat's story is seen by whoever sees the chat. -->
+                <StackPanel x:Name="PrivacyRoot"
+                            Margin="0,0,0,16">
+                    <TextBlock Text="{CustomResource StoryPrivacyWhoCanView}"
+                               Style="{StaticResource BaseTextBlockStyle}"
+                               Margin="0,0,0,4" />
 
-                <RadioButton x:Name="Contacts"
-                             Content="{CustomResource StoryPrivacyOptionContacts}"
-                             GroupName="StoryPrivacy" />
+                    <RadioButton x:Name="Everyone"
+                                 Content="{CustomResource StoryPrivacyOptionEveryone}"
+                                 GroupName="StoryPrivacy" />
 
-                <HyperlinkButton x:Name="ContactsList"
-                                 Click="List_Click"
-                                 Padding="0"
-                                 Margin="28,-6,0,4"
-                                 Template="{StaticResource HyperlinkButtonTemplate}" />
+                    <!-- Lined up under the option's text, past its 20 pixel glyph and 8 pixel gap. -->
+                    <HyperlinkButton x:Name="EveryoneList"
+                                     Click="List_Click"
+                                     Padding="0"
+                                     Margin="28,-6,0,4"
+                                     Template="{StaticResource HyperlinkButtonTemplate}">
+                    </HyperlinkButton>
 
-                <RadioButton x:Name="CloseFriends"
-                             Content="{CustomResource StoryPrivacyOptionCloseFriends}"
-                             GroupName="StoryPrivacy" />
+                    <RadioButton x:Name="Contacts"
+                                 Content="{CustomResource StoryPrivacyOptionContacts}"
+                                 GroupName="StoryPrivacy" />
 
-                <HyperlinkButton x:Name="CloseFriendsList"
-                                 Click="List_Click"
-                                 Padding="0"
-                                 Margin="28,-6,0,4"
-                                 Template="{StaticResource HyperlinkButtonTemplate}" />
+                    <HyperlinkButton x:Name="ContactsList"
+                                     Click="List_Click"
+                                     Padding="0"
+                                     Margin="28,-6,0,4"
+                                     Template="{StaticResource HyperlinkButtonTemplate}" />
 
-                <RadioButton x:Name="SelectedContacts"
-                             Content="{CustomResource StoryPrivacyOptionSelectedContacts}"
-                             GroupName="StoryPrivacy" />
+                    <RadioButton x:Name="CloseFriends"
+                                 Content="{CustomResource StoryPrivacyOptionCloseFriends}"
+                                 GroupName="StoryPrivacy" />
 
-                <HyperlinkButton x:Name="SelectedContactsList"
-                                 Click="List_Click"
-                                 Padding="0"
-                                 Margin="28,-6,0,4"
-                                 Template="{StaticResource HyperlinkButtonTemplate}" />
+                    <HyperlinkButton x:Name="CloseFriendsList"
+                                     Click="List_Click"
+                                     Padding="0"
+                                     Margin="28,-6,0,4"
+                                     Template="{StaticResource HyperlinkButtonTemplate}" />
+
+                    <RadioButton x:Name="SelectedContacts"
+                                 Content="{CustomResource StoryPrivacyOptionSelectedContacts}"
+                                 GroupName="StoryPrivacy" />
+
+                    <HyperlinkButton x:Name="SelectedContactsList"
+                                     Click="List_Click"
+                                     Padding="0"
+                                     Margin="28,-6,0,4"
+                                     Template="{StaticResource HyperlinkButtonTemplate}" />
+
+                    <controls:SettingsFooter x:Name="BlockList"
+                                             Click="BlockList_Click"
+                                             IsLink="True"
+                                             HorizontalAlignment="Left"
+                                             Margin="0,4,0,0" />
+                </StackPanel>
 
                 <CheckBox x:Name="AllowScreenshots"
                           Content="{CustomResource StoryAllowScreenshots}"
-                          IsChecked="True"
-                          Margin="0,16,0,0" />
+                          IsChecked="True" />
 
                 <CheckBox x:Name="Keep"
+                          Click="Keep_Click"
                           Content="{CustomResource StoryKeep}"
                           IsChecked="True" />
+
+                <!-- The albums on the page the story is kept on. -->
+                <HyperlinkButton x:Name="AlbumsList"
+                                 Click="AlbumsList_Click"
+                                 Visibility="Collapsed"
+                                 AutomationProperties.Name="{CustomResource StoriesAlbum}"
+                                 ToolTipService.ToolTip="{CustomResource StoriesAlbum}"
+                                 Padding="0"
+                                 Margin="28,-6,0,4"
+                                 Template="{StaticResource HyperlinkButtonTemplate}" />
 
                 <TextBlock x:Name="KeepInfo"
                            Style="{StaticResource InfoCaptionTextBlockStyle}" />

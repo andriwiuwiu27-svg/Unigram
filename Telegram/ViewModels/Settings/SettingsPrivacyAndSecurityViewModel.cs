@@ -345,7 +345,7 @@ namespace Telegram.ViewModels.Settings
             if (!value)
             {
                 var confirm = await ShowPopupAsync(Strings.SuggestContactsAlert, Strings.AppName, Strings.MuteDisable, Strings.Cancel);
-                if (confirm != ContentDialogResult.Primary)
+                if (confirm != ModalPopupResult.Primary)
                 {
                     RaisePropertyChanged(nameof(IsContactsSuggestEnabled));
                     return;
@@ -375,7 +375,7 @@ namespace Telegram.ViewModels.Settings
                 }
 
                 var confirm = await ShowPopupAsync(new SettingsPasskeysIntroPopup());
-                if (confirm == ContentDialogResult.Primary)
+                if (confirm == ModalPopupResult.Primary)
                 {
                     var response = await PasskeyManager.AddLoginAsync(Window, ClientService);
                     if (response is Passkey passkey)
@@ -403,7 +403,7 @@ namespace Telegram.ViewModels.Settings
                     var popup = new SettingsPasswordConfirmPopup(ClientService, passwordState);
 
                     var confirm = await ShowPopupAsync(popup);
-                    if (confirm == ContentDialogResult.Primary && !string.IsNullOrEmpty(popup.Password))
+                    if (confirm == ModalPopupResult.Primary && !string.IsNullOrEmpty(popup.Password))
                     {
                         NavigationService.Navigate(typeof(SettingsPasswordPage), popup.Password);
                     }
@@ -411,7 +411,7 @@ namespace Telegram.ViewModels.Settings
                     {
                         var emailCode = new SettingsPasswordEmailCodePopup(ClientService, popup.RecoveryEmailAddressCodeInfo, SettingsPasswordEmailCodeType.Recovery);
 
-                        if (ContentDialogResult.Primary == await ShowPopupAsync(emailCode))
+                        if (ModalPopupResult.Primary == await ShowPopupAsync(emailCode))
                         {
                             ShowPopup(new SettingsPasswordDonePopup());
                         }
@@ -421,7 +421,7 @@ namespace Telegram.ViewModels.Settings
                 {
                     var emailCode = new SettingsPasswordEmailCodePopup(ClientService, passwordState.RecoveryEmailAddressCodeInfo, SettingsPasswordEmailCodeType.Continue);
 
-                    if (ContentDialogResult.Primary == await ShowPopupAsync(emailCode))
+                    if (ModalPopupResult.Primary == await ShowPopupAsync(emailCode))
                     {
                         ShowPopup(new SettingsPasswordDonePopup());
                     }
@@ -466,12 +466,12 @@ namespace Telegram.ViewModels.Settings
                 };
 
                 var confirm = await ShowPopupAsync(popup);
-                if (confirm == ContentDialogResult.Primary)
+                if (confirm == ModalPopupResult.Primary)
                 {
                     var address = new SettingsLoginEmailAddressPopup(ClientService);
 
                     var coconfirm = await ShowPopupAsync(address);
-                    if (coconfirm == ContentDialogResult.Primary)
+                    if (coconfirm == ModalPopupResult.Primary)
                     {
                         ShowPopup(new SettingsLoginEmailCodePopup(ClientService, address.CodeInfo));
                     }
@@ -491,7 +491,7 @@ namespace Telegram.ViewModels.Settings
 
         public async void ClearPayments()
         {
-            var dialog = new ContentPopup();
+            var dialog = new ModalPopup();
             var stack = new StackPanel();
             var checkShipping = new CheckBox { Content = Strings.PrivacyClearShipping, IsChecked = true };
             var checkPayment = new CheckBox { Content = Strings.PrivacyClearPayment, IsChecked = true };
@@ -516,7 +516,7 @@ namespace Telegram.ViewModels.Settings
             dialog.SecondaryButtonText = Strings.Cancel;
 
             var confirm = await ShowPopupAsync(dialog);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 var info = checkShipping.IsChecked == true;
                 var credential = checkPayment.IsChecked == true;

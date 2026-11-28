@@ -11,6 +11,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Telegram.Collections;
 using Telegram.Common;
+using Telegram.Controls;
 using Telegram.Controls.Cells;
 using Telegram.Converters;
 using Telegram.Navigation;
@@ -78,6 +79,7 @@ namespace Telegram.ViewModels
                 ClientService.Send(new GetUserFullInfo(item.Id));
             }
 
+            UpdateSuggestion();
             return Task.CompletedTask;
         }
 
@@ -88,6 +90,7 @@ namespace Telegram.ViewModels
                 .Subscribe<UpdateOwnedStarCount>(Handle)
                 .Subscribe<UpdateOwnedGramCount>(Handle)
                 .Subscribe<UpdateTonWalletState>(Handle)
+                .Subscribe<UpdateSuggestedActions>(Handle)
                 .Subscribe<UpdateOption>(Handle);
         }
 
@@ -157,7 +160,7 @@ namespace Telegram.ViewModels
             var text = Regex.Replace(Strings.AskAQuestionInfo, "<!\\[CDATA\\[(.*?)\\]\\]>", "$1");
 
             var confirm = await ShowPopupAsync(text, Strings.AskAQuestion, Strings.AskButton, tertiary: Strings.Cancel);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 var response = await ClientService.SendAsync(new GetSupportUser());
                 if (response is User user)
@@ -171,69 +174,9 @@ namespace Telegram.ViewModels
             }
         }
 
-        public async void PremiumGifting()
+        public void PremiumGifting()
         {
-            var popup = ChooseChatsPopup.Create(NavigationService, Strings.GiftTelegramPremiumOrStarsTitle);
-
-            if (ClientService.TryGetUser(ClientService.Options.MyId, out User self))
-            {
-                var selfChat = await ClientService.SendAsync(new CreatePrivateChat(self.Id, false)) as Chat;
-
-                var profile = new ProfileCell();
-                profile.UpdateUser(ClientService, self, 36, true);
-                profile.Subtitle = Strings.Gift2Myself;
-
-                var button = new Button
-                {
-                    Content = profile,
-                    Style = BootStrapper.Current.Resources["ListEmptyButtonStyle"] as Style,
-                    Margin = new Thickness(12, 0, 12, 0),
-                    CornerRadius = new CornerRadius(4)
-                };
-
-                button.Click += (s, args) =>
-                {
-                    popup.ViewModel.SelectedItems = new RangeObservableCollection<Chat> { selfChat };
-                    popup.Hide(ContentDialogResult.Primary);
-                };
-
-                popup.Header = button;
-            }
-
-            var options = new ChooseChatsOptions()
-            {
-                AllowChannelChats = false,
-                AllowGroupChats = false,
-                AllowBotChats = false,
-                AllowUserChats = true,
-                AllowSecretChats = false,
-                AllowSelf = false,
-                CanPostMessages = false,
-                CanInviteUsers = false,
-                CanShareContact = false,
-                Mode = ChooseChatsMode.Chats,
-                ShowMessages = false
-            };
-
-            var confirm = await popup.PickAsync(XamlRoot, Array.Empty<long>(), options, ListViewSelectionMode.None);
-            if (confirm != ContentDialogResult.Primary)
-            {
-                return;
-            }
-
-            var chat = popup.ViewModel.SelectedItems.FirstOrDefault();
-            var user = ClientService.GetUser(chat);
-
-            if (user != null)
-            {
-                ClientService.TryGetUserFull(user.Id, out UserFullInfo fullInfo);
-                fullInfo ??= await ClientService.SendAsync(new GetUserFullInfo(user.Id)) as UserFullInfo;
-
-                if (fullInfo != null)
-                {
-                    ShowPopup(new GiftPopup(ClientService, NavigationService, user, fullInfo));
-                }
-            }
+            GiftHelper.ChooseRecipient(ClientService, NavigationService);
         }
 
         public void Search(string query)

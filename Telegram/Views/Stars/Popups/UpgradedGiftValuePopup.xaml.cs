@@ -8,6 +8,7 @@
 using System.Threading.Tasks;
 using Telegram.Common;
 using Telegram.Controls;
+using Telegram.Controls.Media;
 using Telegram.Converters;
 using Telegram.Navigation;
 using Telegram.Navigation.Services;
@@ -43,7 +44,7 @@ namespace Telegram.Views.Stars.Popups
             TextBlockHelper.SetMarkdown(MessageLabel, string.Format(Strings.GiftValueAverage, gift.Title));
 
             InitialSale.Content = Formatter.DateAt(valueInfo.InitialSaleDate);
-            InitialPrice.Text = string.Format("{0} (~{1})", valueInfo.InitialSaleStarCount, Locale.FormatCurrency(valueInfo.InitialSalePrice, valueInfo.Currency));
+            InitialPrice.Text = string.Format("{0} {1} (~{2})", Icons.PremiumStar, valueInfo.InitialSaleStarCount, Locale.FormatCurrency(valueInfo.InitialSalePrice, valueInfo.Currency));
 
             if (valueInfo.LastSaleDate != 0)
             {
@@ -64,9 +65,9 @@ namespace Telegram.Views.Stars.Popups
                 LastPriceRoot.Visibility = Visibility.Collapsed;
             }
 
-            if (valueInfo.MinimumPrice != 0)
+            if (valueInfo.MinPrice != 0)
             {
-                MinimumPrice.Text = Locale.FormatCurrency(valueInfo.MinimumPrice, valueInfo.Currency);
+                MinimumPrice.Text = Locale.FormatCurrency(valueInfo.MinPrice, valueInfo.Currency);
             }
             else
             {
@@ -106,7 +107,7 @@ namespace Telegram.Views.Stars.Popups
 
         }
 
-        public static Task<ContentDialogResult> ShowAsync(XamlRoot xamlRoot, IClientService clientService, INavigationService navigationService, UpgradedGift gift, UpgradedGiftValueInfo valueInfo)
+        public static Task<ModalPopupResult> ShowAsync(XamlRoot xamlRoot, IClientService clientService, INavigationService navigationService, UpgradedGift gift, UpgradedGiftValueInfo valueInfo)
         {
             var popup = new UpgradedGiftValuePopup(clientService, navigationService, gift, valueInfo)
             {
@@ -119,7 +120,7 @@ namespace Telegram.Views.Stars.Popups
 
         private void MinimumPriceInfo_Click(object sender, RoutedEventArgs e)
         {
-            ToastPopup.Show(MinimumPriceInfo, string.Format(Strings.GiftValueMinPriceInfo, Locale.FormatCurrency(_valueInfo.MinimumPrice, _valueInfo.Currency), _gift.Title), ToastPlacementMode.Top);
+            ToastPopup.Show(MinimumPriceInfo, string.Format(Strings.GiftValueMinPriceInfo, Locale.FormatCurrency(_valueInfo.MinPrice, _valueInfo.Currency), _gift.Title), ToastPlacementMode.Top);
         }
 
         private void AveragePriceInfo_Click(object sender, RoutedEventArgs e)

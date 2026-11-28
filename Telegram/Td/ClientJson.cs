@@ -672,33 +672,16 @@ namespace Telegram.Td.Api
                 return Vector<T>.Empty;
             }
 
-            T[] items = null;
-            var count = 0;
+            var items = new VectorBuilder<T>();
 
             do
             {
-                if (items == null)
-                {
-                    items = new T[4];
-                }
-                else if (count == items.Length)
-                {
-                    Array.Resize(ref items, count * 2);
-                }
-
-                items[count++] = reader.TokenType == JsonTokenType.Null ? null : handler(ref reader, client);
+                items.Add(reader.TokenType == JsonTokenType.Null ? null : handler(ref reader, client));
                 reader.Read();
             }
             while (reader.TokenType is JsonTokenType.StartObject or JsonTokenType.Null);
 
-            // Trimmed rather than handed over with slack: the parsed object is cached for the
-            // session, so up to 2x wasted is worth one copy here.
-            if (count != items.Length)
-            {
-                Array.Resize(ref items, count);
-            }
-
-            return items;
+            return items.ToVector();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -712,33 +695,16 @@ namespace Telegram.Td.Api
                 return Vector<Vector<T>>.Empty;
             }
 
-            Vector<T>[] items = null;
-            var count = 0;
+            var items = new VectorBuilder<Vector<T>>();
 
             do
             {
-                if (items == null)
-                {
-                    items = new Vector<T>[4];
-                }
-                else if (count == items.Length)
-                {
-                    Array.Resize(ref items, count * 2);
-                }
-
-                items[count++] = reader.GetObjectArray(client, handler);
+                items.Add(reader.GetObjectArray(client, handler));
                 reader.Read();
             }
             while (reader.TokenType is JsonTokenType.StartArray);
 
-            // Trimmed rather than handed over with slack: the parsed object is cached for the
-            // session, so up to 2x wasted is worth one copy here.
-            if (count != items.Length)
-            {
-                Array.Resize(ref items, count);
-            }
-
-            return items;
+            return items.ToVector();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -752,33 +718,16 @@ namespace Telegram.Td.Api
                 return Vector<bool>.Empty;
             }
 
-            bool[] items = null;
-            var count = 0;
+            var items = new VectorBuilder<bool>();
 
             do
             {
-                if (items == null)
-                {
-                    items = new bool[4];
-                }
-                else if (count == items.Length)
-                {
-                    Array.Resize(ref items, count * 2);
-                }
-
-                items[count++] = reader.GetBoolean();
+                items.Add(reader.GetBoolean());
                 reader.Read();
             }
             while (reader.TokenType is JsonTokenType.True or JsonTokenType.False);
 
-            // Trimmed rather than handed over with slack: the parsed object is cached for the
-            // session, so up to 2x wasted is worth one copy here.
-            if (count != items.Length)
-            {
-                Array.Resize(ref items, count);
-            }
-
-            return items;
+            return items.ToVector();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -792,33 +741,16 @@ namespace Telegram.Td.Api
                 return Vector<int>.Empty;
             }
 
-            int[] items = null;
-            var count = 0;
+            var items = new VectorBuilder<int>();
 
             do
             {
-                if (items == null)
-                {
-                    items = new int[4];
-                }
-                else if (count == items.Length)
-                {
-                    Array.Resize(ref items, count * 2);
-                }
-
-                items[count++] = reader.GetInt32();
+                items.Add(reader.GetInt32());
                 reader.Read();
             }
             while (reader.TokenType is JsonTokenType.Number);
 
-            // Trimmed rather than handed over with slack: the parsed object is cached for the
-            // session, so up to 2x wasted is worth one copy here.
-            if (count != items.Length)
-            {
-                Array.Resize(ref items, count);
-            }
-
-            return items;
+            return items.ToVector();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -832,33 +764,16 @@ namespace Telegram.Td.Api
                 return Vector<long>.Empty;
             }
 
-            long[] items = null;
-            var count = 0;
+            var items = new VectorBuilder<long>();
 
             do
             {
-                if (items == null)
-                {
-                    items = new long[4];
-                }
-                else if (count == items.Length)
-                {
-                    Array.Resize(ref items, count * 2);
-                }
-
-                items[count++] = reader.GetInt64();
+                items.Add(reader.GetInt64());
                 reader.Read();
             }
             while (reader.TokenType is JsonTokenType.Number);
 
-            // Trimmed rather than handed over with slack: the parsed object is cached for the
-            // session, so up to 2x wasted is worth one copy here.
-            if (count != items.Length)
-            {
-                Array.Resize(ref items, count);
-            }
-
-            return items;
+            return items.ToVector();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -872,33 +787,16 @@ namespace Telegram.Td.Api
                 return Vector<long>.Empty;
             }
 
-            long[] items = null;
-            var count = 0;
+            var items = new VectorBuilder<long>();
 
             do
             {
-                if (items == null)
-                {
-                    items = new long[4];
-                }
-                else if (count == items.Length)
-                {
-                    Array.Resize(ref items, count * 2);
-                }
-
-                items[count++] = reader.GetInt64String();
+                items.Add(reader.GetInt64String());
                 reader.Read();
             }
             while (reader.TokenType is JsonTokenType.Number or JsonTokenType.String);
 
-            // Trimmed rather than handed over with slack: the parsed object is cached for the
-            // session, so up to 2x wasted is worth one copy here.
-            if (count != items.Length)
-            {
-                Array.Resize(ref items, count);
-            }
-
-            return items;
+            return items.ToVector();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -912,33 +810,16 @@ namespace Telegram.Td.Api
                 return Vector<double>.Empty;
             }
 
-            double[] items = null;
-            var count = 0;
+            var items = new VectorBuilder<double>();
 
             do
             {
-                if (items == null)
-                {
-                    items = new double[4];
-                }
-                else if (count == items.Length)
-                {
-                    Array.Resize(ref items, count * 2);
-                }
-
-                items[count++] = reader.GetDouble();
+                items.Add(reader.GetDouble());
                 reader.Read();
             }
             while (reader.TokenType is JsonTokenType.Number);
 
-            // Trimmed rather than handed over with slack: the parsed object is cached for the
-            // session, so up to 2x wasted is worth one copy here.
-            if (count != items.Length)
-            {
-                Array.Resize(ref items, count);
-            }
-
-            return items;
+            return items.ToVector();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -952,33 +833,16 @@ namespace Telegram.Td.Api
                 return Vector<string>.Empty;
             }
 
-            string[] items = null;
-            var count = 0;
+            var items = new VectorBuilder<string>();
 
             do
             {
-                if (items == null)
-                {
-                    items = new string[4];
-                }
-                else if (count == items.Length)
-                {
-                    Array.Resize(ref items, count * 2);
-                }
-
-                items[count++] = reader.GetString();
+                items.Add(reader.GetString());
                 reader.Read();
             }
             while (reader.TokenType is JsonTokenType.String);
 
-            // Trimmed rather than handed over with slack: the parsed object is cached for the
-            // session, so up to 2x wasted is worth one copy here.
-            if (count != items.Length)
-            {
-                Array.Resize(ref items, count);
-            }
-
-            return items;
+            return items.ToVector();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -992,33 +856,16 @@ namespace Telegram.Td.Api
                 return Vector<byte[]>.Empty;
             }
 
-            byte[][] items = null;
-            var count = 0;
+            var items = new VectorBuilder<byte[]>();
 
             do
             {
-                if (items == null)
-                {
-                    items = new byte[4][];
-                }
-                else if (count == items.Length)
-                {
-                    Array.Resize(ref items, count * 2);
-                }
-
-                items[count++] = reader.GetBytesFromBase64();
+                items.Add(reader.GetBytesFromBase64());
                 reader.Read();
             }
             while (reader.TokenType is JsonTokenType.String);
 
-            // Trimmed rather than handed over with slack: the parsed object is cached for the
-            // session, so up to 2x wasted is worth one copy here.
-            if (count != items.Length)
-            {
-                Array.Resize(ref items, count);
-            }
-
-            return items;
+            return items.ToVector();
         }
 #endif
     }

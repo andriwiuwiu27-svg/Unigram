@@ -237,7 +237,11 @@ namespace Telegram.Controls.Views
             UpdateChatTitle(chat);
             UpdateChatEmojiStatus(chat);
 
-            if (ViewModel.ClientService.TryGetSupergroupFull(chat, out SupergroupFullInfo fullInfo))
+            if (ViewModel.Type == TopicListType.DirectMessages)
+            {
+                Subtitle.Text = Strings.TopicsPanelDirectMessages;
+            }
+            else if (ViewModel.ClientService.TryGetSupergroupFull(chat, out SupergroupFullInfo fullInfo))
             {
                 Subtitle.Text = Locale.Declension(Strings.R.Members, fullInfo.MemberCount);
             }
@@ -727,12 +731,34 @@ namespace Telegram.Controls.Views
                 flyout.CreateFlyoutItem(viewModel.PinTopic, savedMessagesTopic, savedMessagesTopic.IsPinned ? Strings.UnpinFromTop : Strings.PinToTop, savedMessagesTopic.IsPinned ? Icons.PinOff : Icons.Pin);
                 flyout.CreateFlyoutItem(viewModel.DeleteTopic, savedMessagesTopic, Strings.Delete, Icons.Delete, destructive: true);
             }
-            else if (topic is DirectMessagesChatTopic directMessagesChatTopic && supergroup.IsAdministeredDirectMessagesGroup)
+            else if (topic is DirectMessagesChatTopic directMessagesChatTopic && directMessagesChatTopic.Id != 0 && supergroup.IsAdministeredDirectMessagesGroup)
             {
                 flyout.CreateFlyoutItem(viewModel.ClearTopic, directMessagesChatTopic, Strings.ClearHistory, Icons.Broom);
+
+                if (viewModel.TryGetTopicSenderChannel(directMessagesChatTopic, out long channelId))
+                {
+                    var ban = flyout.CreateFlyoutItem(viewModel.BanTopicSender, directMessagesChatTopic, Strings.BanUserMonoforum, Icons.Block);
+                    ban.Visibility = Visibility.Collapsed;
+
+                    UpdateBanTopicSender(ban, viewModel, channelId, directMessagesChatTopic);
+                }
             }
 
             flyout.ShowAt(sender, args);
+        }
+
+        // Whether the item bans or unbans depends on the sender's status in the channel, which has
+        // to be asked for, so the menu opens at once and the item appears once the answer arrives.
+        private async void UpdateBanTopicSender(MenuFlyoutItem item, TopicListViewModel viewModel, long channelId, DirectMessagesChatTopic topic)
+        {
+            var response = await viewModel.ClientService.SendAsync(new GetChatMember(channelId, topic.SenderId));
+            if (response is ChatMember { Status: ChatMemberStatusBanned })
+            {
+                item.Text = Strings.UnbanUserMonoforum;
+                item.Command = new RelayCommand<DirectMessagesChatTopic>(viewModel.UnbanTopicSender);
+            }
+
+            item.Visibility = Visibility.Visible;
         }
 
         private bool CanCreateTopics(Chat chat, Supergroup supergroup, ForumTopic topic)

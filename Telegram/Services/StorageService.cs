@@ -250,8 +250,21 @@ namespace Telegram.Services
                 return;
             }
 
+            string path;
+            try
+            {
+                // A file from the download folder is a broker proxy on UWP, and even reading its
+                // path fails with RPC_S_SERVER_UNAVAILABLE once the broker is gone.
+                path = cached.Path;
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex);
+                return;
+            }
+
             var dataPackage = new DataPackage();
-            dataPackage.SetText(cached.Path);
+            dataPackage.SetText(path);
             ClipboardEx.TrySetContent(dataPackage);
 
             ToastPopup.Show(xamlRoot, Strings.PathCopied, ToastPopupIcon.Copied);

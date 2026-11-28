@@ -21,22 +21,10 @@
     <ClCompile Include="..\Libraries\tgcalls\tgcalls\Instance.cpp">
       <Filter>tgcalls</Filter>
     </ClCompile>
-    <ClCompile Include="..\Libraries\tgcalls\tgcalls\InstanceImpl.cpp">
-      <Filter>tgcalls</Filter>
-    </ClCompile>
     <ClCompile Include="..\Libraries\tgcalls\tgcalls\LogSinkImpl.cpp">
       <Filter>tgcalls</Filter>
     </ClCompile>
-    <ClCompile Include="..\Libraries\tgcalls\tgcalls\Manager.cpp">
-      <Filter>tgcalls</Filter>
-    </ClCompile>
-    <ClCompile Include="..\Libraries\tgcalls\tgcalls\MediaManager.cpp">
-      <Filter>tgcalls</Filter>
-    </ClCompile>
     <ClCompile Include="..\Libraries\tgcalls\tgcalls\Message.cpp">
-      <Filter>tgcalls</Filter>
-    </ClCompile>
-    <ClCompile Include="..\Libraries\tgcalls\tgcalls\NetworkManager.cpp">
       <Filter>tgcalls</Filter>
     </ClCompile>
     <ClCompile Include="..\Libraries\tgcalls\tgcalls\ThreadLocalObject.cpp">
@@ -60,6 +48,66 @@
     <ClCompile Include="VoipVideoCapture.cpp" />
     <ClCompile Include="..\Libraries\tgcalls\tgcalls\group\GroupNetworkManager.cpp">
       <Filter>tgcalls\group</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Libraries\tgcalls\tgcalls\group\GroupAv1Decision.cpp">
+      <Filter>tgcalls\group</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Libraries\tgcalls\tgcalls\group\GroupReferenceFieldTrials.cpp">
+      <Filter>tgcalls\group</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Libraries\tgcalls\tgcalls\group\GroupVideoPayloadTypes.cpp">
+      <Filter>tgcalls\group</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Libraries\tgcalls\tgcalls\v2\InstanceNetworking.cpp">
+      <Filter>tgcalls\v2</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Libraries\tgcalls\tgcalls\group\ScreencastSendParameters.cpp">
+      <Filter>tgcalls\group</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Libraries\tgcalls\tgcalls\group\GroupExternalAudio.cpp">
+      <Filter>tgcalls\group</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Libraries\tgcalls\tgcalls\v2\VideoStatsLog.cpp">
+      <Filter>tgcalls\v2</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Libraries\tgcalls\macos\Sources\BroadcastAudio\BroadcastAudioClock.cpp">
+      <Filter>tgcalls\broadcast</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Libraries\tgcalls\macos\Sources\BroadcastAudio\BroadcastAudioCore.cpp">
+      <Filter>tgcalls\broadcast</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Libraries\tgcalls\macos\Sources\BroadcastAudio\BroadcastAudioLevels.cpp">
+      <Filter>tgcalls\broadcast</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Libraries\tgcalls\macos\Sources\BroadcastMedia\BroadcastMediaIO.cpp">
+      <Filter>tgcalls\broadcast</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Libraries\tgcalls\macos\Sources\BroadcastMedia\BroadcastPartHeader.cpp">
+      <Filter>tgcalls\broadcast</Filter>
+    </ClCompile>
+    <ClCompile Include="Broadcast\BroadcastController.cpp">
+      <Filter>Broadcast</Filter>
+    </ClCompile>
+    <ClCompile Include="Broadcast\BroadcastHandoff.cpp">
+      <Filter>Broadcast</Filter>
+    </ClCompile>
+    <ClCompile Include="Broadcast\BroadcastListenerAudio.cpp">
+      <Filter>Broadcast</Filter>
+    </ClCompile>
+    <ClCompile Include="Broadcast\BroadcastQueue.cpp">
+      <Filter>Broadcast</Filter>
+    </ClCompile>
+    <ClCompile Include="Broadcast\BroadcastSession.cpp">
+      <Filter>Broadcast</Filter>
+    </ClCompile>
+    <ClCompile Include="Broadcast\BroadcastStream.cpp">
+      <Filter>Broadcast</Filter>
+    </ClCompile>
+    <ClCompile Include="Broadcast\BroadcastVideo.cpp">
+      <Filter>Broadcast</Filter>
+    </ClCompile>
+    <ClCompile Include="Broadcast\BroadcastVideoPart.cpp">
+      <Filter>Broadcast</Filter>
     </ClCompile>
     <ClCompile Include="..\Libraries\tgcalls\tgcalls\group\GroupInstanceCustomImpl.cpp">
       <Filter>tgcalls\group</Filter>
@@ -109,25 +157,7 @@
     <ClCompile Include="..\Libraries\tgcalls\tgcalls\TurnCustomizerImpl.cpp">
       <Filter>tgcalls</Filter>
     </ClCompile>
-    <ClCompile Include="..\Libraries\tgcalls\tgcalls\group\AudioStreamingPart.cpp">
-      <Filter>tgcalls\group</Filter>
-    </ClCompile>
-    <ClCompile Include="..\Libraries\tgcalls\tgcalls\group\StreamingMediaContext.cpp">
-      <Filter>tgcalls\group</Filter>
-    </ClCompile>
-    <ClCompile Include="..\Libraries\tgcalls\tgcalls\group\VideoStreamingPart.cpp">
-      <Filter>tgcalls\group</Filter>
-    </ClCompile>
     <ClCompile Include="BroadcastTimeRequestedEventArgs.cpp" />
-    <ClCompile Include="..\Libraries\tgcalls\tgcalls\group\AudioStreamingPartInternal.cpp">
-      <Filter>tgcalls\group</Filter>
-    </ClCompile>
-    <ClCompile Include="..\Libraries\tgcalls\tgcalls\group\AudioStreamingPartPersistentDecoder.cpp">
-      <Filter>tgcalls\group</Filter>
-    </ClCompile>
-    <ClCompile Include="..\Libraries\tgcalls\tgcalls\group\AVIOContextImpl.cpp">
-      <Filter>tgcalls\group</Filter>
-    </ClCompile>
     <ClCompile Include="..\Libraries\tgcalls\tgcalls\v2\ContentNegotiation.cpp">
       <Filter>tgcalls\v2</Filter>
     </ClCompile>
@@ -170,9 +200,6 @@
     <ClCompile Include="..\Libraries\tgcalls\tgcalls\ChannelManager.cpp">
       <Filter>tgcalls</Filter>
     </ClCompile>
-    <ClCompile Include="..\Libraries\tgcalls\tgcalls\v2\DirectNetworkingImpl.cpp">
-      <Filter>tgcalls\v2</Filter>
-    </ClCompile>
     <ClCompile Include="VoipVideoOutputSink.cpp" />
     <ClCompile Include="MediaChannelDescriptionsRequestedEventArgs.cpp" />
     <ClCompile Include="..\Libraries\tgcalls\tgcalls\v2\RawTcpSocket.cpp">
@@ -188,7 +215,7 @@
     <ClCompile Include="..\Libraries\tgcalls\tgcalls\group\GroupInstanceReferenceImpl.cpp">
       <Filter>tgcalls\group</Filter>
     </ClCompile>
-    <ClCompile Include="..\Libraries\tgcalls\tgcalls\group\StreamingAudioRenderer.cpp">
+    <ClCompile Include="..\Libraries\tgcalls\tgcalls\group\GroupOpusDred.cpp">
       <Filter>tgcalls\group</Filter>
     </ClCompile>
     <ClCompile Include="..\Libraries\tgcalls\tgcalls\v2\CustomDcSctpSocket.cpp">
@@ -225,22 +252,10 @@
     <ClInclude Include="..\Libraries\tgcalls\tgcalls\Instance.h">
       <Filter>tgcalls</Filter>
     </ClInclude>
-    <ClInclude Include="..\Libraries\tgcalls\tgcalls\InstanceImpl.h">
-      <Filter>tgcalls</Filter>
-    </ClInclude>
     <ClInclude Include="..\Libraries\tgcalls\tgcalls\LogSinkImpl.h">
       <Filter>tgcalls</Filter>
     </ClInclude>
-    <ClInclude Include="..\Libraries\tgcalls\tgcalls\Manager.h">
-      <Filter>tgcalls</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Libraries\tgcalls\tgcalls\MediaManager.h">
-      <Filter>tgcalls</Filter>
-    </ClInclude>
     <ClInclude Include="..\Libraries\tgcalls\tgcalls\Message.h">
-      <Filter>tgcalls</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Libraries\tgcalls\tgcalls\NetworkManager.h">
       <Filter>tgcalls</Filter>
     </ClInclude>
     <ClInclude Include="..\Libraries\tgcalls\tgcalls\PlatformContext.h">
@@ -279,6 +294,69 @@
     </ClInclude>
     <ClInclude Include="..\Libraries\tgcalls\tgcalls\group\GroupNetworkManager.h">
       <Filter>tgcalls\group</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Libraries\tgcalls\tgcalls\group\GroupAv1Decision.h">
+      <Filter>tgcalls\group</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Libraries\tgcalls\tgcalls\group\GroupReferenceFieldTrials.h">
+      <Filter>tgcalls\group</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Libraries\tgcalls\tgcalls\group\GroupVideoPayloadTypes.h">
+      <Filter>tgcalls\group</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Libraries\tgcalls\tgcalls\group\ScreencastSendParameters.h">
+      <Filter>tgcalls\group</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Libraries\tgcalls\tgcalls\group\GroupExternalAudio.h">
+      <Filter>tgcalls\group</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Libraries\tgcalls\tgcalls\v2\VideoStatsLog.h">
+      <Filter>tgcalls\v2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Libraries\tgcalls\tgcalls\v2\CompatSignalingFraming.h">
+      <Filter>tgcalls\v2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Libraries\tgcalls\macos\Sources\BroadcastAudio\BroadcastAudioClock.h">
+      <Filter>tgcalls\broadcast</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Libraries\tgcalls\macos\Sources\BroadcastAudio\BroadcastAudioCore.h">
+      <Filter>tgcalls\broadcast</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Libraries\tgcalls\macos\Sources\BroadcastAudio\BroadcastAudioLevels.h">
+      <Filter>tgcalls\broadcast</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Libraries\tgcalls\macos\Sources\BroadcastAudio\BroadcastSpscQueue.h">
+      <Filter>tgcalls\broadcast</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Libraries\tgcalls\macos\Sources\BroadcastMedia\BroadcastListenerAudio.h">
+      <Filter>tgcalls\broadcast</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Libraries\tgcalls\macos\Sources\BroadcastMedia\BroadcastMediaIO.h">
+      <Filter>tgcalls\broadcast</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Libraries\tgcalls\macos\Sources\BroadcastMedia\BroadcastPartHeader.h">
+      <Filter>tgcalls\broadcast</Filter>
+    </ClInclude>
+    <ClInclude Include="Broadcast\BroadcastController.h">
+      <Filter>Broadcast</Filter>
+    </ClInclude>
+    <ClInclude Include="Broadcast\BroadcastHandoff.h">
+      <Filter>Broadcast</Filter>
+    </ClInclude>
+    <ClInclude Include="Broadcast\BroadcastQueue.h">
+      <Filter>Broadcast</Filter>
+    </ClInclude>
+    <ClInclude Include="Broadcast\BroadcastSession.h">
+      <Filter>Broadcast</Filter>
+    </ClInclude>
+    <ClInclude Include="Broadcast\BroadcastStream.h">
+      <Filter>Broadcast</Filter>
+    </ClInclude>
+    <ClInclude Include="Broadcast\BroadcastVideo.h">
+      <Filter>Broadcast</Filter>
+    </ClInclude>
+    <ClInclude Include="Broadcast\BroadcastVideoPart.h">
+      <Filter>Broadcast</Filter>
     </ClInclude>
     <ClInclude Include="..\Libraries\tgcalls\tgcalls\group\GroupInstanceCustomImpl.h">
       <Filter>tgcalls\group</Filter>
@@ -352,25 +430,7 @@
     <ClInclude Include="..\Libraries\tgcalls\tgcalls\TurnCustomizerImpl.h">
       <Filter>tgcalls</Filter>
     </ClInclude>
-    <ClInclude Include="..\Libraries\tgcalls\tgcalls\group\AudioStreamingPart.h">
-      <Filter>tgcalls\group</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Libraries\tgcalls\tgcalls\group\StreamingMediaContext.h">
-      <Filter>tgcalls\group</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Libraries\tgcalls\tgcalls\group\VideoStreamingPart.h">
-      <Filter>tgcalls\group</Filter>
-    </ClInclude>
     <ClInclude Include="BroadcastTimeRequestedEventArgs.h" />
-    <ClInclude Include="..\Libraries\tgcalls\tgcalls\group\AudioStreamingPartInternal.h">
-      <Filter>tgcalls\group</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Libraries\tgcalls\tgcalls\group\AudioStreamingPartPersistentDecoder.h">
-      <Filter>tgcalls\group</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Libraries\tgcalls\tgcalls\group\AVIOContextImpl.h">
-      <Filter>tgcalls\group</Filter>
-    </ClInclude>
     <ClInclude Include="..\Libraries\tgcalls\tgcalls\v2\ContentNegotiation.h">
       <Filter>tgcalls\v2</Filter>
     </ClInclude>
@@ -413,9 +473,6 @@
     <ClInclude Include="..\Libraries\tgcalls\tgcalls\ChannelManager.h">
       <Filter>tgcalls</Filter>
     </ClInclude>
-    <ClInclude Include="..\Libraries\tgcalls\tgcalls\v2\DirectNetworkingImpl.h">
-      <Filter>tgcalls\v2</Filter>
-    </ClInclude>
     <ClInclude Include="..\Libraries\tgcalls\tgcalls\v2\InstanceNetworking.h">
       <Filter>tgcalls\v2</Filter>
     </ClInclude>
@@ -438,7 +495,7 @@
     <ClInclude Include="..\Libraries\tgcalls\tgcalls\group\GroupInstanceReferenceImpl.h">
       <Filter>tgcalls\group</Filter>
     </ClInclude>
-    <ClInclude Include="..\Libraries\tgcalls\tgcalls\group\StreamingAudioRenderer.h">
+    <ClInclude Include="..\Libraries\tgcalls\tgcalls\group\GroupOpusDred.h">
       <Filter>tgcalls\group</Filter>
     </ClInclude>
     <ClInclude Include="..\Libraries\tgcalls\tgcalls\v2\CustomDcSctpSocket.h">
@@ -521,6 +578,12 @@
     </Filter>
     <Filter Include="tgcalls\utils">
       <UniqueIdentifier>{ac972e92-c547-4d44-9376-7044e6f1a914}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="tgcalls\broadcast">
+      <UniqueIdentifier>{6b0f2c1e-4d7a-4f5b-9a63-2f8e1c5d7b90}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Broadcast">
+      <UniqueIdentifier>{a3d5e7f1-2b4c-4e6d-8f10-3c5a7b9d1e24}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

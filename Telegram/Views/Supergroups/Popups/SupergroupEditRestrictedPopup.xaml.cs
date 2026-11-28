@@ -140,7 +140,7 @@ namespace Telegram.Views.Supergroups.Popups
                     };
 
                     var confirm = await popup.ShowAsync(XamlRoot);
-                    if (confirm == ContentDialogResult.Primary)
+                    if (confirm == ModalPopupResult.Primary)
                     {
                         InsertDuration((int)popup.Value.ToUnixTimeSeconds());
                     }
@@ -183,7 +183,7 @@ namespace Telegram.Views.Supergroups.Popups
 
         private void Cancel_Click(object sender, RoutedEventArgs e)
         {
-            Hide(ContentDialogResult.Secondary);
+            Hide(ModalPopupResult.Secondary);
         }
 
         private void EditRankField_TextChanged(object sender, TextChangedEventArgs e)

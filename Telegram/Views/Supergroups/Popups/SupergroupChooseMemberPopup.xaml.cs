@@ -89,7 +89,7 @@ namespace Telegram.Views.Supergroups.Popups
                     var markdown = ClientEx.ParseMarkdown(text);
 
                     var confirm = await ToastPopup.ShowActionAsync(XamlRoot, markdown, Strings.UserBlockedNonPremiumButton, ToastPopupIcon.Premium);
-                    if (confirm == ContentDialogResult.Primary)
+                    if (confirm == ModalPopupResult.Primary)
                     {
                         Hide();
                         ViewModel.NavigationService.ShowPromo();

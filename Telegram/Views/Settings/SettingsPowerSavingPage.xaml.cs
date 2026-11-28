@@ -7,6 +7,7 @@
 
 using System;
 using Telegram.Controls;
+using Telegram.Navigation;
 using Telegram.ViewModels.Settings;
 using Windows.System;
 
@@ -19,6 +20,7 @@ namespace Telegram.Views.Settings
         public SettingsPowerSavingPage()
         {
             InitializeComponent();
+            Transition = PageTransition.Entrance;
             Title = Strings.PowerUsage;
         }
 

@@ -32,7 +32,7 @@ namespace Telegram.Controls.RichEditor
     {
         private bool _suggestionPending;
 
-        private Flyout _suggestions;
+        private MenuFlyout _suggestions;
         private string _suggestionQuery;
         private CancellationTokenSource _suggestionToken;
 
@@ -148,7 +148,7 @@ namespace Telegram.Controls.RichEditor
 
             _suggestionQuery = collection.Query;
 
-            if (_suggestions?.Content is ChatTextFlyout presenter)
+            if (ChatTextFlyout.TryResolveFlyout(_suggestions, out ChatTextFlyout presenter))
             {
                 presenter.Update(collection);
                 return;
@@ -174,12 +174,7 @@ namespace Telegram.Controls.RichEditor
             // Over the query's line with a gap, its first item over the query. The old boxes'
             // "+ 6" is from RichEdit's text area, which starts below the box's top: here the
             // point is the line's own top, so the gap is taken off it instead.
-            _suggestions.ShowAt(this, new FlyoutShowOptions
-            {
-                Position = new Point(origin.X - 8, origin.Y - 6),
-                Placement = FlyoutPlacementMode.TopEdgeAlignedLeft,
-                ShowMode = FlyoutShowMode.Transient
-            });
+            ChatTextFlyout.ShowAt(_suggestions, this, new Point(origin.X - 8, origin.Y - 6));
         }
 
         // Added and taken away rather than cleared: a page's own list, the mentions under a
@@ -189,7 +184,7 @@ namespace Telegram.Controls.RichEditor
 
         private void OnSuggestionsOpened(object sender, object e)
         {
-            if (ChatTextFlyout.Elevate(sender) is ChatTextFlyout presenter)
+            if (ChatTextFlyout.TryResolveFlyout(sender as MenuFlyout, out ChatTextFlyout presenter))
             {
                 RemoveSuggestionPeer();
 
@@ -209,7 +204,7 @@ namespace Telegram.Controls.RichEditor
 
         private void OnSuggestionsClosed(object sender, object e)
         {
-            if (sender is Flyout flyout)
+            if (sender is MenuFlyout flyout)
             {
                 flyout.Opened -= OnSuggestionsOpened;
                 flyout.Closed -= OnSuggestionsClosed;
@@ -222,7 +217,7 @@ namespace Telegram.Controls.RichEditor
             }
 
             // Its own list only: the flyout open now may be another one.
-            if (sender is Flyout { Content: ChatTextFlyout presenter } && ReferenceEquals(presenter.ControlledList, _suggestionList))
+            if (ChatTextFlyout.TryResolveFlyout(sender as MenuFlyout, out ChatTextFlyout presenter) && ReferenceEquals(presenter.ControlledList, _suggestionList))
             {
                 RemoveSuggestionPeer();
             }
@@ -265,7 +260,7 @@ namespace Telegram.Controls.RichEditor
         /// </summary>
         public bool ProcessSuggestionKey(VirtualKey key, bool ctrl, bool shift, bool alt)
         {
-            if (_suggestions?.Content is not ChatTextFlyout presenter || presenter.ItemsSource is not IAutocompleteCollection collection)
+            if (!ChatTextFlyout.TryResolveFlyout(_suggestions, out ChatTextFlyout presenter) || presenter.ItemsSource is not IAutocompleteCollection collection)
             {
                 return false;
             }

@@ -102,7 +102,7 @@ namespace Telegram.ViewModels.Settings
             };
 
             var terminate = await ShowPopupAsync(popup);
-            if (terminate == ContentDialogResult.Primary)
+            if (terminate == ModalPopupResult.Primary)
             {
                 var response = await ClientService.SendAsync(new DisconnectWebsite(session.Id));
                 if (response is Ok)
@@ -121,7 +121,7 @@ namespace Telegram.ViewModels.Settings
         public async void TerminateOthers()
         {
             var terminate = await ShowPopupAsync(Strings.AreYouSureWebSessions, Strings.TerminateWebSessionsTitle, Strings.Disconnect, Strings.Cancel, destructive: true);
-            if (terminate == ContentDialogResult.Primary)
+            if (terminate == ModalPopupResult.Primary)
             {
                 var response = await ClientService.SendAsync(new DisconnectAllWebsites());
                 if (response is Ok)

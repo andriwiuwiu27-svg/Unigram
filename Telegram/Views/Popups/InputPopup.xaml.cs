@@ -29,13 +29,13 @@ namespace Telegram.Views.Popups
 
     public partial class InputPopupResult
     {
-        public ContentDialogResult Result { get; set; }
+        public ModalPopupResult Result { get; set; }
 
         public string Text { get; set; }
 
         public long Value { get; set; }
 
-        public InputPopupResult(ContentDialogResult result, string text, long value)
+        public InputPopupResult(ModalPopupResult result, string text, long value)
         {
             Result = result;
             Text = text;
@@ -377,7 +377,7 @@ namespace Telegram.Views.Popups
                 return;
             }
 
-            Hide(ContentDialogResult.Primary);
+            Hide(ModalPopupResult.Primary);
         }
 
         private void Label_TextChanged(object sender, TextChangedEventArgs e)
@@ -400,7 +400,7 @@ namespace Telegram.Views.Popups
             return new InputPopupResult(confirm, popup.Text, popup.Value);
         }
 
-        // Nested: see MessagePopup.ShowNestedAsync - a ContentDialog cannot open over another one.
+        // Nested: not queued - see MessagePopup.ShowNestedAsync.
         public static async Task<InputPopupResult> ShowNestedAsync(XamlRoot xamlRoot, InputPopupType type, string message, string title = null, string placeholderText = null, string primary = null, string secondary = null, bool destructive = false, ElementTheme requestedTheme = ElementTheme.Default)
         {
             var popup = Create(type, message, title, placeholderText, primary, secondary, destructive, requestedTheme);
@@ -429,7 +429,7 @@ namespace Telegram.Views.Popups
             {
                 Theme.AddCheckBoxPalette(popup, Windows.UI.Color.FromArgb(0xFF, 0xD1, 0x34, 0x38));
 
-                popup.DefaultButton = ContentDialogButton.None;
+                popup.DefaultButton = ModalPopupButton.None;
                 popup.PrimaryButtonStyle = BootStrapper.Current.Resources["DangerButtonStyle"] as Style;
             }
 

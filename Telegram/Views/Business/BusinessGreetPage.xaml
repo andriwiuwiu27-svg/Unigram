@@ -12,14 +12,6 @@
                   mc:Ignorable="d"
                   ShowHeader="False">
 
-    <Page.Transitions>
-        <TransitionCollection>
-            <NavigationThemeTransition>
-                <SlideNavigationTransitionInfo Effect="FromRight" />
-            </NavigationThemeTransition>
-        </TransitionCollection>
-    </Page.Transitions>
-
     <Grid Background="{ThemeResource SettingsPageBackground}">
         <ScrollViewer x:Name="ScrollingHost"
                       VerticalScrollBarVisibility="Auto"
@@ -140,6 +132,7 @@
                             </Grid.RowDefinitions>
 
                             <Slider x:Name="Period"
+                                    AutomationProperties.Name="{CustomResource BusinessGreetPeriod}"
                                     Value="{x:Bind ViewModel.InactivityDays, Mode=TwoWay}"
                                     Maximum="3"
                                     Minimum="0"

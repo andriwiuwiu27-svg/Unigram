@@ -118,6 +118,7 @@ namespace Telegram.Controls
                 if (height == 0 && element is FrameworkElement framework)
                 {
                     await framework.UpdateLayoutAsync();
+                    height = element.ActualSize.Y;
                 }
 
                 _height = height;
@@ -355,10 +356,10 @@ namespace Telegram.Controls
         // top follows the visible top of the first and its bottom the bottom of the last, and it
         // takes their opacity, so it slides, grows, shrinks and fades with them.
         //
-        // Both elements belong to the panel and stay first in Children; the stacking skips them.
+        // These elements belong to the panel and stay first in Children; the stacking skips them.
         // They are arranged tall enough for every position the run can slide to, the background
-        // is clipped to the run, and the shadow is a sprite on its own host so that clip does not
-        // cut it off.
+        // is clipped to the run, and the shadow and the border are drawn on hosts of their own so
+        // that clip does not cut them off.
         private readonly Border _card;
         private readonly Border _cardShadowHost;
 
@@ -373,6 +374,21 @@ namespace Telegram.Controls
         private ExpressionAnimation _cardShadowOffsetAnimation;
         private ExpressionAnimation _cardShadowSizeAnimation;
 
+        // A stroke on its own host rather than the card's own border, which would be drawn at the
+        // card's bounds, not the run's. The background stops inside it, as InnerBorderEdge does,
+        // so the two translucent brushes never overlap. Above the children, which reach the card's
+        // edges, so their pointer-over fill does not cover it.
+        private Border _cardBorderHost;
+        private Visual _cardBorderVisual;
+        private CompositionColorBrush _cardBorderBrush;
+        private CompositionRoundedRectangleGeometry _cardBorderGeometry;
+
+        // How far the background is inset from the card's edge: the stroke's width.
+        private float _cardInset;
+
+        private ExpressionAnimation _cardBorderOffsetAnimation;
+        private ExpressionAnimation _cardBorderSizeAnimation;
+
         private Visual _cardFirst;
         private Visual _cardLast;
 
@@ -385,7 +401,8 @@ namespace Telegram.Controls
             _cardShadowHost = new Border { IsHitTestVisible = false };
             _card = new Border { IsHitTestVisible = false };
 
-            // Above whatever else the panel draws behind the children, below the children.
+            // Above whatever else the panel draws behind the children, below the children, which
+            // only holds for a child that sets Canvas.ZIndex to 1 too: at 0 the card covers it.
             Canvas.SetZIndex(_cardShadowHost, 1);
             Canvas.SetZIndex(_card, 1);
 
@@ -416,6 +433,75 @@ namespace Telegram.Controls
             ((SlidePanel)d)._card.Background = e.NewValue as Brush;
         }
 
+        /// <summary>
+        /// A 1 px stroke around the card. Only a <see cref="SolidColorBrush"/> is drawn.
+        /// </summary>
+        public Brush CardBorderBrush
+        {
+            get => (Brush)GetValue(CardBorderBrushProperty);
+            set => SetValue(CardBorderBrushProperty, value);
+        }
+
+        public static readonly DependencyProperty CardBorderBrushProperty =
+            DependencyProperty.Register("CardBorderBrush", typeof(Brush), typeof(SlidePanel), new PropertyMetadata(null, OnCardBorderBrushChanged));
+
+        private static void OnCardBorderBrushChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            ((SlidePanel)d).UpdateCardBorderBrush(e.NewValue as SolidColorBrush);
+        }
+
+        private void UpdateCardBorderBrush(SolidColorBrush brush)
+        {
+            var color = brush?.Color ?? default;
+            if (brush != null)
+            {
+                color.A = (byte)(color.A * brush.Opacity);
+            }
+
+            if (_cardBorderBrush != null)
+            {
+                _cardBorderBrush.Color = color;
+                return;
+            }
+
+            if (brush == null)
+            {
+                return;
+            }
+
+            var compositor = _cardVisual.Compositor;
+
+            _cardInset = 1;
+            _cardGeometry.CornerRadius = new Vector2(Math.Max(0, (float)_cardCornerRadius - _cardInset));
+
+            _cardBorderBrush = compositor.CreateColorBrush(color);
+            _cardBorderGeometry = compositor.CreateRoundedRectangleGeometry();
+            _cardBorderGeometry.CornerRadius = new Vector2(Math.Max(0, (float)_cardCornerRadius - _cardInset / 2));
+
+            var shape = compositor.CreateSpriteShape(_cardBorderGeometry);
+            shape.StrokeBrush = _cardBorderBrush;
+            shape.StrokeThickness = _cardInset;
+
+            var visual = compositor.CreateShapeVisual();
+            visual.RelativeSizeAdjustment = Vector2.One;
+            visual.Shapes.Add(shape);
+
+            _cardBorderHost = new Border { IsHitTestVisible = false };
+            _cardBorderVisual = visual;
+
+            Canvas.SetZIndex(_cardBorderHost, 2);
+            Children.Insert(2, _cardBorderHost);
+
+            ElementComposition.SetElementChildVisual(_cardBorderHost, visual);
+
+            // The geometry only follows the run once UpdateCard starts its animations, which it
+            // skips while the run is unchanged.
+            _cardFirst = null;
+            _cardLast = null;
+
+            InvalidateMeasure();
+        }
+
         private double _cardCornerRadius;
         public double CardCornerRadius
         {
@@ -428,7 +514,8 @@ namespace Telegram.Controls
                 }
 
                 _cardCornerRadius = value;
-                _cardGeometry.CornerRadius = new Vector2((float)value);
+                _cardGeometry.CornerRadius = new Vector2(Math.Max(0, (float)value - _cardInset));
+                _cardBorderGeometry?.CornerRadius = new Vector2(Math.Max(0, (float)value - _cardInset / 2));
 
                 if (_cardShadow != null)
                 {
@@ -485,7 +572,7 @@ namespace Telegram.Controls
                 var child = Children[i];
                 child.Measure(availableSize);
 
-                if (child == _card || child == _cardShadowHost)
+                if (child == _card || child == _cardShadowHost || child == _cardBorderHost)
                 {
                     continue;
                 }
@@ -583,6 +670,15 @@ namespace Telegram.Controls
                 _cardGeometry.StopAnimation("Size");
                 _cardGeometry.Size = Vector2.Zero;
 
+                if (_cardBorderGeometry != null)
+                {
+                    _cardBorderGeometry.StopAnimation("Offset");
+                    _cardBorderGeometry.StopAnimation("Size");
+                    _cardBorderGeometry.Size = Vector2.Zero;
+
+                    _cardBorderVisual.StopAnimation("Opacity");
+                }
+
                 card.StopAnimation("Opacity");
 
                 if (_cardShadow != null)
@@ -611,8 +707,8 @@ namespace Telegram.Controls
             const string top = "(first.Offset.Y + first.Translation.Y + firstClip.TopInset)";
             const string bottom = "(last.Offset.Y + last.Translation.Y + last.Size.Y)";
 
-            _cardOffsetAnimation ??= compositor.CreateExpressionAnimation("Vector2(0, " + top + " - card.Offset.Y)");
-            _cardSizeAnimation ??= compositor.CreateExpressionAnimation("Vector2(card.Size.X, " + bottom + " - " + top + ")");
+            _cardOffsetAnimation ??= compositor.CreateExpressionAnimation("Vector2(inset, " + top + " - card.Offset.Y + inset)");
+            _cardSizeAnimation ??= compositor.CreateExpressionAnimation("Vector2(Max(card.Size.X - 2 * inset, 0), Max(" + bottom + " - " + top + " - 2 * inset, 0))");
             // Only a child alone fades, or two while one replaces the other: then the card stays
             // as opaque as the more opaque of them.
             _cardOpacityAnimation ??= compositor.CreateExpressionAnimation("Max(first.Opacity, last.Opacity)");
@@ -634,6 +730,20 @@ namespace Telegram.Controls
             _cardShadow.StartAnimation("Offset", _cardShadowOffsetAnimation);
             _cardShadow.StartAnimation("Size", _cardShadowSizeAnimation);
             _cardShadow.StartAnimation("Opacity", _cardOpacityAnimation);
+
+            if (_cardBorderGeometry != null)
+            {
+                // Centred on the line half the stroke in, so the stroke ends at the card's edge.
+                _cardBorderOffsetAnimation ??= compositor.CreateExpressionAnimation("Vector2(inset / 2, " + top + " - card.Offset.Y + inset / 2)");
+                _cardBorderSizeAnimation ??= compositor.CreateExpressionAnimation("Vector2(Max(card.Size.X - inset, 0), Max(" + bottom + " - " + top + " - inset, 0))");
+
+                SetCardParameters(_cardBorderOffsetAnimation, first, last, card);
+                SetCardParameters(_cardBorderSizeAnimation, first, last, card);
+
+                _cardBorderGeometry.StartAnimation("Offset", _cardBorderOffsetAnimation);
+                _cardBorderGeometry.StartAnimation("Size", _cardBorderSizeAnimation);
+                _cardBorderVisual.StartAnimation("Opacity", _cardOpacityAnimation);
+            }
         }
 
         // StartAnimation snapshots the parameters, so each expression is reused across restarts.
@@ -647,6 +757,7 @@ namespace Telegram.Controls
             animation.SetScalarParameter("insetTop", (float)_cardShadowInsets.Top);
             animation.SetScalarParameter("insetRight", (float)_cardShadowInsets.Right);
             animation.SetScalarParameter("insetBottom", (float)_cardShadowInsets.Bottom);
+            animation.SetScalarParameter("inset", _cardInset);
         }
 
         private void OnActualThemeChanged(FrameworkElement sender, object args)
@@ -726,7 +837,7 @@ namespace Telegram.Controls
                 var child = Children[i];
                 var height = child.DesiredSize.Height;
 
-                if (child == _card || child == _cardShadowHost)
+                if (child == _card || child == _cardShadowHost || child == _cardBorderHost)
                 {
                     child.Arrange(new Rect(0, -_cardTravel, finalSize.Width, (float)(_cardTravel + finalSize.Height + LeadingSpacing)));
                     continue;

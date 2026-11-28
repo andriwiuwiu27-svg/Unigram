@@ -11,7 +11,7 @@ using Windows.UI.Xaml.Controls;
 
 namespace Telegram.Views.Popups
 {
-    public sealed partial class CloudUpdatePopup : ContentPopup
+    public sealed partial class CloudUpdatePopup : ModalPopup
     {
         private bool _block = true;
 
@@ -21,7 +21,7 @@ namespace Telegram.Views.Popups
             Closing += OnClosing;
         }
 
-        private void OnClosing(ContentDialog sender, ContentDialogClosingEventArgs args)
+        private void OnClosing(ModalPopup sender, ModalPopupClosingEventArgs args)
         {
             args.Cancel = _block;
         }

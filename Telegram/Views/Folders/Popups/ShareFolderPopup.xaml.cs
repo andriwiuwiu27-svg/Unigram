@@ -19,7 +19,7 @@ using Windows.UI.Xaml.Controls;
 
 namespace Telegram.Views.Folders.Popups
 {
-    public sealed partial class ShareFolderPopup : ContentPopup
+    public sealed partial class ShareFolderPopup : ModalPopup
     {
         public ShareFolderViewModel ViewModel => DataContext as ShareFolderViewModel;
 
@@ -72,7 +72,7 @@ namespace Telegram.Views.Folders.Popups
             }
         }
 
-        private void ContentDialog_PrimaryButtonClick(ContentDialog sender, ContentDialogButtonClickEventArgs args)
+        private void OnPrimaryButtonClick(ModalPopup sender, ModalPopupButtonClickEventArgs args)
         {
             SelectedItems = ViewModel.SelectedItems.Select(x => x.Id).ToList();
         }

@@ -8,6 +8,7 @@
 using System;
 using System.Threading.Tasks;
 using Telegram.Common;
+using Telegram.Controls;
 using Telegram.Entities;
 using Telegram.Navigation;
 using Telegram.Navigation.Services;
@@ -252,7 +253,7 @@ namespace Telegram.ViewModels.Authorization
                 if (user.PhoneNumber.Contains(phoneNumber) || phoneNumber.Contains(user.PhoneNumber))
                 {
                     var confirm = await ShowPopupAsync(Strings.AccountAlreadyLoggedIn, Strings.AppName, Strings.AccountSwitch, Strings.OK);
-                    if (confirm == ContentDialogResult.Primary)
+                    if (confirm == ModalPopupResult.Primary)
                     {
                         _lifetimeService.PreviousItem = session;
                         ClientService.Send(new Destroy());

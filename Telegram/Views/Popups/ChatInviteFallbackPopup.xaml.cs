@@ -15,7 +15,7 @@ using Windows.UI.Xaml.Controls;
 
 namespace Telegram.Views.Popups
 {
-    public sealed partial class ChatInviteFallbackPopup : ContentPopup
+    public sealed partial class ChatInviteFallbackPopup : ModalPopup
     {
         private readonly IClientService _clientService;
         private readonly ChatInviteLink _inviteLink;
@@ -78,7 +78,7 @@ namespace Telegram.Views.Popups
             return null;
         }
 
-        private async void ContentDialog_PrimaryButtonClick(ContentDialog sender, ContentDialogButtonClickEventArgs args)
+        private async void OnPrimaryButtonClick(ModalPopup sender, ModalPopupButtonClickEventArgs args)
         {
             if (_inviteLink != null)
             {

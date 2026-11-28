@@ -27,8 +27,13 @@ namespace Telegram.AI
             Vector2 p4 = box.BottomLeft;
 
             // Calculate the primary axes of the quadrilateral
-            Vector2 horizontalAxis = Vector2.Normalize(p2 - p1 + p3 - p4); // Average of top and bottom edges
-            Vector2 verticalAxis = Vector2.Normalize(p4 - p1 + p3 - p2);   // Average of left and right edges
+            Vector2 horizontal = p2 - p1 + p3 - p4; // Average of top and bottom edges
+            Vector2 vertical = p4 - p1 + p3 - p2;   // Average of left and right edges
+
+            // A box collapsed to a line or a point sums to zero on an axis, and normalising that is NaN,
+            // which Direct2D rejects as D2DERR_BAD_NUMBER when the union is outlined.
+            Vector2 horizontalAxis = horizontal != Vector2.Zero ? Vector2.Normalize(horizontal) : Vector2.UnitX;
+            Vector2 verticalAxis = vertical != Vector2.Zero ? Vector2.Normalize(vertical) : new Vector2(-horizontalAxis.Y, horizontalAxis.X);
 
             // Create offset vectors
             Vector2 horizontalOffset = horizontalAxis * horizontalAmount;

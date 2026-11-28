@@ -7,6 +7,7 @@
 
 using System.Threading.Tasks;
 using Telegram.Collections;
+using Telegram.Controls;
 using Telegram.Navigation;
 using Telegram.Services;
 using Telegram.Td.Api;
@@ -48,7 +49,7 @@ namespace Telegram.ViewModels.Settings
         public async void Unblock(MessageSender sender)
         {
             var confirm = await ShowPopupAsync(Strings.AreYouSureUnblockContact, Strings.AppName, Strings.OK, Strings.Cancel);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 Items.Remove(sender);
                 ClientService.Send(new SetMessageSenderBlockList(sender, null));

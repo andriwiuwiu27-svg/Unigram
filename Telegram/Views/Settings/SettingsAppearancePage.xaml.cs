@@ -13,6 +13,8 @@ using Telegram.Controls.Cells;
 using Telegram.Controls.Chats;
 using Telegram.Controls.Media;
 using Telegram.Controls.Messages;
+using Telegram.Navigation;
+using Telegram.Navigation.Services;
 using Telegram.Services;
 using Telegram.Services.Settings;
 using Telegram.Td.Api;
@@ -33,6 +35,7 @@ namespace Telegram.Views.Settings
         public SettingsAppearancePage()
         {
             InitializeComponent();
+            Transition = PageTransition.Entrance;
             Title = Strings.Appearance;
 
             Preview.CreateInsetClip();
@@ -43,7 +46,7 @@ namespace Telegram.Views.Settings
             ViewModel.UpdateActualTheme(true);
         }
 
-        protected override void OnNavigatedTo(NavigationEventArgs e)
+        protected override void OnNavigatedTo(NavigatedEventArgs e)
         {
             if (ViewModel.Window.UpdateChatTheme(ActualTheme, null, null, null, null))
             {
@@ -79,7 +82,7 @@ namespace Telegram.Views.Settings
 
         private MessageBubbleBackgroundCoordinator _background;
 
-        protected override void OnNavigatedFrom(NavigationEventArgs e)
+        protected override void OnNavigatedFrom(NavigatedEventArgs e)
         {
             ViewModel.PropertyChanged -= OnPropertyChanged;
             ViewModel.Aggregator.Unsubscribe(this);

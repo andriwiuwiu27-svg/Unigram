@@ -27,6 +27,16 @@ namespace Telegram.ViewModels
         Time
     }
 
+    public enum StoryInteractionsEmptyState
+    {
+        None,
+        NoViews,
+        NoReactions,
+        NoResult,
+        NoContacts,
+        ServerError
+    }
+
     public partial class StoryInteractionsViewModel : ViewModelBase, IIncrementalCollectionOwner
     {
         private string _nextOffset = string.Empty;
@@ -47,6 +57,24 @@ namespace Telegram.ViewModels
         }
 
         public StoryInteractionsSortBy SortBy { get; private set; }
+
+        private StoryInteractionsEmptyState _emptyState;
+        public StoryInteractionsEmptyState EmptyState
+        {
+            get => _emptyState;
+            private set => Set(ref _emptyState, value);
+        }
+
+        private bool _isPartial;
+        /// <summary>
+        /// Whether the whole list is loaded and holds fewer viewers than the story counts: the
+        /// server keeps no record of the rest.
+        /// </summary>
+        public bool IsPartial
+        {
+            get => _isPartial;
+            private set => Set(ref _isPartial, value);
+        }
 
         private readonly DebouncedProperty<string> _query;
         public string Query
@@ -94,6 +122,9 @@ namespace Telegram.ViewModels
         {
             _nextOffset = string.Empty;
 
+            EmptyState = StoryInteractionsEmptyState.None;
+            IsPartial = false;
+
             // Restarted first: it drops the load in flight, so this one is not coalesced into it.
             Items.Restart();
             _ = Items.LoadMoreItemsAsync(0);
@@ -109,7 +140,7 @@ namespace Telegram.ViewModels
             return Task.CompletedTask;
         }
 
-        public async void BlockUser(StoryInteraction interaction, DependencyObject container)
+        public async Task BlockUser(StoryInteraction interaction, DependencyObject container)
         {
             if (ClientService.TryGetUser(interaction.ActorId, out User user))
             {
@@ -120,7 +151,7 @@ namespace Telegram.ViewModels
                     Strings.Cancel,
                     true);
 
-                if (confirm == ContentDialogResult.Primary)
+                if (confirm == ModalPopupResult.Primary)
                 {
                     interaction.BlockList = new BlockListMain();
                     ClientService.Send(new SetMessageSenderBlockList(interaction.ActorId, new BlockListMain()));
@@ -139,7 +170,7 @@ namespace Telegram.ViewModels
                     Strings.Cancel,
                     true);
 
-                if (confirm == ContentDialogResult.Primary)
+                if (confirm == ModalPopupResult.Primary)
                 {
                     ClientService.Send(new RemoveContacts(new[] { user.Id }));
                 }
@@ -209,7 +240,48 @@ namespace Telegram.ViewModels
                 }
             }
 
+            if (!hasMoreItems && !token.IsCancellationRequested)
+            {
+                UpdateEmptyState();
+            }
+
             return new IncrementalLoadResult(totalCount, hasMoreItems);
+        }
+
+        // Only once the list is complete: an empty page while more are coming says nothing.
+        private void UpdateEmptyState()
+        {
+            var viewCount = _story.InteractionInfo?.ViewCount ?? 0;
+            var filtered = !string.IsNullOrEmpty(Query) || OnlyContacts > 0;
+
+            // Without Premium an expired story lists its reactions only, which the footer
+            // explains: fewer of them than views is not something missing.
+            var limited = _story.HasExpiredViewers && !ClientService.IsPremium;
+
+            if (Items.Count > 0)
+            {
+                EmptyState = StoryInteractionsEmptyState.None;
+            }
+            else if (!string.IsNullOrEmpty(Query))
+            {
+                EmptyState = StoryInteractionsEmptyState.NoResult;
+            }
+            else if (OnlyContacts > 0 && viewCount > 0)
+            {
+                EmptyState = StoryInteractionsEmptyState.NoContacts;
+            }
+            else if (viewCount > 0)
+            {
+                EmptyState = StoryInteractionsEmptyState.ServerError;
+            }
+            else
+            {
+                EmptyState = _story.Chat?.Type is ChatTypeSupergroup
+                    ? StoryInteractionsEmptyState.NoReactions
+                    : StoryInteractionsEmptyState.NoViews;
+            }
+
+            IsPartial = Items.Count > 0 && Items.Count < viewCount && !filtered && !limited;
         }
 
         public void OpenChat(object clickedItem)

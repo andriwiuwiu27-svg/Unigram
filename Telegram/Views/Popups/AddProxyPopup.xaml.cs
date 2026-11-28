@@ -127,7 +127,7 @@ namespace Telegram.Views.Popups
         private async void CheckStatus_Click(Hyperlink sender, HyperlinkClickEventArgs args)
         {
             var confirm = await _navigationService.ShowPopupAsync(Strings.ProxyBottomSheetCheckWarningText, Strings.ProxyBottomSheetCheckWarning, Strings.Proceed, Strings.Cancel);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 StatusInfo.Inlines.Clear();
                 StatusInfo.Text = Strings.ProxyBottomSheetChecking;

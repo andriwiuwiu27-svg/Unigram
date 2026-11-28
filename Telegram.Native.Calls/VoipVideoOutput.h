@@ -13,8 +13,6 @@
 #include "api/video/video_frame.h"
 #include "api/video/video_source_interface.h"
 #include "modules/video_coding/codecs/h264/win/d3d11_texture_buffer.h"
-#include "media/base/video_adapter.h"
-#include "media/base/video_broadcaster.h"
 #include "rtc_base/logging.h"
 #include "rtc_base/string_utils.h"
 
@@ -556,7 +554,7 @@ public:
     }
 };
 
-struct VoipVideoOutput : public std::enable_shared_from_this<VoipVideoOutput>, rtc::VideoSinkInterface<webrtc::VideoFrame>
+struct VoipVideoOutput : public std::enable_shared_from_this<VoipVideoOutput>, webrtc::VideoSinkInterface<webrtc::VideoFrame>
 {
     std::atomic<bool> m_disposed{ false };
     std::atomic<bool> m_deviceLost{ false };
@@ -875,13 +873,13 @@ public:
                 // fails the same way every frame.
                 m_textureFramesFailed = true;
                 RTC_LOG(LS_WARNING) << "Video output can't draw texture ring " << texture->ring_id()
-                    << ": 0x" << rtc::ToHex(textureResult) << "; reading frames back to I420";
+                    << ": 0x" << webrtc::ToHex(textureResult) << "; reading frames back to I420";
             }
         }
 
         if (!drewTexture)
         {
-            rtc::scoped_refptr<webrtc::I420BufferInterface> buffer(frame.video_frame_buffer()->ToI420());
+            webrtc::scoped_refptr<webrtc::I420BufferInterface> buffer(frame.video_frame_buffer()->ToI420());
             if (buffer != nullptr)
             {
                 DrawI420(d2dContext.get(), buffer, matrix, x, y, width, height);
@@ -1080,7 +1078,7 @@ public:
         return S_OK;
     }
 
-    HRESULT DrawI420(ID2D1DeviceContext* d2dContext, rtc::scoped_refptr<webrtc::I420BufferInterface> const& buffer,
+    HRESULT DrawI420(ID2D1DeviceContext* d2dContext, webrtc::scoped_refptr<webrtc::I420BufferInterface> const& buffer,
         D2D1::Matrix3x2F const& matrix, float x, float y, int32_t width, int32_t height)
     {
         HRESULT result = S_OK;

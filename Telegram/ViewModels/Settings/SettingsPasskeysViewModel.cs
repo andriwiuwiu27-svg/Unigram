@@ -9,6 +9,7 @@ using System.Collections.Specialized;
 using System.Threading.Tasks;
 using Telegram.Collections;
 using Telegram.Common;
+using Telegram.Controls;
 using Telegram.Navigation;
 using Telegram.Services;
 using Telegram.Td.Api;
@@ -44,7 +45,7 @@ namespace Telegram.ViewModels.Settings
             }
 
             var confirm = await ShowPopupAsync(new SettingsPasskeysIntroPopup());
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 CreateImpl();
             }
@@ -78,7 +79,7 @@ namespace Telegram.ViewModels.Settings
         public async void Delete(Passkey passkey)
         {
             var confirm = await ShowPopupAsync(Strings.PasskeyDeleteText, Strings.PasskeyDeleteTitle, Strings.Delete, Strings.Cancel, destructive: true);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 Items.Remove(passkey);
                 ClientService.Send(new RemoveLoginPasskey(passkey.Id));

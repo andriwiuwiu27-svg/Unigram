@@ -179,7 +179,7 @@
         </controls:SelectGridView>
 
         <Grid x:Name="EmptyState"
-              Visibility="{x:Bind ViewModel.SelectedCollection.IsEmpty, Mode=OneWay}">
+              Visibility="{x:Bind ViewModel.SelectedCollection.ShowEmptyState, Mode=OneWay}">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition />
@@ -211,6 +211,28 @@
                         Margin="0,12,0,0"
                         Grid.Row="2" />
             </Grid>
+        </Grid>
+
+        <Grid x:Name="NotFoundState"
+              Visibility="{x:Bind ViewModel.SelectedCollection.ShowNotFound, Mode=OneWay}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition />
+            </Grid.RowDefinitions>
+            <Border Height="{x:Bind Header.Height, Mode=OneWay}" />
+            <StackPanel VerticalAlignment="Center"
+                        MaxWidth="1000"
+                        Margin="24,0"
+                        Grid.Row="1">
+                <TextBlock Text="{CustomResource ProfileGiftsNotFoundTitle}"
+                           Style="{StaticResource SubtitleTextBlockStyle}"
+                           TextAlignment="Center"
+                           Margin="12,0,12,0" />
+                <HyperlinkButton Click="ResetFilters_Click"
+                                 Content="{CustomResource ProfileGiftsNotFoundButton}"
+                                 HorizontalAlignment="Center"
+                                 Margin="0,4,0,0" />
+            </StackPanel>
         </Grid>
     </Grid>
 </local:ProfileTabPage>

@@ -12,6 +12,7 @@ using Telegram.Controls;
 using Telegram.Controls.Cells;
 using Telegram.Controls.Media;
 using Telegram.Converters;
+using Telegram.Navigation.Services;
 using Telegram.Navigation;
 using Telegram.Td.Api;
 using Telegram.ViewModels.Settings;
@@ -34,14 +35,14 @@ namespace Telegram.Views.Settings
             InitializeKeepMediaTicks();
         }
 
-        protected override void OnNavigatedTo(NavigationEventArgs e)
+        protected override void OnNavigatedTo(NavigatedEventArgs e)
         {
             ViewModel.PropertyChanged += OnPropertyChanged;
 
             UpdateTotalBytes(ViewModel.TotalBytes, ViewModel.SystemCapacity, ViewModel.SystemFreeSpace);
         }
 
-        protected override void OnNavigatedFrom(NavigationEventArgs e)
+        protected override void OnNavigatedFrom(NavigatedEventArgs e)
         {
             ViewModel.PropertyChanged -= OnPropertyChanged;
         }

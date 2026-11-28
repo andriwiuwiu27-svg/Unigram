@@ -81,7 +81,7 @@ namespace Telegram.Views.Popups
                 CloseButtonText = string.Format(Strings.MessageScheduledUntilOnline, user.FirstName);
             }
 
-            DefaultButton = ContentDialogButton.Primary;
+            DefaultButton = ModalPopupButton.Primary;
 
             UpdatePrimaryButtonText();
         }

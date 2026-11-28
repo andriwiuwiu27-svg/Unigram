@@ -71,9 +71,10 @@ namespace Telegram.Navigation
 
         internal WindowContext(Window window)
         {
+            BackgroundMode.Leave();
+
             _window = window;
             _handle = GetWindowHandle(window);
-            _current = this;
 
             Dispatcher = DispatcherContext.Current;
 
@@ -119,12 +120,9 @@ namespace Telegram.Navigation
             // NightModeService only recolours the caption buttons on a theme change.
             UpdateTitleBar();
 
-            // A package's windows take their icon from the manifest. Without one the taskbar
-            // button still finds the exe's, but its thumbnails and Alt+Tab ask the window.
-            if (!ApiInfo.HasPackageIdentity)
-            {
-                SetIcon(_handle);
-            }
+            // The manifest logo only reaches the taskbar button, packaged or not: the title bar,
+            // Alt+Tab and the thumbnails ask the window.
+            SetIcon(_handle);
 
             Title = _window.Title;
 
@@ -324,6 +322,13 @@ namespace Telegram.Navigation
             // the window would refuse to close and ask the root a second time.
             _window.Close();
 
+            // The process outlives a main window closed to the icon, and so would an account it
+            // was adding: the next window would open on that sign in page.
+            if (IsInMainView && SystemTray.IsShowing())
+            {
+                LifetimeService.Current.DropAbandonedLogin();
+            }
+
             ExitIfIdle();
             return Task.CompletedTask;
         }
@@ -333,10 +338,21 @@ namespace Telegram.Navigation
         /// when the last window goes - which is the point while the notification area icon is up,
         /// and a process nobody can see or quit when it is not. Also called after Exit on the
         /// icon's menu, which can find every window already closed and so none to call this.
+        /// With the icon up, the process goes into <see cref="BackgroundMode"/> instead, and it
+        /// stays when a redirected launch is queued, because that launch is about to open a window.
         /// </summary>
         internal static void ExitIfIdle()
         {
-            if (All.Count == 0 && !SystemTray.IsShowing())
+            if (All.Count != 0)
+            {
+                return;
+            }
+
+            if (SystemTray.IsShowing())
+            {
+                BackgroundMode.Enter();
+            }
+            else if (Program.BeginExit())
             {
                 Application.Current.Exit();
             }
@@ -854,11 +870,9 @@ namespace Telegram.Navigation
         /// <summary>
         /// The AppWindow an element is actually in, straight off its XamlRoot.
         ///
-        /// This exists so that nothing has to reach for <see cref="Current"/>, which is
-        /// thread-static and therefore meaningless on a host that puts every window on one thread -
-        /// it answers whichever window was created last. It also needs no <c>_mapping</c> entry, so
-        /// it works during a page's Loaded whether or not the presenter has registered its
-        /// XamlRoot yet.
+        /// Every window shares one thread here, so there is no "window of this thread" to ask
+        /// instead. It also needs no <c>_mapping</c> entry, so it works during a page's Loaded
+        /// whether or not the presenter has registered its XamlRoot yet.
         /// </summary>
         internal static AppWindow GetAppWindow(UIElement element)
         {
@@ -966,17 +980,6 @@ namespace Telegram.Navigation
             var already = All.Find(x => x.PersistedId == persistedId);
             already?.Activate();
         }
-
-        /// <summary>
-        /// TEMPORARY, and inherited from the Win32 half along with its problem: a thread-static "the
-        /// window on this thread" answers something only while a thread hosts exactly one window,
-        /// and this host puts every window on one thread by design, so it is even less true here
-        /// than there.
-        /// </summary>
-        [ThreadStatic]
-        private static WindowContext _current;
-
-        public static WindowContext Current => _current;
 
         #endregion
 

@@ -7,10 +7,10 @@
 
 #if WINUI3
 using Microsoft.UI.Windowing;
-using Telegram.Navigation;
 #else
 using Windows.ApplicationModel.Core;
 #endif
+using Telegram.Navigation;
 using Windows.UI.Xaml;
 
 namespace Telegram.Controls
@@ -52,7 +52,7 @@ namespace Telegram.Controls
         public bool IsVisible { get; }
     }
 
-    public partial class CorePage : PageEx
+    public partial class CorePage : NavigationPage
     {
         private bool _registered;
 

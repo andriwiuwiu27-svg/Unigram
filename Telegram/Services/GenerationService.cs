@@ -9,6 +9,7 @@ using Microsoft.Graphics.Canvas;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
@@ -652,9 +653,9 @@ namespace Telegram.Services
             var textSide = (int)Math.Round(width * 372 / 1536);
             if (textSide > 0)
             {
-                var device = ElementComposition.GetSharedDevice();
+                var device = ElementComposition.GetBackgroundDevice();
 
-                using var bitmap = await CanvasBitmap.LoadAsync(device, new Uri("ms-appx:///Assets/Images/VideoNoteText.png"));
+                using var bitmap = await CanvasBitmap.LoadAsync(device, Path.Combine(AppPaths.InstalledPath, "Assets", "Images", "VideoNoteText.png"));
                 using var target = new CanvasRenderTarget(device, textSide, textSide, 96);
 
                 using (var session = target.CreateDrawingSession())
@@ -714,7 +715,7 @@ namespace Telegram.Services
                 throw new InvalidOperationException("A sticker drawn on the video could not be downloaded.");
             }
 
-            var device = ElementComposition.GetSharedDevice();
+            var device = ElementComposition.GetBackgroundDevice();
 
             // How many output pixels a unit of the renderer's comes to, for decoding stills at about
             // the size they are drawn.
@@ -1312,7 +1313,10 @@ namespace Telegram.Services
         }
     }
 
-    [JsonSourceGenerationOptions(IgnoreReadOnlyProperties = true, NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals, Converters = new[] { typeof(Vector2Converter) })]
+    // CsWinRT 3 projects Rect, Size and Color with public fields rather than properties, which
+    // System.Text.Json skips: without the converters they round-trip as zeros on WinUI. The
+    // converters write the property names the UWP projection does, so either reads the other.
+    [JsonSourceGenerationOptions(IgnoreReadOnlyProperties = true, NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals, Converters = new[] { typeof(Vector2Converter), typeof(RectConverter), typeof(SizeConverter), typeof(ColorConverter) })]
     [JsonSerializable(typeof(ImageGeneration))]
     [JsonSerializable(typeof(VideoGeneration))]
     public partial class GenerationJsonContext : JsonSerializerContext
@@ -1356,6 +1360,167 @@ namespace Telegram.Services
             writer.WriteNumber("X", value.X);
             writer.WriteNumber("Y", value.Y);
             writer.WriteEndObject();
+        }
+    }
+
+    public class RectConverter : JsonConverter<Rect>
+    {
+        public override Rect Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            double x = 0, y = 0, width = 0, height = 0;
+
+            if (reader.TokenType != JsonTokenType.StartObject)
+                throw new JsonException();
+
+            while (reader.Read())
+            {
+                if (reader.TokenType == JsonTokenType.EndObject)
+                {
+                    // Rect.Empty is negative infinity wide, which the UWP constructor refuses.
+                    return width < 0 || height < 0
+                        ? Rect.Empty
+                        : new Rect((float)x, (float)y, (float)width, (float)height);
+                }
+
+                if (reader.TokenType == JsonTokenType.PropertyName)
+                {
+                    string propName = reader.GetString()!;
+                    reader.Read();
+
+                    switch (propName)
+                    {
+                        case "X": x = GenerationJsonNumber.Read(ref reader); break;
+                        case "Y": y = GenerationJsonNumber.Read(ref reader); break;
+                        case "Width": width = GenerationJsonNumber.Read(ref reader); break;
+                        case "Height": height = GenerationJsonNumber.Read(ref reader); break;
+                        default: reader.Skip(); break;
+                    }
+                }
+            }
+
+            throw new JsonException();
+        }
+
+        public override void Write(Utf8JsonWriter writer, Rect value, JsonSerializerOptions options)
+        {
+            writer.WriteStartObject();
+            GenerationJsonNumber.Write(writer, "X", value.X);
+            GenerationJsonNumber.Write(writer, "Y", value.Y);
+            GenerationJsonNumber.Write(writer, "Width", value.Width);
+            GenerationJsonNumber.Write(writer, "Height", value.Height);
+            writer.WriteEndObject();
+        }
+    }
+
+    public class SizeConverter : JsonConverter<Size>
+    {
+        public override Size Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            double width = 0, height = 0;
+
+            if (reader.TokenType != JsonTokenType.StartObject)
+                throw new JsonException();
+
+            while (reader.Read())
+            {
+                if (reader.TokenType == JsonTokenType.EndObject)
+                {
+                    return width < 0 || height < 0
+                        ? Size.Empty
+                        : new Size((float)width, (float)height);
+                }
+
+                if (reader.TokenType == JsonTokenType.PropertyName)
+                {
+                    string propName = reader.GetString()!;
+                    reader.Read();
+
+                    switch (propName)
+                    {
+                        case "Width": width = GenerationJsonNumber.Read(ref reader); break;
+                        case "Height": height = GenerationJsonNumber.Read(ref reader); break;
+                        default: reader.Skip(); break;
+                    }
+                }
+            }
+
+            throw new JsonException();
+        }
+
+        public override void Write(Utf8JsonWriter writer, Size value, JsonSerializerOptions options)
+        {
+            writer.WriteStartObject();
+            GenerationJsonNumber.Write(writer, "Width", value.Width);
+            GenerationJsonNumber.Write(writer, "Height", value.Height);
+            writer.WriteEndObject();
+        }
+    }
+
+    public class ColorConverter : JsonConverter<Color>
+    {
+        public override Color Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            byte a = 0, r = 0, g = 0, b = 0;
+
+            if (reader.TokenType != JsonTokenType.StartObject)
+                throw new JsonException();
+
+            while (reader.Read())
+            {
+                if (reader.TokenType == JsonTokenType.EndObject)
+                    return Color.FromArgb(a, r, g, b);
+
+                if (reader.TokenType == JsonTokenType.PropertyName)
+                {
+                    string propName = reader.GetString()!;
+                    reader.Read();
+
+                    switch (propName)
+                    {
+                        case "A": a = reader.GetByte(); break;
+                        case "R": r = reader.GetByte(); break;
+                        case "G": g = reader.GetByte(); break;
+                        case "B": b = reader.GetByte(); break;
+                        default: reader.Skip(); break;
+                    }
+                }
+            }
+
+            throw new JsonException();
+        }
+
+        public override void Write(Utf8JsonWriter writer, Color value, JsonSerializerOptions options)
+        {
+            writer.WriteStartObject();
+            writer.WriteNumber("A", value.A);
+            writer.WriteNumber("R", value.R);
+            writer.WriteNumber("G", value.G);
+            writer.WriteNumber("B", value.B);
+            writer.WriteEndObject();
+        }
+    }
+
+    // A custom converter bypasses the context's NumberHandling, so the named literals it allows
+    // (Rect.Empty and Size.Empty are infinite) are handled here, in the form it writes them.
+    internal static class GenerationJsonNumber
+    {
+        public static double Read(ref Utf8JsonReader reader)
+        {
+            return reader.TokenType == JsonTokenType.String
+                ? double.Parse(reader.GetString(), NumberStyles.Float, CultureInfo.InvariantCulture)
+                : reader.GetDouble();
+        }
+
+        public static void Write(Utf8JsonWriter writer, string name, double value)
+        {
+            if (double.IsNaN(value) || double.IsInfinity(value))
+            {
+                writer.WriteString(name, value.ToString(CultureInfo.InvariantCulture));
+            }
+            else
+            {
+                writer.WriteNumber(name, value);
+            }
         }
     }
 }

@@ -505,7 +505,7 @@ namespace Telegram.Controls
             var popup = new StoryLinkPopup(_clientService, null);
 
             var confirm = await navigationService.ShowPopupAsync(popup, requestedTheme: ElementTheme.Dark);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 // Its first fill, on the other clients too.
                 var link = new PaintEntity
@@ -526,7 +526,7 @@ namespace Telegram.Controls
             var popup = new SendLocationPopup(_clientService.Session, await GetMediaLocationAsync(_surface.Media?.File));
 
             var confirm = await navigationService.ShowPopupAsync(popup, requestedTheme: ElementTheme.Dark);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 // Its first fill, on the other clients too.
                 var location = new PaintEntity
@@ -618,7 +618,7 @@ namespace Telegram.Controls
             if (entity.Type == PaintEntityType.Link)
             {
                 var popup = new StoryLinkPopup(_clientService, entity);
-                if (await navigationService.ShowPopupAsync(popup, requestedTheme: ElementTheme.Dark) == ContentDialogResult.Primary)
+                if (await navigationService.ShowPopupAsync(popup, requestedTheme: ElementTheme.Dark) == ModalPopupResult.Primary)
                 {
                     popup.ApplyTo(entity);
                     _surface.Entities.RefreshWidget(entity);
@@ -627,7 +627,7 @@ namespace Telegram.Controls
             else if (entity.Type == PaintEntityType.Location)
             {
                 var popup = new SendLocationPopup(_clientService.Session, new Location(entity.LocationLatitude, entity.LocationLongitude, 0));
-                if (await navigationService.ShowPopupAsync(popup, requestedTheme: ElementTheme.Dark) == ContentDialogResult.Primary)
+                if (await navigationService.ShowPopupAsync(popup, requestedTheme: ElementTheme.Dark) == ModalPopupResult.Primary)
                 {
                     popup.ApplyTo(entity);
                     _surface.Entities.RefreshWidget(entity);

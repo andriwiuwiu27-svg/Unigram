@@ -9,6 +9,7 @@ using System;
 using System.Threading.Tasks;
 using Telegram.Collections;
 using Telegram.Common;
+using Telegram.Controls;
 using Telegram.Converters;
 using Telegram.Navigation;
 using Telegram.Navigation.Services;
@@ -171,7 +172,7 @@ namespace Telegram.ViewModels.Chats
             var popup = new ChatInviteLinkPopup(ClientService, _chatId, _channel, _canCreateJoinRequests, null);
 
             var confirm = await ShowPopupAsync(popup);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 var response = await ClientService.SendAsync(popup.Request);
                 if (response is ChatInviteLink newLink)
@@ -196,7 +197,7 @@ namespace Telegram.ViewModels.Chats
             var popup = new ChatInviteLinkPopup(ClientService, _chatId, _channel, _canCreateJoinRequests, inviteLink);
 
             var confirm = await ShowPopupAsync(popup);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 var response = await ClientService.SendAsync(popup.Request);
                 if (response is ChatInviteLink newLink)
@@ -211,7 +212,7 @@ namespace Telegram.ViewModels.Chats
         public async void RevokeLink(ChatInviteLink inviteLink)
         {
             var confirm = await ShowPopupAsync(Strings.RevokeAlert, Strings.RevokeLink, Strings.RevokeButton, Strings.Cancel, destructive: true);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 var response = await ClientService.SendAsync(new RevokeChatInviteLink(_chatId, inviteLink.InviteLink));
                 if (response is ChatInviteLinks inviteLinks)
@@ -237,7 +238,7 @@ namespace Telegram.ViewModels.Chats
         public async void DeleteLink(ChatInviteLink inviteLink)
         {
             var confirm = await ShowPopupAsync(Strings.DeleteLinkHelp, Strings.DeleteLink, Strings.Delete, Strings.Cancel, destructive: true);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 var response = await ClientService.SendAsync(new DeleteRevokedChatInviteLink(_chatId, inviteLink.InviteLink));
                 if (response is Ok)
@@ -250,7 +251,7 @@ namespace Telegram.ViewModels.Chats
         public async void RevokeAll()
         {
             var confirm = await ShowPopupAsync(Strings.DeleteAllRevokedLinkHelp, Strings.DeleteAllRevokedLinks, Strings.Delete, Strings.Cancel, destructive: true);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 var response = await ClientService.SendAsync(new DeleteAllRevokedChatInviteLinks(_chatId, _creatorUserId));
                 if (response is Ok)

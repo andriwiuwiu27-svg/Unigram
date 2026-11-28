@@ -98,6 +98,8 @@ namespace Telegram.Views
                 flyout.CreateFlyoutSeparator();
                 flyout.CreateFlyoutItem(anim => ViewModel.SendAnimation(anim, SchedulingState.Auto, true), animation, Strings.SendWithoutSound, Icons.AlertOff);
                 flyout.CreateFlyoutItem(anim => ViewModel.SendAnimation(anim, SchedulingState.Schedule, null), animation, self ? Strings.SetReminder : Strings.ScheduleMessage, Icons.CalendarClock);
+                flyout.CreateFlyoutItem(ViewModel.CaptionAnimation, animation, Strings.AddACaption, Icons.TextDescription);
+                flyout.CreateFlyoutItem(ViewModel.EditAnimation, animation, Strings.Edit, Icons.Edit);
             }
 
             args.ShowAt(flyout, element);

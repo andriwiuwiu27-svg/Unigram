@@ -82,7 +82,8 @@ namespace Telegram.ViewModels
                 }
             }
 
-            if (state.TryGet("selectedIndex", out int selectedIndex))
+            // The caller asks for the Monetization tab without knowing whether this chat gets one.
+            if (state.TryGet("selectedIndex", out int selectedIndex) && selectedIndex < Items.Count)
             {
                 SelectedItem = Items[selectedIndex];
             }

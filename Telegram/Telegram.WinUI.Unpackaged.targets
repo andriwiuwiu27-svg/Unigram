@@ -19,6 +19,11 @@
 
   <PropertyGroup Condition="'$(Unpackaged)' != 'true'">
     <AppxPackage>true</AppxPackage>
+    <!-- A framework-dependent package loads XAML from the framework package, never from its own. -->
+    <WindowsAppSDKSelfContained Condition="'$(TelegramXaml)' != ''">true</WindowsAppSDKSelfContained>
+    <!-- Self-contained, XAML's <lang>\*.mui become language resource packs, and only the languages
+         the manifest declares - English - survive packaging. Unsplit they all stay in the main one. -->
+    <AppxBundleAutoResourcePackageQualifiers Condition="'$(TelegramXaml)' != ''">Scale|DXFeatureLevel</AppxBundleAutoResourcePackageQualifiers>
   </PropertyGroup>
 
   <!-- Last, so the MSIX props read the values above. -->

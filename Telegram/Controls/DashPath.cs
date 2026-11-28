@@ -154,7 +154,10 @@ namespace Telegram.Controls
                 result = CanvasGeometry.CreatePath(builder);
             }
 
-            return compositor.CreatePathGeometry(new CompositionPath(result));
+            using (result)
+            {
+                return compositor.CreatePathGeometry(new CompositionPath(result));
+            }
         }
 
         private CompositionPathGeometry CreateGeometry(Compositor compositor, int count)
@@ -180,7 +183,10 @@ namespace Telegram.Controls
                 result = CanvasGeometry.CreatePath(builder);
             }
 
-            return compositor.CreatePathGeometry(new CompositionPath(result));
+            using (result)
+            {
+                return compositor.CreatePathGeometry(new CompositionPath(result));
+            }
         }
 
         #region Stripe1

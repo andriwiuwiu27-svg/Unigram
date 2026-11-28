@@ -10,6 +10,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Telegram.Collections;
 using Telegram.Common;
+using Telegram.Controls;
 using Telegram.Navigation;
 using Telegram.Navigation.Services;
 using Telegram.Services;
@@ -255,7 +256,7 @@ namespace Telegram.ViewModels.Folders
                     var popup = new RemoveFolderPopup();
 
                     var confirm = await navigationService.ShowPopupAsync(popup, Tuple.Create(folder, leave));
-                    if (confirm == ContentDialogResult.Primary)
+                    if (confirm == ModalPopupResult.Primary)
                     {
                         clientService.Send(new DeleteChatFolder(info.Id, popup.SelectedItems.ToVector()));
                     }
@@ -264,7 +265,7 @@ namespace Telegram.ViewModels.Folders
             else
             {
                 var confirm = await navigationService.ShowPopupAsync(info.HasMyInviteLinks ? Strings.FilterDeleteAlertLinks : Strings.FilterDeleteAlert, Strings.FilterDelete, Strings.Delete, Strings.Cancel, destructive: true);
-                if (confirm != ContentDialogResult.Primary)
+                if (confirm != ModalPopupResult.Primary)
                 {
                     return;
                 }

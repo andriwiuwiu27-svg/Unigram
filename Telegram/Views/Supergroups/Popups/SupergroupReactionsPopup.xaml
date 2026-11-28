@@ -125,6 +125,7 @@
                     </Grid>
 
                     <Slider Maximum="{x:Bind ViewModel.MaximumMaxReactionCount}"
+                            AutomationProperties.Name="{CustomResource MaximumReactionsHeader}"
                             Minimum="1"
                             Value="{x:Bind ViewModel.MaxReactionCount, Mode=TwoWay}"
                             SmallChange="1"

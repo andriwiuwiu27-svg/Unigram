@@ -15,7 +15,7 @@ using Windows.UI.Xaml.Input;
 
 namespace Telegram.Views.Settings.Password
 {
-    public sealed partial class SettingsPasswordCreatePopup : ContentPopup
+    public sealed partial class SettingsPasswordCreatePopup : ModalPopup
     {
         public SettingsPasswordCreatePopup()
         {
@@ -36,7 +36,7 @@ namespace Telegram.Views.Settings.Password
 
         public string Password { get; private set; }
 
-        private void OnPrimaryButtonClick(ContentDialog sender, ContentDialogButtonClickEventArgs args)
+        private void OnPrimaryButtonClick(ModalPopup sender, ModalPopupButtonClickEventArgs args)
         {
             var password1 = Field1.Password;
             var password2 = Field2.Password;
@@ -75,7 +75,7 @@ namespace Telegram.Views.Settings.Password
                 }
                 else
                 {
-                    Hide(ContentDialogResult.Primary);
+                    Hide(ModalPopupResult.Primary);
                 }
 
                 e.Handled = true;

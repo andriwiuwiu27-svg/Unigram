@@ -10,6 +10,7 @@ using Telegram.Common;
 using Telegram.Controls;
 using Telegram.Controls.Cells;
 using Telegram.Controls.Media;
+using Telegram.Navigation.Services;
 using Telegram.Td.Api;
 using Telegram.ViewModels;
 using Windows.UI.Xaml;
@@ -28,7 +29,7 @@ namespace Telegram.Views.Profile
             InitializeComponent();
         }
 
-        protected override void OnNavigatedTo(NavigationEventArgs e)
+        protected override void OnNavigatedTo(NavigatedEventArgs e)
         {
             if (ViewModel.ClientService.TryGetSupergroup(ViewModel.Chat, out Supergroup supergroup))
             {

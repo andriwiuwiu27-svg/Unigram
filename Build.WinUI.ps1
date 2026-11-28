@@ -43,7 +43,11 @@ param(
 
     # The unpackaged build's version, which has no manifest of its own to take it from. Defaults to
     # the release package's.
-    [version] $Version
+    [version] $Version,
+
+    # A folder with our own build of Microsoft.ui.xaml.dll and its <lang>\*.mui, which replace the
+    # Windows App SDK's in the payload. A package built with it is self-contained.
+    [string] $Xaml
 )
 
 $ErrorActionPreference = 'Stop'
@@ -76,6 +80,16 @@ $solution = Join-Path $PSScriptRoot 'Telegram.WinUI.slnx'
 
 # The natives restore through packages.config, which -restore skips without this.
 $common = @("-p:Configuration=$Configuration", '-p:RestorePackagesConfig=true', '-nologo', '-verbosity:minimal')
+
+$xamlArguments = @()
+if ($Xaml) {
+    $Xaml = (Resolve-Path $Xaml).Path
+    if (-not (Test-Path (Join-Path $Xaml 'Microsoft.ui.xaml.dll'))) {
+        throw "$Xaml has no Microsoft.ui.xaml.dll."
+    }
+
+    $xamlArguments = @("-p:TelegramXaml=$Xaml\")
+}
 
 function Invoke-MSBuild {
     param([string[]] $Arguments, [string] $Description)
@@ -236,7 +250,7 @@ if ($Unpackaged) {
           '-p:Unpackaged=true',
           "-p:WinUIPackageVersion=$Version",
           "-p:PublishDir=$publish\",
-          '-nodeReuse:false') + $common)
+          '-nodeReuse:false') + $xamlArguments + $common)
 
     # The natives, the vcpkg libraries and tdjson import the desktop CRT, which the package gets from
     # the UWPDesktop framework and nothing provides without one, so it goes beside the app: the
@@ -382,7 +396,7 @@ Invoke-MSBuild -Description "Telegram.WinUI ($Configuration|$Platform, $Identity
       '-p:UapAppxPackageBuildMode=SideloadOnly',
       '-p:AppxPackageSigningEnabled=true',
       "-p:AppxPackageDir=$packages\",
-      '-nodeReuse:false') + $common)
+      '-nodeReuse:false') + $xamlArguments + $common)
 
 $bundle = Get-ChildItem $packages -Recurse -Filter '*.msixbundle' -ErrorAction SilentlyContinue |
     Sort-Object LastWriteTime | Select-Object -Last 1

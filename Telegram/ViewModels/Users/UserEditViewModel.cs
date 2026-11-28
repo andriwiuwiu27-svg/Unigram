@@ -7,6 +7,7 @@
 
 using System.Threading.Tasks;
 using Telegram.Common;
+using Telegram.Controls;
 using Telegram.Navigation;
 using Telegram.Navigation.Services;
 using Telegram.Services;
@@ -183,7 +184,7 @@ namespace Telegram.ViewModels.Users
                         args.Cancel = true;
 
                         var confirm = await ShowPopupAsync(Strings.BotSettingsChangedAlert, Strings.UnsavedChanges, Strings.ApplyTheme, Strings.Discard);
-                        if (confirm == ContentDialogResult.Primary)
+                        if (confirm == ModalPopupResult.Primary)
                         {
                             Continue(args);
                         }
@@ -279,7 +280,7 @@ namespace Telegram.ViewModels.Users
                 var popup = new SettingsBirthdatePopup(user);
 
                 var confirm = await ShowPopupAsync(popup);
-                if (confirm == ContentDialogResult.Primary)
+                if (confirm == ModalPopupResult.Primary)
                 {
                     ClientService.Send(new SuggestUserBirthdate(user.Id, popup.Value));
 
@@ -321,7 +322,7 @@ namespace Telegram.ViewModels.Users
             if (ClientService.TryGetUser(_userId, out User user))
             {
                 var confirm = await ShowPopupAsync(string.Format(Strings.ResetToOriginalPhotoMessage, user.FirstName), Strings.ResetToOriginalPhotoTitle, Strings.Reset, Strings.Cancel);
-                if (confirm == ContentDialogResult.Primary)
+                if (confirm == ModalPopupResult.Primary)
                 {
                     ClientService.Send(new SetUserPersonalProfilePhoto(user.Id, null));
                 }

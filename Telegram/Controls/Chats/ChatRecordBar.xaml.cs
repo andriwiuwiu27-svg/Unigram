@@ -256,7 +256,9 @@ namespace Telegram.Controls.Chats
                 };
 
                 _videoPopup.IsOpen = true;
+#if !WINUI3
                 _ = mediaCapture.StartPreviewAsync();
+#endif
             }
             catch
             {
@@ -386,18 +388,46 @@ namespace Telegram.Controls.Chats
                     return;
                 }
 
+#if WINUI3
+                // Before the first await: the engine is tearing the capture down while this runs.
+                using var bitmap = element.GetLastFrame();
+                if (bitmap == null)
+                {
+                    return;
+                }
+#else
                 var target = new RenderTargetBitmap();
                 await target.RenderAsync(_videoElement, 80, 80);
                 var pixels = await target.GetPixelsAsync();
+#endif
 
                 var file = await AppPaths.TemporaryFolder.CreateFileAsync("LastVideoFrame.png", CreationCollisionOption.ReplaceExisting);
                 using var stream = await file.OpenAsync(FileAccessMode.ReadWrite);
                 var encoder = await BitmapEncoder.CreateAsync(BitmapEncoder.PngEncoderId, stream);
 
+#if WINUI3
+                // The 80 pixel square UniformToFill shows: the short side scaled to 80, the middle kept.
+                var scale = 80d / Math.Min(bitmap.PixelWidth, bitmap.PixelHeight);
+                var scaledWidth = (uint)Math.Max(80, Math.Round(bitmap.PixelWidth * scale));
+                var scaledHeight = (uint)Math.Max(80, Math.Round(bitmap.PixelHeight * scale));
+
+                encoder.SetSoftwareBitmap(bitmap);
+                encoder.BitmapTransform.InterpolationMode = BitmapInterpolationMode.Fant;
+                encoder.BitmapTransform.ScaledWidth = scaledWidth;
+                encoder.BitmapTransform.ScaledHeight = scaledHeight;
+                encoder.BitmapTransform.Bounds = new BitmapBounds
+                {
+                    X = (scaledWidth - 80) / 2,
+                    Y = (scaledHeight - 80) / 2,
+                    Width = 80,
+                    Height = 80
+                };
+#else
                 var width = (uint)target.PixelWidth;
                 var height = (uint)target.PixelHeight;
 
                 encoder.SetPixelData(BitmapPixelFormat.Bgra8, BitmapAlphaMode.Premultiplied, width, height, 96, 96, pixels.ToArray());
+#endif
                 encoder.BitmapTransform.Flip = BitmapFlip.Horizontal;
 
                 await encoder.FlushAsync();

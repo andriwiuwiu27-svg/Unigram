@@ -66,7 +66,7 @@ namespace Telegram.Views.Popups
             var popup = new CodeLanguagePopup(language);
 
             var confirm = await popup.ShowAsync(xamlRoot);
-            return confirm == ContentDialogResult.Primary ? popup._language : null;
+            return confirm == ModalPopupResult.Primary ? popup._language : null;
         }
 
         private static List<CodeLanguage> All
@@ -153,14 +153,14 @@ namespace Telegram.Views.Popups
 
             if (Validate())
             {
-                Hide(ContentDialogResult.Primary);
+                Hide(ModalPopupResult.Primary);
             }
         }
 
         // Escape closes the list first, as it would anywhere else, and the popup only after.
         private void OnClosing(ModalPopup sender, ModalPopupClosingEventArgs args)
         {
-            if (args.Result == ContentDialogResult.None && Input.IsSuggestionListOpen)
+            if (args.Result == ModalPopupResult.None && Input.IsSuggestionListOpen)
             {
                 Input.IsSuggestionListOpen = false;
                 args.Cancel = true;

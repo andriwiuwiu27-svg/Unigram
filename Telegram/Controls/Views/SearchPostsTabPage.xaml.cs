@@ -13,6 +13,7 @@ using Telegram.Common;
 using Telegram.Controls.Cells;
 using Telegram.Controls.Media;
 using Telegram.Controls.Views;
+using Telegram.Navigation.Services;
 using Telegram.Td.Api;
 using Telegram.ViewModels;
 using Windows.UI.Xaml;
@@ -32,7 +33,7 @@ namespace Telegram.Views.Profile
             InitializeComponent();
         }
 
-        protected override void OnNavigatedTo(NavigationEventArgs e)
+        protected override void OnNavigatedTo(NavigatedEventArgs e)
         {
             base.OnNavigatedTo(e);
 
@@ -47,7 +48,7 @@ namespace Telegram.Views.Profile
             UpdateLimits(ViewModel.Limits);
         }
 
-        protected override void OnNavigatedFrom(NavigationEventArgs e)
+        protected override void OnNavigatedFrom(NavigatedEventArgs e)
         {
             base.OnNavigatedFrom(e);
 

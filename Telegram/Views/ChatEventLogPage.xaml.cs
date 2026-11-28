@@ -21,7 +21,7 @@ namespace Telegram.Views
         public ChatEventLogPage()
         {
             InitializeComponent();
-            NavigationCacheMode = ApiInfo.NavigationCacheMode;
+            Retention = ApiInfo.PageRetention;
         }
 
         public override string GetTitle()
@@ -74,14 +74,14 @@ namespace Telegram.Views
             View.PopupClosed();
         }
 
-        public void StartBannerAnimation(ScalarKeyFrameAnimation translate, bool title)
+        public void StartBannerAnimation(ScalarKeyFrameAnimation translate)
         {
-            View.StartBannerAnimation(translate, title);
+            View.StartBannerAnimation(translate);
         }
 
-        public void CompleteBannerAnimation(bool title)
+        public void CompleteBannerAnimation()
         {
-            View.CompleteBannerAnimation(title);
+            View.CompleteBannerAnimation();
         }
     }
 }

@@ -36,6 +36,7 @@ VersionInfoVersion={#AppVersion}
 ; Fixed, because AppPaths keeps LocalState, LocalCache and TempState under the same root.
 DefaultDirName={localappdata}\TelegramFZ-LLC.Windows
 PrivilegesRequired=lowest
+ChangesAssociations=yes
 
 ; There is nothing to ask: the folder is fixed, the shortcuts are always made and the app picks its
 ; own language. So no page is shown, and the wizard is cut down to a progress bar - see [Code].
@@ -113,6 +114,11 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Explorer\StartupA
 ; picker when another one already handles the scheme.
 Root: HKCU; Subkey: "Software\Classes\{#LinkProgId}"; ValueType: string; ValueName: ""; ValueData: "{#AppName}"; Flags: uninsdeletekey
 Root: HKCU; Subkey: "Software\Classes\{#LinkProgId}\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: """{app}\app\Telegram.exe"",0"
+; Without it the picker names the app after the exe's FileDescription, "Telegram", which other
+; apps share.
+Root: HKCU; Subkey: "Software\Classes\{#LinkProgId}\Application"; ValueType: string; ValueName: "ApplicationName"; ValueData: "{#AppName}"
+Root: HKCU; Subkey: "Software\Classes\{#LinkProgId}\Application"; ValueType: string; ValueName: "ApplicationIcon"; ValueData: """{app}\app\Telegram.exe"",0"
+Root: HKCU; Subkey: "Software\Classes\{#LinkProgId}\Application"; ValueType: string; ValueName: "AppUserModelId"; ValueData: "{#AppUserModelId}"
 Root: HKCU; Subkey: "Software\Classes\{#LinkProgId}\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\app\Telegram.exe"" ""----ms-protocol:%1"""
 Root: HKCU; Subkey: "Software\{#AppUserModelId}"; Flags: uninsdeletekey
 Root: HKCU; Subkey: "Software\{#AppUserModelId}\Capabilities"; ValueType: string; ValueName: "ApplicationName"; ValueData: "{#AppName}"

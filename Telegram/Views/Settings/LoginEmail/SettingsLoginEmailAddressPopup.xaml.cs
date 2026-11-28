@@ -14,23 +14,31 @@ using Windows.UI.Xaml.Input;
 
 namespace Telegram.Views.Settings.LoginEmail
 {
-    public sealed partial class SettingsLoginEmailAddressPopup : ContentPopup
+    public sealed partial class SettingsLoginEmailAddressPopup : ModalPopup
     {
         private readonly IClientService _clientService;
 
-        public SettingsLoginEmailAddressPopup(IClientService clientService)
+        public SettingsLoginEmailAddressPopup(IClientService clientService, bool canBeCancelled = true)
         {
             InitializeComponent();
 
             _clientService = clientService;
 
             PrimaryButtonText = Strings.Continue;
-            SecondaryButtonText = Strings.Cancel;
+
+            if (canBeCancelled)
+            {
+                SecondaryButtonText = Strings.Cancel;
+            }
+            else
+            {
+                IsLightDismissEnabled = false;
+            }
         }
 
         public EmailAddressAuthenticationCodeInfo CodeInfo { get; private set; }
 
-        private async void OnPrimaryButtonClick(ContentDialog sender, ContentDialogButtonClickEventArgs args)
+        private async void OnPrimaryButtonClick(ModalPopup sender, ModalPopupButtonClickEventArgs args)
         {
             var address = PrimaryInput.Text;
 
@@ -71,7 +79,7 @@ namespace Telegram.Views.Settings.LoginEmail
         {
             if (e.Key == Windows.System.VirtualKey.Enter)
             {
-                Hide(ContentDialogResult.Primary);
+                Hide(ModalPopupResult.Primary);
                 e.Handled = true;
             }
         }

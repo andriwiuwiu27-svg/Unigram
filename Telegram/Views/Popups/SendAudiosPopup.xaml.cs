@@ -157,7 +157,7 @@ namespace Telegram.Views.Popups
         private void OnItemClick(object sender, ItemClickEventArgs e)
         {
             SelectedItems = [e.ClickedItem as PlaybackItem];
-            Hide(ContentDialogResult.Primary);
+            Hide(ModalPopupResult.Primary);
         }
 
         public IList<PlaybackItem> SelectedItems { get; private set; }
@@ -356,7 +356,7 @@ namespace Telegram.Views.Popups
         private void Local_Click(object sender, RoutedEventArgs e)
         {
             SelectedItems = null;
-            Hide(ContentDialogResult.Primary);
+            Hide(ModalPopupResult.Primary);
         }
     }
 }

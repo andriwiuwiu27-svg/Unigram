@@ -7,13 +7,5 @@
                   mc:Ignorable="d"
                   ShowHeader="False"
                   NavigationMode="Root">
-    <Page.Transitions>
-        <TransitionCollection>
-            <NavigationThemeTransition>
-                <SlideNavigationTransitionInfo Effect="FromRight" />
-            </NavigationThemeTransition>
-        </TransitionCollection>
-    </Page.Transitions>
-
     <local:ChatView x:Name="View" />
 </local:HostedPage>

@@ -1,0 +1,38 @@
+<Project>
+
+  <!--
+    Shared by the two reference projection projects. CsWinRT regenerates a reference projection whenever its input hash
+    changes, and the recompile gives a byte-identical assembly a new timestamp. Consumers compile against that assembly,
+    so the timestamp alone rebuilt the whole app on every launch. They get a copy instead, which CopyRefAssembly replaces
+    only when the MVID changes - for a deterministic compile, only when the projected API does.
+  -->
+
+  <Target Name="TelegramCopyStableReferenceProjection"
+          AfterTargets="_RunCsWinRTForwarderImplGenerator"
+          Condition="'$(CsWinRTGenerateReferenceProjection)' == 'true' and '$(DesignTimeBuild)' != 'true'">
+    <PropertyGroup>
+      <!-- CsWinRT's own formula for _CsWinRTRefAssemblyPath, which the target below redirects. -->
+      <_TelegramReferenceProjectionPath>$([MSBuild]::NormalizePath('$(MSBuildProjectDirectory)', '$(IntermediateOutputPath)$(AssemblyName).dll'))</_TelegramReferenceProjectionPath>
+      <_TelegramStableReferenceProjectionPath>$([MSBuild]::NormalizePath('$(MSBuildProjectDirectory)', '$(IntermediateOutputPath)stable', '$(AssemblyName).dll'))</_TelegramStableReferenceProjectionPath>
+    </PropertyGroup>
+
+    <MakeDir Directories="$([System.IO.Path]::GetDirectoryName('$(_TelegramStableReferenceProjectionPath)'))" />
+    <CopyRefAssembly SourcePath="$(_TelegramReferenceProjectionPath)" DestinationPath="$(_TelegramStableReferenceProjectionPath)" />
+
+    <ItemGroup>
+      <FileWrites Include="$(_TelegramStableReferenceProjectionPath)" />
+    </ItemGroup>
+  </Target>
+
+  <!-- %(ReferenceAssembly) is read from _CsWinRTRefAssemblyPath by these two targets, and it is what consumers compile
+       against. Before the first build there is no copy yet, and they keep CsWinRT's path. -->
+  <Target Name="TelegramUseStableReferenceProjection"
+          BeforeTargets="GetTargetPathWithTargetPlatformMoniker;CsWinRTGetForwarderTargetPathWithTargetPlatformMoniker"
+          Condition="'$(CsWinRTGenerateReferenceProjection)' == 'true'">
+    <PropertyGroup>
+      <_TelegramStableReferenceProjectionPath>$([MSBuild]::NormalizePath('$(MSBuildProjectDirectory)', '$(IntermediateOutputPath)stable', '$(AssemblyName).dll'))</_TelegramStableReferenceProjectionPath>
+      <_CsWinRTRefAssemblyPath Condition="Exists('$(_TelegramStableReferenceProjectionPath)')">$(_TelegramStableReferenceProjectionPath)</_CsWinRTRefAssemblyPath>
+    </PropertyGroup>
+  </Target>
+
+</Project>

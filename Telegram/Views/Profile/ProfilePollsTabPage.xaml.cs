@@ -21,7 +21,8 @@ namespace Telegram.Views.Profile
         public ProfilePollsTabPage()
         {
             InitializeComponent();
-            NavigationCacheMode = ApiInfo.NavigationCacheMode;
+            Retention = ApiInfo.PageRetention;
+            Transition = PageTransition.None;
         }
 
         public override string GetTitle()
@@ -76,14 +77,14 @@ namespace Telegram.Views.Profile
             View.PopupClosed();
         }
 
-        public void StartBannerAnimation(ScalarKeyFrameAnimation translate, bool title)
+        public void StartBannerAnimation(ScalarKeyFrameAnimation translate)
         {
-            View.StartBannerAnimation(translate, title);
+            View.StartBannerAnimation(translate);
         }
 
-        public void CompleteBannerAnimation(bool title)
+        public void CompleteBannerAnimation()
         {
-            View.CompleteBannerAnimation(title);
+            View.CompleteBannerAnimation();
         }
 
         public double HeaderHeight

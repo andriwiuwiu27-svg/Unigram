@@ -64,7 +64,7 @@ namespace Telegram.Controls
                 _emojiFlyout.Hide();
                 e.Handled = true;
             }
-            else if (_emojiFlyout?.Content is ChatTextFlyout presenter && presenter.ItemsSource is IAutocompleteCollection autocomplete)
+            else if (ChatTextFlyout.TryResolveFlyout(_emojiFlyout, out ChatTextFlyout presenter) && presenter.ItemsSource is IAutocompleteCollection autocomplete)
             {
                 e.Handled = ChatTextBox.ProcessFlyoutKey(e.Key, presenter.ControlledList, autocomplete);
             }
@@ -102,7 +102,7 @@ namespace Telegram.Controls
             CancelEmoji();
         }
 
-        private Flyout _emojiFlyout;
+        private MenuFlyout _emojiFlyout;
         private string _emojiQuery;
 
         public override bool HasOpenSuggestions => _emojiFlyout != null;
@@ -151,7 +151,7 @@ namespace Telegram.Controls
 
             _emojiQuery = collection.Query;
 
-            if (_emojiFlyout?.Content is ChatTextFlyout presenter)
+            if (ChatTextFlyout.TryResolveFlyout(_emojiFlyout, out ChatTextFlyout presenter))
             {
                 presenter.Update(collection);
                 return;
@@ -165,12 +165,7 @@ namespace Telegram.Controls
             _emojiFlyout.Opened += EmojiFlyout_Opened;
             _emojiFlyout.Closed += EmojiFlyout_Closed;
 
-            _emojiFlyout.ShowAt(this, new FlyoutShowOptions
-            {
-                Position = new Point((float)(rect.X + Padding.Left - 8), rect.Y + 6),
-                Placement = FlyoutPlacementMode.TopEdgeAlignedLeft,
-                ShowMode = FlyoutShowMode.Transient
-            });
+            ChatTextFlyout.ShowAt(_emojiFlyout, this, new Point((float)(rect.X + Padding.Left - 8), rect.Y + 6));
         }
 
         // Added and taken away rather than cleared: the page's own list may be there as well.
@@ -180,7 +175,7 @@ namespace Telegram.Controls
 
         void EmojiFlyout_Opened(object sender, object args)
         {
-            if (ChatTextFlyout.Elevate(sender) is ChatTextFlyout presenter)
+            if (ChatTextFlyout.TryResolveFlyout(sender as MenuFlyout, out ChatTextFlyout presenter))
             {
                 _flyoutList = presenter.ControlledList;
                 AutomationProperties.GetControlledPeers(this).Insert(0, _flyoutList);

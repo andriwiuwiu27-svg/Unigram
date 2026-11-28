@@ -202,11 +202,11 @@ namespace Telegram.Controls.Chats
                 if (!_selectedTheme.AreTheSame(theme.Type))
                 {
                     var confirm = await _viewModel.ShowPopupAsync(Strings.SaveChangesAlertText, Strings.SaveChangesAlertTitle, Strings.ApplyTheme, Strings.Discard);
-                    if (confirm == ContentDialogResult.None)
+                    if (confirm == ModalPopupResult.None)
                     {
                         return;
                     }
-                    else if (confirm == ContentDialogResult.Primary)
+                    else if (confirm == ModalPopupResult.Primary)
                     {
                         Apply_Click(null, null);
                         return;
@@ -224,7 +224,7 @@ namespace Telegram.Controls.Chats
                 if (theme.Type is ChatThemeGift gift && gift.GiftTheme.Gift.UsedThemeChatId != _viewModel.ChatId && _viewModel.ClientService.TryGetChat(gift.GiftTheme.Gift.UsedThemeChatId, out Chat usedChat))
                 {
                     var confirm = await _viewModel.ShowPopupAsync(string.Format(Strings.GiftThemesSetInReuseInfo, usedChat.Title), Strings.AppName, Strings.GiftThemesSetInReuseConfirm, Strings.Cancel);
-                    if (confirm != ContentDialogResult.Primary)
+                    if (confirm != ModalPopupResult.Primary)
                     {
                         return;
                     }
@@ -238,7 +238,7 @@ namespace Telegram.Controls.Chats
         private async void Wallpaper_Click(object sender, RoutedEventArgs e)
         {
             var confirm = await _viewModel.ShowPopupAsync(new BackgroundsPopup(), _viewModel.Chat.Id);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 ThemeSelected?.Invoke(this, new ChatThemeSelectedEventArgs(true));
             }

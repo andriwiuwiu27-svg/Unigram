@@ -14,14 +14,6 @@
                   Title="{x:Bind ConvertTitle(ViewModel.Folder), Mode=OneWay}"
                   ShowHeader="False">
 
-    <Page.Transitions>
-        <TransitionCollection>
-            <NavigationThemeTransition>
-                <SlideNavigationTransitionInfo Effect="FromRight" />
-            </NavigationThemeTransition>
-        </TransitionCollection>
-    </Page.Transitions>
-
     <Grid Background="{ThemeResource SettingsPageBackground}">
         <controls:TableListView x:Name="ScrollingHost"
                                 ItemsSource="{x:Bind ViewModel.Links}"

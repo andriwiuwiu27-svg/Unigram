@@ -10,6 +10,7 @@ using Telegram.Controls.Cells;
 using Telegram.Controls.Media;
 using Telegram.Td.Api;
 using Telegram.ViewModels.Profile;
+using Telegram.Views.Stars.Popups;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
@@ -43,6 +44,10 @@ namespace Telegram.Views.Profile
         private void OnContextRequested(UIElement sender, ContextRequestedEventArgs args)
         {
             var gift = ScrollingHost.ItemFromContainer(sender) as ReceivedGift;
+            if (gift == null)
+            {
+                return;
+            }
 
             var flyout = new MenuFlyout();
 
@@ -95,11 +100,18 @@ namespace Telegram.Views.Profile
                 flyout.Items.Add(item);
             }
 
-            if (gift.Gift is SentGiftUpgraded)
+            if (gift.Gift is SentGiftUpgraded upgraded)
             {
-                if (ViewModel.IsOwned)
+                // Pins lead the full list, so a collection does not offer them.
+                if (ViewModel.IsOwned && ViewModel.SelectedCollection.Id == 0)
                 {
                     flyout.CreateFlyoutItem(ViewModel.PinGift, gift, gift.IsPinned ? Strings.Gift2Unpin : Strings.Gift2Pin, gift.IsPinned ? Icons.PinOff : Icons.Pin);
+                }
+
+                if (ViewModel.IsOwned)
+                {
+                    var worn = ReceivedGiftPopup.IsWorn(ViewModel.ClientService, upgraded.Gift);
+                    flyout.CreateFlyoutItem(ViewModel.ToggleWear, gift, worn ? Strings.Gift2ActionWearOff : Strings.Gift2ActionWear, worn ? Icons.CrownOffFilled : Icons.CrownFilled);
                 }
 
                 flyout.CreateFlyoutItem(ViewModel.CopyGift, gift, Strings.CopyLink, Icons.Link);
@@ -142,7 +154,17 @@ namespace Telegram.Views.Profile
         {
             try
             {
-                if (e.Items[0] is ReceivedGift gift && gift.IsPinned && ViewModel.IsOwned)
+                var canReorder = false;
+
+                // In All gifts only the pinned ones move, and only while they lead the list, sorted by date.
+                if (e.Items[0] is ReceivedGift gift)
+                {
+                    canReorder = ViewModel.SelectedCollection.Id == 0
+                        ? gift.IsPinned && ViewModel.IsOwned && !ViewModel.SortByPrice
+                        : ViewModel.CanReorderCollectionGifts;
+                }
+
+                if (canReorder)
                 {
                     ScrollingHost.CanReorderItems = true;
                 }
@@ -163,24 +185,15 @@ namespace Telegram.Views.Profile
         {
             ScrollingHost.CanReorderItems = false;
 
-            if (args.DropResult == DataPackageOperation.Move && args.Items.Count == 1 && args.Items[0] is ReceivedGift gift)
+            if (args.DropResult == DataPackageOperation.Move && args.Items.Count == 1 && args.Items[0] is ReceivedGift)
             {
-                var items = ViewModel.Items;
-                if (items.Count == 1)
-                {
-                    return;
-                }
-
-                var index = items.IndexOf(gift);
-                var compare = items[index > 0 ? index - 1 : index + 1];
-
-                if (compare.IsPinned)
+                if (ViewModel.SelectedCollection.Id == 0)
                 {
                     ViewModel.SetPinnedItems();
                 }
                 else
                 {
-                    ViewModel.SetPinnedItem(gift);
+                    ViewModel.ReorderCollectionGifts();
                 }
             }
         }
@@ -216,17 +229,35 @@ namespace Telegram.Views.Profile
                 flyout.CreateFlyoutItem(ViewModel.DeleteCollection, collection, Strings.GiftsCollectionMenuDeleteCollection, Icons.Delete, destructive: true);
             }
 
-            flyout.ShowAt(sender, args);
+            if (flyout.Items.Count > 0)
+            {
+                flyout.ShowAt(sender, args);
+            }
         }
 
         private void Navigation_DragItemsStarting(object sender, DragItemsStartingEventArgs e)
         {
-
+            // All gifts is not a collection, and with a single collection there is nothing to reorder.
+            if (ViewModel.IsOwned && ViewModel.Collections.Count > 2 && e.Items.Count == 1 && e.Items[0] is GiftCollectionViewModel { Id: not 0 })
+            {
+                Navigation.CanReorderItems = true;
+                ViewModel.BeginReorderCollections();
+            }
+            else
+            {
+                Navigation.CanReorderItems = false;
+                e.Cancel = true;
+            }
         }
 
         private void Navigation_DragItemsCompleted(ListViewBase sender, DragItemsCompletedEventArgs args)
         {
+            Navigation.CanReorderItems = false;
 
+            if (args.DropResult == DataPackageOperation.Move)
+            {
+                ViewModel.ReorderCollections();
+            }
         }
 
         private void AddCollection_Click(object sender, RoutedEventArgs e)
@@ -237,6 +268,11 @@ namespace Telegram.Views.Profile
         private void AddToCollection_Click(object sender, RoutedEventArgs e)
         {
             ViewModel.AddGiftsToCollection(ViewModel.SelectedCollection);
+        }
+
+        private void ResetFilters_Click(object sender, RoutedEventArgs e)
+        {
+            ViewModel.ResetFilters();
         }
     }
 }

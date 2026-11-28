@@ -17,7 +17,7 @@ using Windows.UI.Xaml.Input;
 
 namespace Telegram.Views.Settings.Password
 {
-    public sealed partial class SettingsPasswordConfirmPopup : ContentPopup
+    public sealed partial class SettingsPasswordConfirmPopup : ModalPopup
     {
         private readonly IClientService _clientService;
         private readonly PasswordState _passwordState;
@@ -88,7 +88,7 @@ namespace Telegram.Views.Settings.Password
         private async void CancelReset_Click(Hyperlink sender, HyperlinkClickEventArgs args)
         {
             var confirm = await MessagePopup.ShowNestedAsync(XamlRoot, Strings.CancelPasswordReset, Strings.AppName, Strings.CancelPasswordResetYes, Strings.CancelPasswordResetNo);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 var response = await _clientService.SendAsync(new CancelPasswordReset());
                 if (response is Ok)
@@ -116,7 +116,7 @@ namespace Telegram.Views.Settings.Password
 
         public EmailAddressAuthenticationCodeInfo RecoveryEmailAddressCodeInfo { get; private set; }
 
-        private async void OnPrimaryButtonClick(ContentDialog sender, ContentDialogButtonClickEventArgs args)
+        private async void OnPrimaryButtonClick(ModalPopup sender, ModalPopupButtonClickEventArgs args)
         {
             try
             {
@@ -159,7 +159,7 @@ namespace Telegram.Views.Settings.Password
         {
             if (e.Key == Windows.System.VirtualKey.Enter)
             {
-                Hide(ContentDialogResult.Primary);
+                Hide(ModalPopupResult.Primary);
                 e.Handled = true;
             }
         }
@@ -182,7 +182,7 @@ namespace Telegram.Views.Settings.Password
             else if (_passwordState.PendingResetDate == 0)
             {
                 var confirm = await MessagePopup.ShowNestedAsync(XamlRoot, Strings.RestorePasswordNoEmailText2, Strings.RestorePasswordNoEmailTitle, Strings.Reset, Strings.Cancel);
-                if (confirm == ContentDialogResult.Primary)
+                if (confirm == ModalPopupResult.Primary)
                 {
                     ResetPassword();
                 }

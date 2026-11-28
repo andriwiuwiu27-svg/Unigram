@@ -195,12 +195,12 @@ namespace Telegram.Views.Popups
 
                     // Deny still logs in, without the number; only dismissing the question stops.
                     var confirm = await MessagePopup.ShowNestedAsync(XamlRoot, string.Format(Strings.BotAuthPhoneNumberText, _name, phoneNumber), Strings.BotAuthPhoneNumber, Strings.BotAuthPhoneNumberAccept, Strings.BotAuthPhoneNumberDeny);
-                    if (confirm == ContentDialogResult.None)
+                    if (confirm == ModalPopupResult.None)
                     {
                         return;
                     }
 
-                    allowPhoneNumberAccess = confirm == ContentDialogResult.Primary;
+                    allowPhoneNumberAccess = confirm == ModalPopupResult.Primary;
                 }
 
                 var matchCode = _matchCode;

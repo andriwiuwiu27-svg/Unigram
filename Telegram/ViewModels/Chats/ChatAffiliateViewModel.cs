@@ -259,7 +259,7 @@ namespace Telegram.ViewModels.Chats
             }
 
             var confirm = await ShowPopupAsync(string.Format(Strings.LeaveAffiliateLinkAlert, user.FirstName), Strings.LeaveAffiliateLink, Strings.LeaveAffiliateLinkButton, Strings.Cancel, destructive: true);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 var response = await ClientService.SendAsync(new DisconnectAffiliateProgram(_affiliateType, program.Url));
                 if (response is ConnectedAffiliateProgram)

@@ -479,7 +479,7 @@ namespace Telegram.Controls.Messages.Content
             }
 
             var confirm = await MessagePopup.ShowAsync(XamlRoot, message1 + "\n\n" + message2 + "\n\n" + message3, title, primary, secondary);
-            if (confirm == ContentDialogResult.Primary && response is GiveawayInfoCompleted completed3 && completed3.GiftCode.Length > 0)
+            if (confirm == ModalPopupResult.Primary && response is GiveawayInfoCompleted completed3 && completed3.GiftCode.Length > 0)
             {
                 MessageHelper.OpenTelegramUrl(_message.ClientService, _message.Delegate.NavigationService, new InternalLinkTypePremiumGiftCode(completed3.GiftCode));
             }

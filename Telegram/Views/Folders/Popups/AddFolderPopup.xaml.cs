@@ -18,7 +18,7 @@ using Windows.UI.Xaml.Controls;
 
 namespace Telegram.Views.Folders.Popups
 {
-    public sealed partial class AddFolderPopup : ContentPopup
+    public sealed partial class AddFolderPopup : ModalPopup
     {
         public AddFolderViewModel ViewModel => DataContext as AddFolderViewModel;
 
@@ -57,7 +57,7 @@ namespace Telegram.Views.Folders.Popups
             CustomEmojiIcon.Add(SubtitleText, SubtitleParagraph.Inlines, ViewModel.ClientService, name);
         }
 
-        private void ContentDialog_PrimaryButtonClick(ContentDialog sender, ContentDialogButtonClickEventArgs args)
+        private void OnPrimaryButtonClick(ModalPopup sender, ModalPopupButtonClickEventArgs args)
         {
             SelectedItems = ViewModel.SelectedItems.Select(x => x.Id).ToList();
         }

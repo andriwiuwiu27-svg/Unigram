@@ -175,17 +175,21 @@ namespace Telegram.Common
 
         public static CurrencyNumberFormatter GetCurrencyFormatter(string currency)
         {
-            if (_currencyCache.TryGetValue(currency, out CurrencyNumberFormatter formatter) == false)
+            // Notification content is built on the TDLib thread while the chat list formats on the UI thread.
+            lock (_currencyCache)
             {
-                var culture = NativeUtils.GetCurrentCulture();
-                var languages = new[] { culture }.Union(GlobalizationPreferences.Languages);
-                var region = GlobalizationPreferences.HomeGeographicRegion;
+                if (_currencyCache.TryGetValue(currency, out CurrencyNumberFormatter formatter) == false)
+                {
+                    var culture = NativeUtils.GetCurrentCulture();
+                    var languages = new[] { culture }.Union(GlobalizationPreferences.Languages);
+                    var region = GlobalizationPreferences.HomeGeographicRegion;
 
-                formatter = new CurrencyNumberFormatter(currency, languages, region);
-                _currencyCache[currency] = formatter;
+                    formatter = new CurrencyNumberFormatter(currency, languages, region);
+                    _currencyCache[currency] = formatter;
+                }
+
+                return formatter;
             }
-
-            return formatter;
         }
 
         public static string FormatCurrency(long amount, string currency)

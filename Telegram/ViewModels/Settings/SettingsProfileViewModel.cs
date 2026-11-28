@@ -212,7 +212,7 @@ namespace Telegram.ViewModels.Settings
                 var popup = new SettingsBirthdatePopup(fullInfo.Birthdate);
 
                 var confirm = await ShowPopupAsync(popup);
-                if (confirm == ContentDialogResult.Primary)
+                if (confirm == ModalPopupResult.Primary)
                 {
                     var response = await ClientService.SendAsync(new SetBirthdate(popup.Value));
                     if (response is Error error)
@@ -252,7 +252,7 @@ namespace Telegram.ViewModels.Settings
             var popup = new SettingsPersonalChatPopup(ClientService);
 
             var confirm = await ShowPopupAsync(popup);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 ClientService.Send(new SetPersonalChat(popup.SelectedChatId));
 

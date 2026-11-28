@@ -119,7 +119,7 @@ namespace Telegram.ViewModels
             }
 
             var confirm = await ToastPopup.ShowActionAsync(XamlRoot, Strings.ChatArchived, Strings.Undo, ToastPopupIcon.Archived);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 ClientService.Send(new AddChatToList(chat.Id, new ChatListMain()));
             }
@@ -142,7 +142,7 @@ namespace Telegram.ViewModels
             SelectedItems.Clear();
 
             var confirm = await ToastPopup.ShowActionAsync(XamlRoot, Strings.ChatsArchived, Strings.Undo, ToastPopupIcon.Archived);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 foreach (var undo in chats)
                 {
@@ -252,7 +252,7 @@ namespace Telegram.ViewModels
                 var popup = new ChatMutePopup(muteFor);
 
                 var confirm = await ShowPopupAsync(popup);
-                if (confirm != ContentDialogResult.Primary)
+                if (confirm != ModalPopupResult.Primary)
                 {
                     return;
                 }
@@ -311,7 +311,7 @@ namespace Telegram.ViewModels
             var popup = new DeleteChatPopup(ClientService, updated, Items.ChatList, false);
 
             var confirm = await ShowPopupAsync(popup);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 var check = popup.IsChecked == true;
 
@@ -338,7 +338,7 @@ namespace Telegram.ViewModels
             var chats = SelectedItems.ToList();
 
             var confirm = await ShowPopupAsync(Strings.AreYouSureDeleteFewChats, Locale.Declension(Strings.R.ChatsSelected, chats.Count), Strings.Delete, Strings.Cancel, destructive: true);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 DeleteChatService.AddPending(XamlRoot, ClientService, chats.Select(x => x.Id).ToArray(), Strings.ChatDeletedUndo, true, false, false);
             }
@@ -359,7 +359,7 @@ namespace Telegram.ViewModels
             var dialog = new DeleteChatPopup(ClientService, updated, Items.ChatList, true);
 
             var confirm = await ShowPopupAsync(dialog);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 DeleteChatService.AddPending(XamlRoot, ClientService, new[] { chat.Id }, Strings.HistoryClearedUndo, false, dialog.IsChecked, false);
             }
@@ -374,7 +374,7 @@ namespace Telegram.ViewModels
             var chats = SelectedItems.ToList();
 
             var confirm = await ShowPopupAsync(Strings.AreYouSureClearHistoryFewChats, Locale.Declension(Strings.R.ChatsSelected, chats.Count), Strings.ClearHistory, Strings.Cancel);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 DeleteChatService.AddPending(XamlRoot, ClientService, chats.Select(x => x.Id).ToArray(), Strings.HistoryClearedUndo, false, false, false);
             }

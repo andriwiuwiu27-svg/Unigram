@@ -263,7 +263,8 @@
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
-                        <Grid Control.IsTemplateFocusTarget="True"
+                        <Grid x:Name="Icon"
+                              Control.IsTemplateFocusTarget="True"
                               Background="{TemplateBinding Background}"
                               CornerRadius="24"
                               Width="48"
@@ -311,7 +312,8 @@
                                        FontSize="20"
                                        FontFamily="{StaticResource SymbolThemeFontFamily}" />
                         </Border>
-                        <StackPanel Margin="8,0,0,2"
+                        <StackPanel x:Name="Details"
+                                    Margin="8,0,0,2"
                                     VerticalAlignment="Center"
                                     Grid.Column="1">
                             <!--<TextBlock x:Name="Title" Foreground="{ThemeResource MessageForegroundBrush}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" Style="{StaticResource BaseTextBlockStyle}"/>-->

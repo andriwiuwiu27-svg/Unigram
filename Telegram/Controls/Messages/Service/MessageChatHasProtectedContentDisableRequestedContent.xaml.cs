@@ -51,7 +51,7 @@ namespace Telegram.Controls.Messages.Service
             Message.ClientService.TryGetUser(Message.Chat, out User user);
 
             var confirm = await Message.Delegate.NavigationService.ShowPopupAsync(Strings.SharingOfferDisableCancelText, Strings.SharingOfferDisableCancelTitle, Strings.SharingOfferCancelYes, Strings.Cancel);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 Message.ClientService.Send(new ProcessChatHasProtectedContentDisableRequest(Message.ChatId, Message.Id, false));
             }
@@ -60,7 +60,7 @@ namespace Telegram.Controls.Messages.Service
         private async void Accept_Click(object sender, RoutedEventArgs e)
         {
             var confirm = await Message.Delegate.NavigationService.ShowPopupAsync(Strings.SharingOfferEnableConfirmText, Strings.SharingOfferEnableCancelTitle, Strings.SharingOfferCancelYes, Strings.Cancel);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 Message.ClientService.Send(new ProcessChatHasProtectedContentDisableRequest(Message.ChatId, Message.Id, true));
             }

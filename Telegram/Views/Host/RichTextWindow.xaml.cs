@@ -191,11 +191,11 @@ namespace Telegram.Views.Host
             var deferral = e.GetDeferral();
 
             var confirm = await MessagePopup.ShowAsync(XamlRoot, Strings.ArticleSaveDraftMessage, Strings.ArticleSaveDraftTitle, Strings.Save, Strings.Discard);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 SaveDraft();
             }
-            else if (confirm != ContentDialogResult.Secondary)
+            else if (confirm != ModalPopupResult.Secondary)
             {
                 // Dismissed — cancel the close and keep editing.
                 e.Handled = true;
@@ -574,7 +574,7 @@ namespace Telegram.Views.Host
 
                         var popup = new FormulaPopup(math.Expression);
                         var confirm = await popup.ShowQueuedAsync(XamlRoot);
-                        if (confirm == ContentDialogResult.Primary)
+                        if (confirm == ModalPopupResult.Primary)
                         {
                             _engine.BeginChange();
                             math.Expression = popup.Source;
@@ -610,7 +610,7 @@ namespace Telegram.Views.Host
             {
                 var popup = new FormulaPopup(e.Object.Text);
                 var confirm = await popup.ShowQueuedAsync(XamlRoot);
-                if (confirm == ContentDialogResult.Primary)
+                if (confirm == ModalPopupResult.Primary)
                 {
                     _engine.ReplaceObject(new RichPosition(e.Leaf, e.Offset), RichInlineObject.FromMath(popup.Source));
                 }
@@ -880,7 +880,7 @@ namespace Telegram.Views.Host
             var popup = new SendAudiosPopup(_clientService, _navigationService);
 
             var confirm = await popup.ShowQueuedAsync(XamlRoot);
-            if (confirm != ContentDialogResult.Primary)
+            if (confirm != ModalPopupResult.Primary)
             {
                 return null;
             }
@@ -1015,7 +1015,7 @@ namespace Telegram.Views.Host
             {
                 if (content.Contains(StandardDataFormats.StorageItems))
                 {
-                    var items = (await content.GetStorageItemsAsync()).ToFileSystemItems();
+                    var items = await content.GetStorageItemsAsync().ToFileSystemItemsAsync();
                     await InsertFilesAsync(items, false);
                 }
                 else if (content.Contains(StandardDataFormats.Bitmap))
@@ -1057,7 +1057,7 @@ namespace Telegram.Views.Host
                 CancelPlainPasteOffer();
             }
 
-            if (confirm == ContentDialogResult.Primary && current)
+            if (confirm == ModalPopupResult.Primary && current)
             {
                 _engine.Undo();
                 Editor.InsertPlainText(e.Text);
@@ -1095,7 +1095,7 @@ namespace Telegram.Views.Host
             var popup = new EditMediaPopup(XamlRoot, _clientService, media);
 
             var confirm = await popup.ShowAsync();
-            if (confirm == ContentDialogResult.Primary && await RichMediaFactory.CreateAsync(media) is RichMediaSource source)
+            if (confirm == ModalPopupResult.Primary && await RichMediaFactory.CreateAsync(media) is RichMediaSource source)
             {
                 _engine.SetSource(block, source);
             }
@@ -1173,7 +1173,7 @@ namespace Telegram.Views.Host
             var popup = new SendLocationPopup(_clientService.Session);
 
             var confirm = await popup.ShowQueuedAsync(XamlRoot);
-            if (confirm != ContentDialogResult.Primary)
+            if (confirm != ModalPopupResult.Primary)
             {
                 return default;
             }
@@ -1634,7 +1634,7 @@ namespace Telegram.Views.Host
             };
 
             var confirm = await popup.ShowAsync(XamlRoot);
-            if (confirm != ContentDialogResult.Primary)
+            if (confirm != ModalPopupResult.Primary)
             {
                 Editor.Focus(FocusState.Programmatic);
                 return;
@@ -1967,7 +1967,7 @@ namespace Telegram.Views.Host
             var popup = new FormulaPopup(null, choice);
 
             var confirm = await popup.ShowQueuedAsync(XamlRoot);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 if (choice == null ? _engine.SelectedNode != null : popup.IsSeparateLine)
                 {

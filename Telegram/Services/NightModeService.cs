@@ -202,17 +202,17 @@ namespace Telegram.Services
 
                     foreach (var popup in VisualTreeHelper.GetOpenPopupsForXamlRoot(window.XamlRoot))
                     {
-                        if (popup.Child is ContentPopup contentPopup && contentPopup.RequestedTheme != ElementTheme.Default)
+                        if (popup.Child is ModalPopup modalPopup && modalPopup.RequestedTheme != ElementTheme.Default)
                         {
                             // This should be no longer needed
                             if (force is true)
                             {
-                                contentPopup.RequestedTheme = theme == ElementTheme.Dark
+                                modalPopup.RequestedTheme = theme == ElementTheme.Dark
                                     ? ElementTheme.Light
                                     : ElementTheme.Dark;
                             }
 
-                            contentPopup.RequestedTheme = theme;
+                            modalPopup.RequestedTheme = theme;
                         }
                     }
                 }

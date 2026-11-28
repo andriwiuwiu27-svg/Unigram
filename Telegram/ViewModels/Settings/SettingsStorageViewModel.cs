@@ -248,7 +248,7 @@ namespace Telegram.ViewModels.Settings
         public async void ClearCache()
         {
             var confirm = await ShowPopupAsync(Strings.StorageUsageInfo, Strings.ClearCache, Strings.ClearCache, Strings.Cancel, destructive: true);
-            if (confirm != ContentDialogResult.Primary)
+            if (confirm != ModalPopupResult.Primary)
             {
                 return;
             }
@@ -293,7 +293,7 @@ namespace Telegram.ViewModels.Settings
             var dialog = new SettingsStorageOptimizationPage(ClientService, byChat);
 
             var confirm = await ShowPopupAsync(dialog);
-            if (confirm != ContentDialogResult.Primary)
+            if (confirm != ModalPopupResult.Primary)
             {
                 return;
             }
@@ -501,7 +501,7 @@ namespace Telegram.ViewModels.Settings
             var size = string.Format(Strings.LocalDatabaseClearText2, FileSizeConverter.Convert(StatisticsFast.DatabaseSize, true));
 
             var confirm = await ShowPopupAsync(Strings.LocalDatabaseClearText + "\n\n" + size + "\n\n" + Strings.LocalDatabaseClearText3, Strings.LocalDatabaseClearTextTitle, Strings.CacheClear, Strings.Cancel, destructive: true);
-            if (confirm != ContentDialogResult.Primary)
+            if (confirm != ModalPopupResult.Primary)
             {
                 return;
             }

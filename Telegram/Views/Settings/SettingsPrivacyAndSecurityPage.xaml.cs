@@ -7,6 +7,8 @@
 
 using System.ComponentModel;
 using Telegram.Common;
+using Telegram.Navigation;
+using Telegram.Navigation.Services;
 using Telegram.Td.Api;
 using Telegram.ViewModels.Settings;
 using Windows.UI.Xaml;
@@ -21,10 +23,11 @@ namespace Telegram.Views.Settings
         public SettingsPrivacyAndSecurityPage()
         {
             InitializeComponent();
+            Transition = PageTransition.Entrance;
             Title = Strings.PrivacySettings;
         }
 
-        protected override void OnNavigatedTo(NavigationEventArgs e)
+        protected override void OnNavigatedTo(NavigatedEventArgs e)
         {
             ViewModel.PropertyChanged += OnPropertyChanged;
 
@@ -36,7 +39,7 @@ namespace Telegram.Views.Settings
             UpdateEmailAddressPattern(ViewModel.EmailAddressPattern);
         }
 
-        protected override void OnNavigatedFrom(NavigationEventArgs e)
+        protected override void OnNavigatedFrom(NavigatedEventArgs e)
         {
             ViewModel.PropertyChanged += OnPropertyChanged;
         }

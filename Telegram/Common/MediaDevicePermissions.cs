@@ -135,7 +135,7 @@ namespace Telegram.Common
             };
 
             var confirm = await popup.ShowQueuedAsync(xamlRoot);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 await Launcher.LaunchUriAsync(new Uri("ms-settings:appsfeatures-app"));
             }

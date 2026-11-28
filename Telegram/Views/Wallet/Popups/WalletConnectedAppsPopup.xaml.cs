@@ -166,7 +166,7 @@ namespace Telegram.Views.Wallet.Popups
                 : Strings.WalletUnknown;
 
             var confirm = await MessagePopup.ShowNestedAsync(XamlRoot, string.Format(Strings.WalletDisconnectConfirm, name), Strings.WalletDisconnect, Strings.WalletDisconnect, Strings.Cancel, destructive: true);
-            if (confirm != ContentDialogResult.Primary)
+            if (confirm != ModalPopupResult.Primary)
             {
                 return;
             }

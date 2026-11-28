@@ -4,20 +4,13 @@
                   xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                   xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
                   xmlns:controls="using:Telegram.Controls"
+                  xmlns:navigation="using:Telegram.Navigation"
                   xmlns:messages="using:Telegram.Controls.Messages"
                   xmlns:local="using:Telegram.Views"
                   xmlns:chats="using:Telegram.Controls.Chats"
                   mc:Ignorable="d"
                   ShowHeader="False"
                   NavigationMode="Root">
-
-    <Page.Transitions>
-        <TransitionCollection>
-            <NavigationThemeTransition>
-                <EntranceNavigationTransitionInfo />
-            </NavigationThemeTransition>
-        </TransitionCollection>
-    </Page.Transitions>
 
     <Grid Background="{ThemeResource SettingsPageBackground}">
         <chats:ChatBackgroundControl x:Name="BackgroundRoot" />
@@ -26,7 +19,7 @@
                       SizeChanged="OnSizeChanged"
                       DirectManipulationStarted="OnDirectManipulationStarted"
                       ViewChanged="OnViewChanged">
-            <Grid>
+            <controls:HeaderGrid HeaderMeasured="OnHeaderMeasured">
                 <StackPanel x:Name="Header"
                             SizeChanged="ProfileHeader_SizeChanged"
                             VerticalAlignment="Top"
@@ -143,10 +136,11 @@
                     </Grid>
                 </StackPanel>
 
-                <Frame x:Name="MediaFrame"
-                       Navigating="OnNavigating"
-                       Navigated="OnNavigated" />
-            </Grid>
+                <navigation:NavigationFrame x:Name="MediaFrame"
+                                            Navigating="OnNavigating"
+                                            Navigated="OnNavigated"
+                                            Released="OnMediaReleased" />
+            </controls:HeaderGrid>
         </ScrollViewer>
 
         <Grid MaxWidth="1000"
@@ -186,6 +180,7 @@
         </ToolTip>
 
         <Grid x:Name="ManagePanel"
+              x:Load="False"
               VerticalAlignment="Bottom"
               Visibility="Collapsed"
               Margin="24,0,24,8"

@@ -15,7 +15,7 @@ using Windows.UI.Xaml.Controls;
 
 namespace Telegram.Controls.Messages.Content
 {
-    public sealed partial class DocumentContent : FileButton, IContent
+    public sealed partial class DocumentContent : FileButton, IContent, IContentWithWrap
     {
         private MessageViewModel _message;
         public MessageViewModel Message => _message;
@@ -34,6 +34,7 @@ namespace Telegram.Controls.Messages.Content
         private AutomaticDragHelper ButtonDrag;
 
         private FileButton Button => this;
+        private Grid Icon;
         private TextBlock Title;
         private TextBlock TitleTrim;
         private TextBlock Subtitle;
@@ -43,6 +44,7 @@ namespace Telegram.Controls.Messages.Content
         {
             base.OnApplyTemplate();
 
+            Icon = GetTemplateChild(nameof(Icon)) as Grid;
             Title = GetTemplateChild(nameof(Title)) as TextBlock;
             TitleTrim = GetTemplateChild(nameof(TitleTrim)) as TextBlock;
             Subtitle = GetTemplateChild(nameof(Subtitle)) as TextBlock;
@@ -162,13 +164,22 @@ namespace Telegram.Controls.Messages.Content
             }
         }
 
+        public float ContentEnd()
+        {
+            if (!_templateApplied)
+            {
+                return -1;
+            }
+
+            return (float)(Icon.DesiredSize.Width + Subtitle.DesiredSize.Width);
+        }
+
         public bool IsValid(MessageContent content, bool primary)
         {
             return content switch
             {
                 MessageDocument => true,
                 MessageText text when text.LinkPreview != null && !primary => text.LinkPreview.Type is LinkPreviewTypeDocument,
-                MessagePoll poll when poll.Media is PollMediaDocument && !primary => true,
                 _ => false,
             };
         }
@@ -187,8 +198,6 @@ namespace Telegram.Controls.Messages.Content
                     return document.Document;
                 case MessageText text when text.LinkPreview?.Type is LinkPreviewTypeDocument previewDocument:
                     return previewDocument.Document;
-                case MessagePoll poll when poll.Media is PollMediaDocument pollDocument:
-                    return pollDocument.Document;
             }
 
             return null;

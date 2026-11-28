@@ -2,10 +2,16 @@
 
 #include "VoipGroupManager.g.h"
 #include "group/GroupInstanceCustomImpl.h"
+#include "group/GroupInstanceReferenceImpl.h"
 
 #include "rtc_base/synchronization/mutex.h"
 
 #include "VoipLoopbackCapture.h"
+
+#include "Broadcast/BroadcastHandoff.h"
+#include "Broadcast/BroadcastQueue.h"
+#include "Broadcast/BroadcastSession.h"
+#include "Broadcast/BroadcastVideo.h"
 
 #include <mutex>
 
@@ -24,7 +30,7 @@ namespace winrt::Telegram::Native::Calls::implementation
 
         void Stop();
 
-        void SetConnectionMode(VoipGroupConnectionMode connectionMode, bool keepBroadcastIfWasEnabled, bool isUnifiedBroadcast);
+        void SetConnectionMode(VoipGroupConnectionMode connectionMode, bool keepBroadcastIfWasEnabled);
 
         void EmitJoinPayload(EmitJsonPayloadDelegate completion);
         void SetJoinResponsePayload(hstring payload);
@@ -74,13 +80,18 @@ namespace winrt::Telegram::Native::Calls::implementation
             winrt::Telegram::Native::Calls::BroadcastTimeRequestedEventArgs> const& value);
         void BroadcastTimeRequested(winrt::event_token const& token);
 
+        winrt::event_token RejoinRequested(Windows::Foundation::TypedEventHandler<
+            winrt::Telegram::Native::Calls::VoipGroupManager,
+            Windows::Foundation::IInspectable> const& value);
+        void RejoinRequested(winrt::event_token const& token);
+
         winrt::event_token MediaChannelDescriptionsRequested(Windows::Foundation::TypedEventHandler<
             winrt::Telegram::Native::Calls::VoipGroupManager,
             winrt::Telegram::Native::Calls::MediaChannelDescriptionsRequestedEventArgs> const& value);
         void MediaChannelDescriptionsRequested(winrt::event_token const& token);
 
     private:
-        std::unique_ptr<tgcalls::GroupInstanceCustomImpl> m_impl = nullptr;
+        std::unique_ptr<tgcalls::GroupInstanceInterface> m_impl = nullptr;
 
         // Only the encrypt/decrypt delegates need guarding: they are written from the UI
         // thread and read per frame from a media thread. The events guard themselves.
@@ -94,12 +105,36 @@ namespace winrt::Telegram::Native::Calls::implementation
         bool m_isNoiseSuppressionEnabled = true;
 
         bool m_isScreencast = false;
+        bool m_isStream = false;
+
+        // Broadcast, for every manager but a screencast's. The queue runs the session; the core plays listener
+        // audio through the engine's playout; the handoff decides when a broadcast plays.
+        std::shared_ptr<broadcast::TaskQueue> m_queue;
+        std::shared_ptr<broadcast_audio::Core> m_core;
+        std::shared_ptr<broadcast::VideoHub> m_video;
+        std::unique_ptr<broadcast::Handoff> m_handoff;
+
+        // Queue thread.
+        std::shared_ptr<broadcast::Session> m_session;
+        std::vector<broadcast::VideoChannelRequest> m_videoChannels;
+        std::string m_outputDeviceId;
+
+        // What the broadcast played since the engine last reported levels.
+        std::mutex m_levelsLock;
+        std::vector<broadcast_audio::Level> m_broadcastLevels;
+
+        void CreateBroadcast(VoipGroupDescriptor const& descriptor);
+        void StartSession();
+        void StopSession();
+        void Tick();
+        broadcast::SessionHost MakeSessionHost();
+        void OnBroadcastLevels(std::vector<broadcast_audio::Level>&& levels);
+        void OnBroadcastTimeRequested(std::function<void(int64_t)> answer);
+        void OnBroadcastPartRequested(broadcast::PartRequest const& request, std::function<void(broadcast::PartAnswer&&)> answer);
+        void OnBroadcastNetworkStateUpdated(bool connected, bool transitioning);
 
         void OnNetworkStateUpdated(tgcalls::GroupNetworkState state);
         void OnAudioLevelsUpdated(tgcalls::GroupLevelsUpdate const& levels);
-        std::shared_ptr<tgcalls::BroadcastPartTask> OnRequestCurrentTime(std::function<void(int64_t)> done);
-        std::shared_ptr<tgcalls::BroadcastPartTask> OnRequestVideoBroadcastPart(int64_t time, int64_t period, int32_t channel, tgcalls::VideoChannelDescription::Quality quality, std::function<void(tgcalls::BroadcastPart&&)> done);
-        std::shared_ptr<tgcalls::BroadcastPartTask> OnRequestAudioBroadcastPart(int64_t time, int64_t period, std::function<void(tgcalls::BroadcastPart&&)> done);
         std::shared_ptr<tgcalls::RequestMediaChannelDescriptionTask> OnRequestMediaChannelDescriptions(const std::vector<uint32_t>& ssrcs, std::function<void(std::vector<tgcalls::MediaChannelDescription>&&)> done);
         std::vector<uint8_t> OnE2EEncryptDecrypt(std::vector<uint8_t> const& message, int64_t userId, bool encrypt, int32_t channelId);
 
@@ -121,6 +156,9 @@ namespace winrt::Telegram::Native::Calls::implementation
         winrt::event<Windows::Foundation::TypedEventHandler<
             winrt::Telegram::Native::Calls::VoipGroupManager,
             winrt::Telegram::Native::Calls::BroadcastTimeRequestedEventArgs>> m_broadcastTimeRequested;
+        winrt::event<Windows::Foundation::TypedEventHandler<
+            winrt::Telegram::Native::Calls::VoipGroupManager,
+            Windows::Foundation::IInspectable>> m_rejoinRequested;
         winrt::event<Windows::Foundation::TypedEventHandler<
             winrt::Telegram::Native::Calls::VoipGroupManager,
             winrt::Telegram::Native::Calls::MediaChannelDescriptionsRequestedEventArgs>> m_mediaChannelDescriptionsRequested;
@@ -183,107 +221,6 @@ namespace winrt::Telegram::Native::Calls::implementation
         std::function<void(std::vector<tgcalls::MediaChannelDescription>&&)> _done;
         webrtc::Mutex _mutex;
 
-    };
-
-    class BroadcastPartTaskImpl final : public tgcalls::BroadcastPartTask
-    {
-    public:
-        BroadcastPartTaskImpl(std::function<void(tgcalls::BroadcastPart&&)> done)
-            : _done(std::move(done))
-        {
-
-        }
-
-        void done(int64_t time, int64_t response, array_view<uint8_t const> filePart)
-        {
-            webrtc::MutexLock lock(&_mutex);
-
-            if (_done)
-            {
-                auto broadcastPart = tgcalls::BroadcastPart();
-
-                // Both timestamps belong on every status, not just Success: NotReady is
-                // precisely where tgcalls reads responseTimestamp, to work out where to
-                // restart a stream that has not begun yet.
-                //
-                // And it reads it in seconds — it is the one value in this API that is
-                // not milliseconds, so the conversion happens here rather than leaving
-                // the delegate to disagree with its neighbours about units.
-                broadcastPart.responseTimestamp = response / 1000.0;
-                broadcastPart.timestampMilliseconds = time;
-
-                if (filePart.size() > 0)
-                {
-                    broadcastPart.data = std::vector<uint8_t>(filePart.begin(), filePart.end());
-                    broadcastPart.status = tgcalls::BroadcastPart::Status::Success;
-                }
-                else
-                {
-                    broadcastPart.status = tgcalls::BroadcastPart::Status::NotReady;
-                }
-
-                _done(std::move(broadcastPart));
-
-                // See RequestMediaChannelDescriptionTaskImpl::done.
-                _done = nullptr;
-            }
-        }
-
-        void cancel() override
-        {
-            webrtc::MutexLock lock(&_mutex);
-
-            if (!_done)
-            {
-                return;
-            }
-
-            _done = nullptr;
-        }
-
-    private:
-        std::function<void(tgcalls::BroadcastPart&&)> _done;
-        webrtc::Mutex _mutex;
-
-    };
-
-    class BroadcastTimeTaskImpl final : public tgcalls::BroadcastPartTask
-    {
-    public:
-        BroadcastTimeTaskImpl(std::function<void(int64_t)> done)
-            : _done(std::move(done))
-        {
-
-        }
-
-        void done(int64_t time)
-        {
-            webrtc::MutexLock lock(&_mutex);
-
-            if (_done)
-            {
-                _done(time);
-
-                // See RequestMediaChannelDescriptionTaskImpl::done.
-                _done = nullptr;
-            }
-        }
-
-        void cancel() override
-        {
-            webrtc::MutexLock lock(&_mutex);
-
-            if (!_done)
-            {
-                return;
-            }
-
-            _done = nullptr;
-        }
-
-    private:
-        std::function<void(int64_t)> _done;
-        webrtc::Mutex _mutex;
     };
 }
 

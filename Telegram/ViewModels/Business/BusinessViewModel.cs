@@ -11,6 +11,7 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
 using Telegram.Common;
+using Telegram.Controls;
 using Telegram.Navigation;
 using Telegram.Navigation.Services;
 using Telegram.Services;
@@ -153,7 +154,7 @@ namespace Telegram.ViewModels.Business
                 var popup = new BusinessFeaturesPopup(ClientService, null, _features, _animations, feature);
 
                 var confirm = await ShowPopupAsync(popup);
-                if (confirm == ContentDialogResult.Primary && !ClientService.IsPremium)
+                if (confirm == ModalPopupResult.Primary && !ClientService.IsPremium)
                 {
                     //Purchase();
                 }

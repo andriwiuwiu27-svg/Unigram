@@ -7,6 +7,7 @@
 
 using System.Threading.Tasks;
 using Telegram.Common;
+using Telegram.Controls;
 using Telegram.Navigation;
 using Telegram.Navigation.Services;
 using Telegram.Services;
@@ -49,7 +50,7 @@ namespace Telegram.ViewModels.Authorization
                 var title = Strings.EditNumber;
 
                 var confirm = await ShowPopupAsync(message, title, Strings.Edit, Strings.Close);
-                if (confirm == ContentDialogResult.Primary)
+                if (confirm == ModalPopupResult.Primary)
                 {
                     _confirmedGoBack = true;
                     NavigationService.GoBack();
@@ -138,7 +139,7 @@ namespace Telegram.ViewModels.Authorization
                 else if (error.MessageEquals(ErrorType.FIRSTNAME_INVALID))
                 {
                     NavigationService.GoBack();
-                    NavigationService.Frame.ForwardStack.Clear();
+                    NavigationService.ClearForwardStack();
 
                     await ShowPopupAsync(error.Message, Strings.InvalidFirstName, Strings.OK);
                 }

@@ -15,6 +15,7 @@ using Microsoft.UI.Composition;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Settings;
+using Microsoft.Win32.SafeHandles;
 using Microsoft.Windows.AppLifecycle;
 using Telegram.Common;
 using Telegram.Host;
@@ -45,6 +46,21 @@ namespace Telegram
 
         private static DispatcherQueue _dispatcher;
 
+        // Redirected launches the dispatcher has queued and not run yet, and whether the process
+        // has decided to end. One lock, so neither can change while the other is read.
+        private static readonly object _exitLock = new();
+        private static int _pendingLaunches;
+        private static bool _exiting;
+
+        // Reset while the process is ending. A launch that arrives then waits on it in
+        // OnRedirected and never returns, unless the exit is called off.
+        private static readonly ManualResetEventSlim _takingLaunches = new(true);
+
+        // Set while no share window is open or queued, and waited on by every process that
+        // redirected a share here. Under _exitLock, with the counts it is set from.
+        private static EventWaitHandle _sharesIdle;
+        private static int _openShares;
+
         /// <summary>
         /// This process started after the user ended a running instance that took no launches.
         /// Read by App, which reports it once the crash reporter is up.
@@ -69,8 +85,15 @@ namespace Telegram
 
             while (!keyInstance.IsCurrent)
             {
-                if (RedirectActivationTo(AppInstance.GetCurrent().GetActivatedEventArgs(), keyInstance))
+                var activation = AppInstance.GetCurrent().GetActivatedEventArgs();
+                if (RedirectActivationTo(activation, keyInstance))
                 {
+                    if (activation.Data is ShareTargetActivatedEventArgs)
+                    {
+                        WaitForShares(keyInstance);
+                    }
+
+                    GC.KeepAlive(activation);
                     return;
                 }
 
@@ -111,26 +134,222 @@ namespace Telegram
 
                 _ = new App();
             });
+
+            // Every Application.Exit ends up here: Exit on the notification area icon, the last
+            // window closing without it, an update. The process exit would otherwise end TDLib in
+            // the middle of whatever it was writing.
+            BeginExit(force: true);
+            LifetimeService.Current.CloseAll();
         }
 
         /// <summary>
-        /// Another launch was handed to this process. It arrives on a background thread. A link
-        /// goes through BootStrapper the way the first activation does; anything else only brings
-        /// the window back.
+        /// Stops taking launches, because the process is about to end. False, and nothing changes,
+        /// when a redirected launch is still queued and about to open a window, unless
+        /// <paramref name="force"/> - which a restart is, as it brings the app back anyway.
+        /// </summary>
+        internal static bool BeginExit(bool force = false)
+        {
+            lock (_exitLock)
+            {
+                if (_pendingLaunches > 0 && !force)
+                {
+                    return false;
+                }
+
+                _exiting = true;
+                _takingLaunches.Reset();
+                return true;
+            }
+        }
+
+        /// <summary>
+        /// The process is not ending after all, so the launches held since
+        /// <see cref="BeginExit"/> go through.
+        /// </summary>
+        internal static void CancelExit()
+        {
+            lock (_exitLock)
+            {
+                _exiting = false;
+                _takingLaunches.Set();
+            }
+        }
+
+        /// <summary>
+        /// Another launch was handed to this process. It arrives on a background thread. A link or
+        /// a share goes through BootStrapper the way the first activation does; anything else only
+        /// brings the window back.
+        ///
+        /// A share is read through the process that redirected it, so this marks the shares busy
+        /// before returning, which is what lets that process go: see <see cref="WaitForShares"/>.
         ///
         /// Brought back the way a click on the notification area icon does it, because the window
         /// may be gone: closing to the icon destroys it, and then there is no Main to raise and
         /// no window whose dispatcher could be used, so the UI thread's queue is kept from start.
+        ///
+        /// A process that is ending cannot take the launch, so this holds it and never returns:
+        /// the SDK answers the launching process only once this handler has, and that process
+        /// treats this one exiting first as its cue to start in its place - after TDLib has closed,
+        /// since that is the last thing this one does.
         /// </summary>
         private static void OnRedirected(object sender, AppActivationArguments args)
         {
-            if (args.Data is IProtocolActivatedEventArgs link)
+            // Outside the lock: Data is a proxy, and every question asked of it is a call into the
+            // launching process.
+            var activation = args.Data as IActivatedEventArgs;
+            var share = activation is ShareTargetActivatedEventArgs;
+
+            if (!share && activation is not IProtocolActivatedEventArgs)
             {
-                _dispatcher?.TryEnqueue(() => BootStrapper.Current.ActivateFromLink(link));
+                activation = null;
             }
-            else
+
+            while (true)
             {
-                _dispatcher?.TryEnqueue(BootStrapper.Current.ActivateFromNotifyIcon);
+                _takingLaunches.Wait();
+
+                lock (_exitLock)
+                {
+                    if (_exiting)
+                    {
+                        continue;
+                    }
+
+                    if (_dispatcher != null && _dispatcher.TryEnqueue(() => RunRedirected(activation)))
+                    {
+                        _pendingLaunches++;
+
+                        if (share)
+                        {
+                            _sharesIdle ??= new EventWaitHandle(false, EventResetMode.ManualReset, GetSharesIdleName(Environment.ProcessId));
+                            _sharesIdle.Reset();
+                        }
+
+                        return;
+                    }
+
+                    // The dispatcher is gone, so the process is ending whether it said so or not.
+                    _exiting = true;
+                    _takingLaunches.Reset();
+                }
+            }
+        }
+
+        private static void RunRedirected(IActivatedEventArgs activation)
+        {
+            try
+            {
+                lock (_exitLock)
+                {
+                    _pendingLaunches--;
+
+                    // Only a restart exits with a launch queued, and it brings the app back itself.
+                    if (_exiting)
+                    {
+                        return;
+                    }
+                }
+
+                if (activation != null)
+                {
+                    BootStrapper.Current.ActivateRedirected(activation);
+                }
+                else
+                {
+                    BootStrapper.Current.ActivateFromNotifyIcon();
+                }
+            }
+            finally
+            {
+                // Only now, with the share's window open and counted: setting it any earlier would
+                // let the launching process go between the two.
+                lock (_exitLock)
+                {
+                    UpdateSharesIdle();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Every share window counts, including one this process was started with, so a closing
+        /// window never needs to know how its share arrived.
+        /// </summary>
+        internal static void TrackShare(WindowContext window)
+        {
+            lock (_exitLock)
+            {
+                _openShares++;
+            }
+
+            window.Closed += OnShareClosed;
+        }
+
+        private static void OnShareClosed(object sender, EventArgs e)
+        {
+            ((WindowContext)sender).Closed -= OnShareClosed;
+
+            lock (_exitLock)
+            {
+                _openShares--;
+                UpdateSharesIdle();
+            }
+        }
+
+        private static void UpdateSharesIdle()
+        {
+            if (_pendingLaunches == 0 && _openShares == 0)
+            {
+                _sharesIdle?.Set();
+            }
+        }
+
+        private static string GetSharesIdleName(int processId)
+        {
+            return $"Local\\Telegram.SharesIdle.{processId}";
+        }
+
+        /// <summary>
+        /// The share now runs in the instance it was redirected to, but not without this process:
+        /// the SDK hands the arguments over as a COM proxy into it, and the share operation, its
+        /// data and the files in it are all read through that proxy. So this process stays until
+        /// that instance has no share left open, or has exited.
+        /// </summary>
+        private static void WaitForShares(AppInstance keyInstance)
+        {
+            // Missing when the instance never took the share - the user gave up on one that was
+            // not responding - and then there is nothing to wait for.
+            if (!EventWaitHandle.TryOpenExisting(GetSharesIdleName((int)keyInstance.ProcessId), out var idle))
+            {
+                return;
+            }
+
+            using (idle)
+            {
+                Process owner;
+
+                try
+                {
+                    owner = Process.GetProcessById((int)keyInstance.ProcessId);
+                }
+                catch (ArgumentException)
+                {
+                    return;
+                }
+
+                using (owner)
+                using (var exited = new ProcessWaitHandle(owner))
+                {
+                    WaitHandle.WaitAny([idle, exited]);
+                }
+            }
+        }
+
+        private sealed class ProcessWaitHandle : WaitHandle
+        {
+            public ProcessWaitHandle(Process process)
+            {
+                // Not owned: the Process closes it.
+                SafeWaitHandle = new SafeWaitHandle(process.Handle, false);
             }
         }
 

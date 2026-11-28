@@ -26,11 +26,11 @@ namespace Windows.Storage.Pickers
             return (await picker.PickSingleFileAsync()).ToFileItem();
         }
 
-        public static async Task<IReadOnlyList<FileItem>> PickMultipleFilesAsync(this FileOpenPicker picker, XamlRoot xamlRoot)
+        public static Task<IReadOnlyList<FileItem>> PickMultipleFilesAsync(this FileOpenPicker picker, XamlRoot xamlRoot)
         {
             WindowContext.InitializeWithWindow(picker, xamlRoot);
 
-            return (await picker.PickMultipleFilesAsync()).ToFileItems();
+            return picker.PickMultipleFilesAsync().ToFileItemsAsync();
         }
 
         public static async Task<FileItem> PickSaveFileAsync(this FileSavePicker picker, XamlRoot xamlRoot)

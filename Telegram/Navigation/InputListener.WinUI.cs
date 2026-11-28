@@ -17,7 +17,7 @@ namespace Telegram.Services.Keyboard
     /// <c>CoreDispatcher.AcceleratorKeyActivated</c>, which covers the whole window; this one
     /// listens to the keyboard and pointer sources of the window's content island, which is the
     /// nearest thing. Routed events on the root are not: popups live under the popup root, so a
-    /// key or a click inside a ContentDialog or a ModalPopup never bubbles up to it.
+    /// key or a click inside a ModalPopup never bubbles up to it.
     ///
     /// Where it still falls short: a WebView2 and a windowed popup - a menu let out of the window's
     /// bounds - each have an island of their own, so nothing typed into them arrives here. The

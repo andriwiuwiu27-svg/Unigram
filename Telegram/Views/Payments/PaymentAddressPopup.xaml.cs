@@ -14,7 +14,7 @@ using Windows.UI.Xaml.Controls;
 
 namespace Telegram.Views.Payments
 {
-    public sealed partial class PaymentAddressPopup : ContentPopup
+    public sealed partial class PaymentAddressPopup : ModalPopup
     {
         public PaymentAddressViewModel ViewModel => DataContext as PaymentAddressViewModel;
 
@@ -32,12 +32,12 @@ namespace Telegram.Views.Payments
             ViewModel.Initialize(inputInvoice, invoice, info);
         }
 
-        private void OnOpened(ContentDialog sender, ContentDialogOpenedEventArgs args)
+        private void OnOpened(ModalPopup sender, ModalPopupOpenedEventArgs args)
         {
             ViewModel.PropertyChanged += OnPropertyChanged;
         }
 
-        private void OnClosed(ContentDialog sender, ContentDialogClosedEventArgs args)
+        private void OnClosed(ModalPopup sender, ModalPopupClosedEventArgs args)
         {
             ViewModel.PropertyChanged -= OnPropertyChanged;
         }
@@ -76,7 +76,7 @@ namespace Telegram.Views.Payments
             }
         }
 
-        private async void OnPrimaryButtonClick(ContentDialog sender, ContentDialogButtonClickEventArgs args)
+        private async void OnPrimaryButtonClick(ModalPopup sender, ModalPopupButtonClickEventArgs args)
         {
             IsPrimaryButtonEnabled = false;
 

@@ -6,6 +6,9 @@
 //
 
 using System;
+using Telegram.Native;
+using Telegram.Streams;
+using Windows.UI;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 
@@ -14,6 +17,13 @@ namespace Telegram.Controls.Chats
     public partial class ChatSendButton : GlyphButton
     {
         private TextBlock ExpiresInLabel;
+
+        private Grid StarsRoot;
+        private AnimatedImage Stars;
+        private ProgressRingIndeterminate RewriteRing;
+
+        private bool _hasTextComposition;
+        private bool _isRewriting;
 
         public ChatSendButton()
         {
@@ -24,10 +34,69 @@ namespace Telegram.Controls.Chats
         {
             ExpiresInLabel = GetTemplateChild(nameof(ExpiresInLabel)) as TextBlock;
 
+            StarsRoot = GetTemplateChild(nameof(StarsRoot)) as Grid;
+            Stars = GetTemplateChild(nameof(Stars)) as AnimatedImage;
+            RewriteRing = GetTemplateChild(nameof(RewriteRing)) as ProgressRingIndeterminate;
+
             OnSlowModeDelayChanged(SlowModeDelay, SlowModeDelayExpiresIn);
             OnReadOnlyChanged(IsReadOnly);
+            UpdateStars();
+            UpdateRewriteRing();
 
             base.OnApplyTemplate();
+        }
+
+        /// <summary>Whether the chat rewrites what is sent with its text composition settings, which the stars say.</summary>
+        public bool HasTextComposition
+        {
+            get => _hasTextComposition;
+            set
+            {
+                if (_hasTextComposition != value)
+                {
+                    _hasTextComposition = value;
+                    UpdateStars();
+                }
+            }
+        }
+
+        /// <summary>Whether a rewrite is in flight, which the ring inside the button says.</summary>
+        public bool IsRewriting
+        {
+            get => _isRewriting;
+            set
+            {
+                if (_isRewriting != value)
+                {
+                    _isRewriting = value;
+                    UpdateRewriteRing();
+                }
+            }
+        }
+
+        private void UpdateStars()
+        {
+            if (StarsRoot == null || Stars == null)
+            {
+                return;
+            }
+
+            if (_hasTextComposition && !IsReadOnly)
+            {
+                StarsRoot.Visibility = Visibility.Visible;
+                Stars.Source ??= new ParticlesImageSource(Color.FromArgb(0xB0, 0xFF, 0xFF, 0xFF), ParticlesType.Premium);
+            }
+            else
+            {
+                // Without a source the image stops drawing frames, which collapsing it alone does not promise.
+                StarsRoot.Visibility = Visibility.Collapsed;
+                Stars.Source = null;
+            }
+        }
+
+        private void UpdateRewriteRing()
+        {
+            RewriteRing?.Visibility = _isRewriting ? Visibility.Visible : Visibility.Collapsed;
         }
 
         #region SlowModeDelay
@@ -96,6 +165,7 @@ namespace Telegram.Controls.Chats
         private void OnReadOnlyChanged(bool newValue)
         {
             VisualStateManager.GoToState(this, newValue ? "ReadOnly" : "NotReadOnly", false);
+            UpdateStars();
         }
 
         #endregion

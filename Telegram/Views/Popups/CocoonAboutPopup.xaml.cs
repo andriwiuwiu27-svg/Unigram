@@ -22,7 +22,7 @@ namespace Telegram.Views.Popups
             InitializeComponent();
 
             PrimaryButtonText = Strings.Understood;
-            ButtonsLayout = ContentPopupButtonsLayout.Vertical;
+            ButtonsLayout = ModalPopupButtonsLayout.Vertical;
 
             SetText(Feature1, Strings.CocoonFeature1Text);
             SetText(Feature2, Strings.CocoonFeature2Text);

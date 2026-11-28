@@ -139,7 +139,7 @@ namespace Telegram.Controls.Stories
                 Icon.Visibility = Visibility.Visible;
 
                 TitleBarrr?.IsHitTestVisible = false;
-                TitleBarHandle?.Margin = new Thickness(SystemOverlayLeftInset > 0 ? SystemOverlayLeftInset + (count * 12 + 12 + 8) : TitleBarrr.Margin.Left + 40 + (count * 12 + 12 + 8), 0, SystemOverlayRightInset > 0 ? SystemOverlayRightInset : 88, 0);
+                TitleBarHandle?.Margin = new Thickness(SystemOverlayLeftInset > 0 ? SystemOverlayLeftInset + _captionReserve + (count * 12 + 12 + 8) : TitleBarrr.Margin.Left + 40 + (count * 12 + 12 + 8), 0, SystemOverlayLeftInset > 0 ? SystemOverlayRightInset : (SystemOverlayRightInset > 0 ? SystemOverlayRightInset : 88) + _captionReserve, 0);
             }
             else
             {
@@ -147,7 +147,7 @@ namespace Telegram.Controls.Stories
                 Icon.Visibility = Visibility.Collapsed;
 
                 TitleBarrr?.IsHitTestVisible = true;
-                TitleBarHandle?.Margin = new Thickness(SystemOverlayLeftInset > 0 ? SystemOverlayLeftInset : TitleBarrr.Margin.Left + 40, 0, SystemOverlayRightInset > 0 ? SystemOverlayRightInset : 88, 0);
+                TitleBarHandle?.Margin = new Thickness(SystemOverlayLeftInset > 0 ? SystemOverlayLeftInset + _captionReserve : TitleBarrr.Margin.Left + 40, 0, SystemOverlayLeftInset > 0 ? SystemOverlayRightInset : (SystemOverlayRightInset > 0 ? SystemOverlayRightInset : 88) + _captionReserve, 0);
             }
 
             ScrollingHost.IsHitTestVisible = !_collapsed;
@@ -216,6 +216,11 @@ namespace Telegram.Controls.Stories
                 flyout.CreateFlyoutItem(ViewModel.OpenProfile, activeStories, Strings.OpenChannel2, Icons.Megaphone);
             }
 
+            if (activeStories.Chat.CanPostStories(activeStories.ClientService))
+            {
+                flyout.CreateFlyoutItem(ViewModel.AddChatStory, activeStories, Strings.AddStory, Icons.StoriesAdd);
+            }
+
             if (activeStories.Chat.Type is ChatTypePrivate && !activeStories.IsMyStory)
             {
                 flyout.CreateFlyoutItem(ViewModel.MuteProfile, activeStories, muted ? Strings.NotificationsStoryUnmute2 : Strings.NotificationsStoryMute2, muted ? Icons.Alert : Icons.AlertOff);
@@ -227,9 +232,13 @@ namespace Telegram.Controls.Stories
             {
                 flyout.CreateFlyoutItem(ViewModel.ShowProfile, activeStories, Strings.UnarchiveStories, Icons.Unarchive);
             }
-            else
+            else if (activeStories.CanBeArchived)
             {
                 flyout.CreateFlyoutItem(ViewModel.HideProfile, activeStories, Strings.ArchivePeerStories, Icons.Archive);
+            }
+            else
+            {
+                flyout.CreateFlyoutItem(ViewModel.RemoveFromRecent, activeStories, Strings.StoriesRemoveFromRecent, Icons.Delete);
             }
 
             flyout.ShowAt(element, args);
@@ -468,6 +477,29 @@ namespace Telegram.Controls.Stories
             }
         }
 
+        private float _captionReserve;
+
+        /// <summary>
+        /// Room to keep out of the drag region beside the caption buttons, for something
+        /// clickable the page puts there.
+        /// </summary>
+        public float CaptionReserve
+        {
+            get => _captionReserve;
+            set
+            {
+                if (_captionReserve != value)
+                {
+                    _captionReserve = value;
+
+                    if (ViewModel != null)
+                    {
+                        UpdateIndexes();
+                    }
+                }
+            }
+        }
+
         // Where the stack starts in the title row.
         private float _padding;
 
@@ -499,7 +531,10 @@ namespace Telegram.Controls.Stories
 
         public bool TabsTopCollapsed { get; set; } = true;
 
-        public bool BannerCollapsed { get; set; } = true;
+        /// <summary>
+        /// The height of the panel above the chat list, 0 when it holds nothing.
+        /// </summary>
+        public double BannerHeight { get; set; }
 
         private ListView _controlledList;
         public ListView ControlledList
@@ -514,7 +549,7 @@ namespace Telegram.Controls.Stories
             {
                 var title = 40;
                 var search = 32;
-                var padding = 4 + (TabsTopCollapsed || !TabsLeftCollapsed ? 0 : 36) + (BannerCollapsed ? 0 : 40);
+                var padding = GetPadding(!TabsTopCollapsed && TabsLeftCollapsed);
                 //var padding = 8 + (ChatTabs == null || ChatTabs.Visibility == Visibility.Collapsed || !TabsLeftCollapsed ? 0 : 32);
                 //var padding = ChatTabs == null || ChatTabs.Visibility == Visibility.Collapsed || !TabsLeftCollapsed ? 0 : 40;
 
@@ -522,22 +557,18 @@ namespace Telegram.Controls.Stories
             }
         }
 
+        // Each island is 4 below the one above it: the tabs carry theirs, 4 plus 32, and so does the
+        // banner as its top margin. The list sits directly on whichever is last.
+        private double GetPadding(bool tabs)
+        {
+            return (tabs ? 36 : 0) + BannerHeight;
+        }
+
         public double GetTopPadding(bool collapsed)
         {
             var title = 40;
             var search = 32;
-            var padding = 4 + (collapsed /*|| !TabsLeftCollapsed*/ ? 0 : 36) + (BannerCollapsed ? 0 : 40);
-            //var padding = 8 + (ChatTabs == null || ChatTabs.Visibility == Visibility.Collapsed || !TabsLeftCollapsed ? 0 : 32);
-            //var padding = ChatTabs == null || ChatTabs.Visibility == Visibility.Collapsed || !TabsLeftCollapsed ? 0 : 40;
-
-            return title + search + padding;
-        }
-
-        public double GetTopPaddingBanner(bool collapsed)
-        {
-            var title = 40;
-            var search = 32;
-            var padding = 4 + (TabsTopCollapsed || !TabsLeftCollapsed ? 0 : 36) + (collapsed ? 0 : 40);
+            var padding = GetPadding(!collapsed /*&& TabsLeftCollapsed*/);
             //var padding = 8 + (ChatTabs == null || ChatTabs.Visibility == Visibility.Collapsed || !TabsLeftCollapsed ? 0 : 32);
             //var padding = ChatTabs == null || ChatTabs.Visibility == Visibility.Collapsed || !TabsLeftCollapsed ? 0 : 40;
 

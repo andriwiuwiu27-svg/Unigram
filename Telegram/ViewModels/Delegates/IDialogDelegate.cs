@@ -22,9 +22,9 @@ namespace Telegram.ViewModels.Delegates
 
         void UpdateChatTheme(Chat chat);
         void UpdateChatBackground(Chat chat);
+        void UpdateChatTextCompositionParameters(Chat chat);
         void UpdateChatMessageAutoDeleteTime(Chat chat);
         void UpdateChatPermissions(Chat chat);
-        void UpdateChatActionBar(Chat chat);
         void UpdateChatHasScheduledMessages(Chat chat);
         void UpdateChatReplyMarkup(Chat chat, MessageViewModel message);
         void UpdateChatUnreadMentionCount(Chat chat, int unreadMentionCount);
@@ -38,6 +38,8 @@ namespace Telegram.ViewModels.Delegates
         void UpdateChatBusinessBotManageBar(Chat chat, BusinessBotManageBar businessBotManageBar);
         void UpdateChatDraft(Chat chat, DraftMessage draft);
         void UpdatePendingMessage(Chat chat);
+
+        void UpdateFooter(Chat chat, ChatFooterState state);
 
         void UpdateUserEmptyState(Chat chat, User user, UserFullInfo fullInfo, CanSendMessageToUserResult result);
         void UpdateSupergroupEmptyState(Chat chat, Supergroup supergroup);

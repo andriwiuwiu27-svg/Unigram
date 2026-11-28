@@ -250,7 +250,7 @@ namespace Telegram.ViewModels
             var popup = new TranslateToPopup();
 
             var confirm = await ShowPopupAsync(popup);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 Settings.Translate.To = popup.SelectedItem;
 

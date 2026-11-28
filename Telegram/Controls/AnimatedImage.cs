@@ -387,10 +387,21 @@ namespace Telegram.Controls
 
         #region Source
 
+        // XAML keeps a custom DP's non-DependencyObject value as an unowned pointer, so a GetValue,
+        // or the old/new comparison inside a SetValue, can reach a collected CCW. This field mirrors
+        // the effective value from the change callback and keeps the object alive while XAML holds it.
+        private AnimatedImageSource _source;
+
         public AnimatedImageSource Source
         {
-            get { return (AnimatedImageSource)GetValue(SourceProperty); }
-            set { SetValue(SourceProperty, value); }
+            get => _source;
+            set
+            {
+                if (!ReferenceEquals(_source, value))
+                {
+                    SetValue(SourceProperty, value);
+                }
+            }
         }
 
         public static readonly DependencyProperty SourceProperty =
@@ -582,12 +593,18 @@ namespace Telegram.Controls
 
         private void OnSourceChanged(DependencyPropertyChangedEventArgs e)
         {
-            if (e.OldValue is AnimatedImageSource oldValue)
+            // The old value comes from the field, not e.OldValue, which would unbox it from XAML.
+            var oldValue = _source;
+            var newValue = e.NewValue as AnimatedImageSource;
+
+            _source = newValue;
+
+            if (oldValue != null)
             {
                 oldValue.OutlineChanged -= OnOutlineChanged;
             }
 
-            if (e.NewValue is AnimatedImageSource newValue && IsConnected)
+            if (newValue != null && IsConnected)
             {
                 if (IsOutlineEnabled)
                 {
@@ -1912,12 +1929,14 @@ namespace Telegram.Controls
             // Into a local: the UI thread reads _nextPosition, and every task zeroes its out
             // parameter on entry, so a Skip would publish position 0 between two real frames.
             var state = task.Render(frame, time, out double position);
-            if (state != AnimatedImageTaskState.Skip)
+            var drawn = state != AnimatedImageTaskState.Skip && state != AnimatedImageTaskState.Failed;
+
+            if (drawn)
             {
                 Volatile.Write(ref _nextPosition, position);
             }
 
-            if (state == AnimatedImageTaskState.Stop)
+            if (state is AnimatedImageTaskState.Stop or AnimatedImageTaskState.Failed)
             {
                 _ticking = false;
                 Interlocked.Exchange(ref _loopCount, -1);
@@ -1940,7 +1959,7 @@ namespace Telegram.Controls
                 }
             }
 
-            return state != AnimatedImageTaskState.Skip;
+            return drawn;
         }
 
         #endregion
@@ -2072,6 +2091,9 @@ namespace Telegram.Controls
 
         // A cycle was completed
         Loop,
+
+        // Animation must stop right away, and the buffer was not updated
+        Failed,
     }
 
     public partial class LottieAnimatedImageTask : AnimatedImageTask
@@ -2262,7 +2284,18 @@ namespace Telegram.Controls
 
             if (_pending == null)
             {
-                clock = Decode(frame, clock);
+                clock = Decode(frame, clock, out bool finished);
+
+                if (_pending == null && finished)
+                {
+                    _index = 0;
+                    Rewind();
+                    return AnimatedImageTaskState.Failed;
+                }
+                else if (_pending == null)
+                {
+                    return AnimatedImageTaskState.Skip;
+                }
             }
 
             // Half a poll early counts, for the reason LottieAnimatedImageTask rounds: a deadline
@@ -2304,7 +2337,7 @@ namespace Telegram.Controls
         }
 
         // Returns the clock, moved back by the loop's length when the frame starts the next loop.
-        private double Decode(IBuffer frame, double clock)
+        private double Decode(IBuffer frame, double clock, out bool finished)
         {
             var previous = _lastPosition;
 
@@ -2318,7 +2351,22 @@ namespace Telegram.Controls
             // frames before the clock are passed over rather than every one of them shown late.
             var behind = clock - (previous + _frameDuration) > _frameDuration * 1.5;
 
-            _animation.RenderSync(frame, behind ? clock - _frameDuration : 0, out double seconds, out bool completed);
+            var rendered = _animation.RenderSync(frame, behind ? clock - _frameDuration : 0, out double seconds, out bool completed);
+            if (!rendered)
+            {
+                // Without completed the decoder is still in a trimmed file's lead-in, which it takes
+                // a few packets a call. The clock waits on the frame that is next, so the wait plays
+                // as a pause rather than as the opening frames passed over to catch up.
+                finished = completed;
+
+                _lastPosition = previous;
+                clock = previous + _frameDuration;
+                SetClock(clock);
+
+                return clock;
+            }
+
+            finished = false;
 
             // Live decoding seeks back and decodes on in the same call, so it reports the end of a
             // loop on the next loop's first frame: the timestamp going back tells it apart from

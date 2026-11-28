@@ -39,8 +39,9 @@ namespace Telegram.ViewModels
         private readonly IVoipService _voipService;
         private readonly ICloudUpdateService _cloudUpdateService;
         private readonly IShortcutsService _shortcutService;
+        private readonly IProfilePhotoService _profilePhotoService;
 
-        public MainViewModel(IClientService clientService, ISettingsService settingsService, IStorageService storageService, IEventAggregator aggregator, INotificationsService pushService, IContactsService contactsService, IPasscodeService passcodeService, IVoipService voipService, ISettingsSearchService settingsSearchService, ICloudUpdateService cloudUpdateService, IShortcutsService shortcutService)
+        public MainViewModel(IClientService clientService, ISettingsService settingsService, IStorageService storageService, IEventAggregator aggregator, INotificationsService pushService, IContactsService contactsService, IPasscodeService passcodeService, IVoipService voipService, ISettingsSearchService settingsSearchService, ICloudUpdateService cloudUpdateService, IShortcutsService shortcutService, IProfilePhotoService profilePhotoService)
             : base(clientService, settingsService, aggregator)
         {
             _contactsService = contactsService;
@@ -48,6 +49,7 @@ namespace Telegram.ViewModels
             _voipService = voipService;
             _cloudUpdateService = cloudUpdateService;
             _shortcutService = shortcutService;
+            _profilePhotoService = profilePhotoService;
 
             Folders = new ChatFolderCollection();
 
@@ -81,6 +83,10 @@ namespace Telegram.ViewModels
 
             Aggregator.Unsubscribe(Stories.Items);
             Aggregator.Unsubscribe(this);
+
+            // XAML can leave a story the strip showed pegged after its window closes, so no item may
+            // keep the window. Before the clear below: the setter only reaches the items still listed.
+            Stories.NavigationService = null;
 
             if (Dispatcher != null && Dispatcher.HasThreadAccess)
             {
@@ -491,42 +497,6 @@ namespace Telegram.ViewModels
             ShowPopup(new FrozenPopup(ClientService.FreezeState));
         }
 
-        public async void SetBirthdate()
-        {
-            async Task<UserPrivacySettingRule> GetPrimaryRuleAsync()
-            {
-                var response = await ClientService.SendAsync(new GetUserPrivacySettingRules(new UserPrivacySettingShowBirthdate()));
-                if (response is UserPrivacySettingRules rules)
-                {
-                    foreach (var rule in rules.Rules)
-                    {
-                        return rule;
-                    }
-                }
-
-                return null;
-            }
-
-            var rule = await GetPrimaryRuleAsync();
-            var popup = new SettingsBirthdatePopup(date: null, rule);
-
-            var confirm = await ShowPopupAsync(popup);
-            if (confirm == ContentDialogResult.Primary)
-            {
-                ClientService.Send(new SetBirthdate(popup.Value));
-                ShowToast(Strings.PrivacyBirthdaySetDone, ToastPopupIcon.Success);
-            }
-            else if (popup.ShowPrivacySettings)
-            {
-                NavigationService.Navigate(typeof(SettingsPrivacyShowBirthdatePage));
-            }
-        }
-
-        public void HideBirthdate()
-        {
-            ClientService.Send(new HideSuggestedAction(new SuggestedActionSetBirthdate()));
-        }
-
         public async void UpdateApp()
         {
             await _cloudUpdateService.LaunchAsync();
@@ -563,7 +533,7 @@ namespace Telegram.ViewModels
         public async void RemoveMiniApp(AttachmentMenuBot bot)
         {
             var confirm = await ShowPopupAsync(string.Format(Strings.BotRemoveFromMenu, bot.Name), Strings.BotRemoveFromMenuTitle, Strings.OK, Strings.Cancel);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 ClientService.Send(new ToggleBotIsAddedToAttachmentMenu(bot.BotUserId, false, false));
             }
@@ -599,26 +569,9 @@ namespace Telegram.ViewModels
         public async void MarkFolderAsRead(ChatFolderViewModel folder)
         {
             var confirm = await ShowPopupAsync(Strings.AreYouSure, Strings.MarkAllAsRead, Strings.OK, Strings.Cancel);
-            if (confirm != ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
-                return;
-            }
-
-            var chats = await ClientService.GetChatListAsync(folder.ChatList, 0, int.MaxValue);
-            if (chats.TotalCount > chats.ChatIds.Count)
-            {
-                // ???
-            }
-
-            foreach (var id in chats.ChatIds)
-            {
-                var chat = ClientService.GetChat(id);
-                if (chat == null || chat.LastMessage == null || !chat.IsUnread())
-                {
-                    continue;
-                }
-
-                ClientService.Send(new ViewMessages(chat.Id, new[] { chat.LastMessage.Id }, new MessageSourceChatList(), true));
+                ClientService.Send(new ReadChatList(folder.ChatList));
             }
         }
 

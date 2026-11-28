@@ -13,6 +13,50 @@
                      SecondaryButtonText="Cancel"
                      Padding="0,24,0,0">
 
+    <controls:ModalPopup.Resources>
+        <ControlTemplate x:Key="SettingsExpanderPopupTemplate"
+                         TargetType="controls:SettingsExpander">
+            <Grid CornerRadius="{TemplateBinding CornerRadius}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Border x:Name="PopupHost"
+                        Background="{TemplateBinding Background}"
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        Padding="{TemplateBinding Padding}"
+                        Grid.Row="1">
+                    <ContentPresenter x:Name="PopupRoot" />
+                </Border>
+
+                <controls:SettingsButton x:Name="ActionButton"
+                                         Content="{TemplateBinding Header}"
+                                         Badge="{TemplateBinding Badge}"
+                                         BadgeTemplate="{TemplateBinding BadgeTemplate}"
+                                         BadgeVisibility="{TemplateBinding BadgeVisibility}"
+                                         BadgeLabel="{TemplateBinding BadgeLabel}"
+                                         Description="{TemplateBinding Description}"
+                                         Glyph="{TemplateBinding Glyph}"
+                                         IsGlyphVisible="{TemplateBinding IsGlyphVisible}"
+                                         IsPremiumVisible="{TemplateBinding IsPremiumVisible}"
+                                         IsChevronVisible="True"
+                                         BorderBrush="{TemplateBinding BorderBrush}"
+                                         BorderThickness="{TemplateBinding BorderThickness}"
+                                         CornerRadius="{TemplateBinding CornerRadius}"
+                                         HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                         Padding="0"
+                                         MinHeight="{TemplateBinding MinHeight}"
+                                         HorizontalAlignment="Stretch">
+                    <controls:SettingsButton.Template>
+                        <ControlTemplate TargetType="controls:SettingsButton">
+                            <ContentPresenter Background="Transparent" />
+                        </ControlTemplate>
+                    </controls:SettingsButton.Template>
+                </controls:SettingsButton>
+            </Grid>
+        </ControlTemplate>
+    </controls:ModalPopup.Resources>
+
     <ScrollViewer x:Name="ScrollingHost"
                   VerticalScrollBarVisibility="Auto"
                   VerticalScrollMode="Auto">
@@ -31,12 +75,12 @@
                            Style="{StaticResource BaseTextBlockStyle}"
                            Margin="0,0,0,4" />
                 <controls:SettingsExpander x:Name="ReportSpamExpander"
+                                           Template="{StaticResource SettingsExpanderPopupTemplate}"
                                            ExpandedChanged="ReportSpam_Expanded"
                                            Background="Transparent"
-                                           MinHeight="32"
-                                           Margin="0,0,-16,0">
+                                           MinHeight="32">
                     <controls:SettingsExpander.Header>
-                        <Grid Margin="-12,-11,0,-12">
+                        <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition />
                                 <ColumnDefinition Width="Auto" />
@@ -66,23 +110,23 @@
                     </StackPanel>
                 </controls:SettingsExpander>
 
-                <controls:SettingsExpander x:Name="DeleteAllExpander"
-                                           ExpandedChanged="DeleteAll_Expanded"
+                <controls:SettingsExpander x:Name="DeleteAllMessagesExpander"
+                                           Template="{StaticResource SettingsExpanderPopupTemplate}"
+                                           ExpandedChanged="DeleteAllMessages_Expanded"
                                            Background="Transparent"
-                                           MinHeight="32"
-                                           Margin="0,0,-16,0">
+                                           MinHeight="32">
                     <controls:SettingsExpander.Header>
-                        <Grid Margin="-12,-11,0,-12">
+                        <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition />
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <CheckBox x:Name="DeleteAllCheck"
-                                      Checked="DeleteAll_Checked"
-                                      Unchecked="DeleteAll_Checked" />
+                            <CheckBox x:Name="DeleteAllMessagesCheck"
+                                      Checked="DeleteAllMessages_Checked"
+                                      Unchecked="DeleteAllMessages_Checked" />
 
-                            <TextBlock x:Name="DeleteAllIcon"
+                            <TextBlock x:Name="DeleteAllMessagesIcon"
                                        Text="&#xE9B9;"
                                        FontFamily="{StaticResource SymbolThemeFontFamily}"
                                        FontSize="16"
@@ -90,25 +134,90 @@
                                        Margin="0,0,4,0"
                                        Grid.Column="1" />
 
-                            <controls:AnimatedTextBlock x:Name="DeleteAllCount"
+                            <controls:AnimatedTextBlock x:Name="DeleteAllMessagesCount"
                                                         TextStyle="{StaticResource BaseTextBlockStyle}"
                                                         VerticalAlignment="Center"
                                                         Grid.Column="2" />
                         </Grid>
                     </controls:SettingsExpander.Header>
-                    <StackPanel x:Name="DeleteAllRoot"
+                    <StackPanel x:Name="DeleteAllMessagesRoot"
                                 Margin="8,0,0,0">
 
                     </StackPanel>
                 </controls:SettingsExpander>
 
-                <controls:SettingsExpander x:Name="BanUserExpander"
-                                           ExpandedChanged="BanUser_Expanded"
+                <controls:SettingsExpander x:Name="DeleteAllReactionsExpander"
+                                           Template="{StaticResource SettingsExpanderPopupTemplate}"
+                                           ExpandedChanged="DeleteAllReactions_Expanded"
+                                           Background="Transparent"
+                                           MinHeight="32">
+                    <controls:SettingsExpander.Header>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <CheckBox x:Name="DeleteAllReactionsCheck"
+                                      Checked="DeleteAllReactions_Checked"
+                                      Unchecked="DeleteAllReactions_Checked" />
+
+                            <TextBlock x:Name="DeleteAllReactionsIcon"
+                                       Text="&#xE9B9;"
+                                       FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                       FontSize="16"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,4,0"
+                                       Grid.Column="1" />
+
+                            <controls:AnimatedTextBlock x:Name="DeleteAllReactionsCount"
+                                                        TextStyle="{StaticResource BaseTextBlockStyle}"
+                                                        VerticalAlignment="Center"
+                                                        Grid.Column="2" />
+                        </Grid>
+                    </controls:SettingsExpander.Header>
+                    <StackPanel x:Name="DeleteAllReactionsRoot"
+                                Margin="8,0,0,0">
+
+                    </StackPanel>
+                </controls:SettingsExpander>
+
+                <controls:SettingsExpander x:Name="DeleteAllExpander"
+                                           Template="{StaticResource SettingsExpanderPopupTemplate}"
                                            Background="Transparent"
                                            MinHeight="32"
-                                           Margin="0,0,-16,0">
+                                           Visibility="Collapsed">
                     <controls:SettingsExpander.Header>
-                        <Grid Margin="-12,-11,0,-12">
+                        <CheckBox x:Name="DeleteAllCheck"
+                                  Checked="DeleteAll_Checked"
+                                  Unchecked="DeleteAll_Checked">
+                            <TextBlock>
+                                <Run x:Name="DeleteAllText" />
+                                <Run x:Name="DeleteAllCount"
+                                     FontWeight="SemiBold" />
+                            </TextBlock>
+                        </CheckBox>
+                    </controls:SettingsExpander.Header>
+                    <StackPanel Margin="8,0,0,0">
+                        <CheckBox x:Name="DeleteAllMessagesItem"
+                                  Checked="DeleteAllItem_Checked"
+                                  Unchecked="DeleteAllItem_Checked"
+                                  Content="{CustomResource RestrictUserDeleteAllMessages}" />
+
+                        <CheckBox x:Name="DeleteAllReactionsItem"
+                                  Checked="DeleteAllItem_Checked"
+                                  Unchecked="DeleteAllItem_Checked"
+                                  Content="{CustomResource RestrictUserDeleteAllReactions}" />
+                    </StackPanel>
+                </controls:SettingsExpander>
+
+                <controls:SettingsExpander x:Name="BanUserExpander"
+                                           Template="{StaticResource SettingsExpanderPopupTemplate}"
+                                           ExpandedChanged="BanUser_Expanded"
+                                           Background="Transparent"
+                                           MinHeight="32">
+                    <controls:SettingsExpander.Header>
+                        <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition />
                                 <ColumnDefinition Width="Auto" />
@@ -148,13 +257,12 @@
                               IsChecked="{x:Bind ViewModel.CanSendBasicMessages, Mode=TwoWay}"
                               Content="{CustomResource UserRestrictionsSend}" />
 
-                    <controls:SettingsExpander Background="Transparent"
-                                               MinHeight="32"
-                                               Margin="0,0,-16,0">
+                    <controls:SettingsExpander Template="{StaticResource SettingsExpanderPopupTemplate}"
+                                               Background="Transparent"
+                                               MinHeight="32">
                         <controls:SettingsExpander.Header>
                             <CheckBox x:Name="CanSendMediaMessages"
-                                      IsChecked="{x:Bind ViewModel.CanSendMediaMessages, Mode=TwoWay}"
-                                      Margin="-12,-11,0,-12">
+                                      IsChecked="{x:Bind ViewModel.CanSendMediaMessages, Mode=TwoWay}">
                                 <TextBlock>
                                 <Run Text="{CustomResource UserRestrictionsSendMedia}" />
                                 <Run Text="{x:Bind ConvertCanSendCount(ViewModel.CanSendCount), Mode=OneWay}"

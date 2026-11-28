@@ -39,7 +39,7 @@ namespace Telegram.Controls
                 }
             }
 
-            var page = this.GetParent<Page>();
+            var page = this.GetParent<NavigationPage>();
             if (page != null)
             {
                 if (page is INavigablePage navigable)
@@ -58,9 +58,9 @@ namespace Telegram.Controls
                     viewModel.NavigationService.GoBack();
                     return;
                 }
-                else if (page.Frame != null && page.Frame.CanGoBack)
+                else if (page.Frame?.NavigationService is { CanGoBack: true } service)
                 {
-                    page.Frame.GoBack();
+                    service.GoBack();
                     return;
                 }
             }

@@ -13,7 +13,7 @@ using Windows.UI.Xaml.Controls;
 
 namespace Telegram.Views.Popups
 {
-    public sealed partial class ChooseOptionPopup : ContentPopup
+    public sealed partial class ChooseOptionPopup : ModalPopup
     {
         public ChooseOptionPopup(IEnumerable<ChooseOptionItem> options)
         {
@@ -45,7 +45,7 @@ namespace Telegram.Views.Popups
 
         public object SelectedIndex { get; private set; }
 
-        private void ContentDialog_PrimaryButtonClick(ContentDialog sender, ContentDialogButtonClickEventArgs args)
+        private void OnPrimaryButtonClick(ModalPopup sender, ModalPopupButtonClickEventArgs args)
         {
             SelectedIndex = ((ChooseOptionItem)LayoutRoot.Items.OfType<RadioButton>().FirstOrDefault(x => x.IsChecked == true)?.Tag)?.Value;
         }

@@ -11,6 +11,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Telegram.Common;
 using Telegram.Entities;
+using Telegram.Navigation;
 using Telegram.Services;
 using Telegram.Services.Factories;
 using Telegram.Streams;
@@ -333,7 +334,7 @@ namespace Telegram.Controls.Views
 
             if (_canceled)
             {
-                _shareOperation.TryReportCompleted();
+                _shareOperation.TryReportCompleted(WindowContext.ForXamlRoot(this));
             }
             else
             {
@@ -356,7 +357,7 @@ namespace Telegram.Controls.Views
         {
             if (_completed)
             {
-                _shareOperation.TryReportCompleted();
+                _shareOperation.TryReportCompleted(WindowContext.ForXamlRoot(this));
             }
             else
             {

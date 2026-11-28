@@ -8,6 +8,7 @@
 using Telegram.Common;
 using Telegram.Controls;
 using Telegram.Controls.Media;
+using Telegram.Navigation;
 using Telegram.Td.Api;
 using Telegram.ViewModels.Settings;
 using Windows.UI.Xaml;
@@ -23,6 +24,7 @@ namespace Telegram.Views.Settings
         public SettingsLanguagePage()
         {
             InitializeComponent();
+            Transition = PageTransition.Entrance;
             Title = Strings.Language;
         }
 

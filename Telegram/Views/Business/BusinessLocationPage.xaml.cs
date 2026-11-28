@@ -6,6 +6,7 @@
 //
 
 using Telegram.Common;
+using Telegram.Navigation.Services;
 using Telegram.Td.Api;
 using Telegram.ViewModels.Business;
 using Windows.UI.Xaml;
@@ -23,12 +24,12 @@ namespace Telegram.Views.Business
             Title = Strings.BusinessLocation;
         }
 
-        protected override void OnNavigatedTo(NavigationEventArgs e)
+        protected override void OnNavigatedTo(NavigatedEventArgs e)
         {
             ViewModel.PropertyChanged += OnPropertyChanged;
         }
 
-        protected override void OnNavigatedFrom(NavigationEventArgs e)
+        protected override void OnNavigatedFrom(NavigatedEventArgs e)
         {
             ViewModel.PropertyChanged -= OnPropertyChanged;
         }

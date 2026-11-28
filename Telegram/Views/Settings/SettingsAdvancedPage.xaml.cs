@@ -6,6 +6,7 @@
 //
 
 using Telegram.Common;
+using Telegram.Navigation;
 using Telegram.ViewModels.Settings;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
@@ -19,6 +20,7 @@ namespace Telegram.Views.Settings
         public SettingsAdvancedPage()
         {
             InitializeComponent();
+            Transition = PageTransition.Entrance;
             Title = Strings.PrivacyAdvanced;
 
             // The Store serves a single channel: the app channel's beta builds are only reachable
@@ -31,7 +33,7 @@ namespace Telegram.Views.Settings
 
         private void Shortcuts_Click(object sender, RoutedEventArgs e)
         {
-            Frame.Navigate(typeof(SettingsShortcutsPage));
+            ViewModel.NavigationService.Navigate(typeof(SettingsShortcutsPage));
         }
     }
 }

@@ -24,7 +24,7 @@ namespace Telegram.Views.Create
         }
     }
 
-    public sealed partial class NewBotPopup : ContentPopup
+    public sealed partial class NewBotPopup : ModalPopup
     {
         public NewBotViewModel ViewModel => DataContext as NewBotViewModel;
 
@@ -91,7 +91,7 @@ namespace Telegram.Views.Create
 
         #endregion
 
-        private async void OnPrimaryButtonClick(ContentDialog sender, ContentDialogButtonClickEventArgs args)
+        private async void OnPrimaryButtonClick(ModalPopup sender, ModalPopupButtonClickEventArgs args)
         {
             IsPrimaryButtonPending = true;
 

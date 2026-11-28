@@ -12,7 +12,7 @@ using Windows.UI.Xaml.Controls;
 
 namespace Telegram.Views.Monetization.Popups
 {
-    public sealed partial class LearnMorePopup : ContentPopup
+    public sealed partial class LearnMorePopup : ModalPopup
     {
         private readonly string _value;
         private readonly string _url;
@@ -24,28 +24,28 @@ namespace Telegram.Views.Monetization.Popups
             //Icon.Source = new LocalFileSource($"ms-appx:///Assets/Animations/CollectibleUsername.tgs");
         }
 
-        private void ContentDialog_PrimaryButtonClick(ContentDialog sender, ContentDialogButtonClickEventArgs args)
+        private void OnPrimaryButtonClick(ModalPopup sender, ModalPopupButtonClickEventArgs args)
         {
         }
 
-        private void ContentDialog_SecondaryButtonClick(ContentDialog sender, ContentDialogButtonClickEventArgs args)
+        private void OnSecondaryButtonClick(ModalPopup sender, ModalPopupButtonClickEventArgs args)
         {
         }
 
-        private void OnOpened(ContentDialog sender, ContentDialogOpenedEventArgs args)
+        private void OnOpened(ModalPopup sender, ModalPopupOpenedEventArgs args)
         {
             Icon.Play();
         }
 
         private void Learn_Click(object sender, RoutedEventArgs e)
         {
-            Hide(ContentDialogResult.Primary);
+            Hide(ModalPopupResult.Primary);
             MessageHelper.OpenUrl(null, null, _url);
         }
 
         private void Copy_Click(object sender, RoutedEventArgs e)
         {
-            Hide(ContentDialogResult.Secondary);
+            Hide(ModalPopupResult.Secondary);
             MessageHelper.CopyText(XamlRoot, _value);
         }
     }

@@ -118,7 +118,7 @@ namespace Telegram.Views.Wallet.Popups
 
         private void SendMoneyButton_Click(object sender, RoutedEventArgs e)
         {
-            Hide(ContentDialogResult.Primary);
+            Hide(ModalPopupResult.Primary);
         }
 
         private void CloseCardButton_Click(object sender, RoutedEventArgs e)

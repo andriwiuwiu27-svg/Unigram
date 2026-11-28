@@ -10,6 +10,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Telegram.Collections;
 using Telegram.Common;
+using Telegram.Controls;
 using Telegram.Converters;
 using Telegram.Navigation;
 using Telegram.Navigation.Services;
@@ -177,7 +178,7 @@ namespace Telegram.ViewModels
         public async void CreateSecretChat(User user)
         {
             var confirm = await ShowPopupAsync(Strings.AreYouSureSecretChat, Strings.AreYouSureSecretChatTitle, Strings.Start, Strings.Cancel);
-            if (confirm != ContentDialogResult.Primary)
+            if (confirm != ModalPopupResult.Primary)
             {
                 return;
             }
@@ -192,7 +193,7 @@ namespace Telegram.ViewModels
         public async void Delete(User user)
         {
             var confirm = await ShowPopupAsync(Strings.AreYouSureDeleteContact, Strings.AppName, Strings.OK, Strings.Cancel);
-            if (confirm != ContentDialogResult.Primary)
+            if (confirm != ModalPopupResult.Primary)
             {
                 return;
             }

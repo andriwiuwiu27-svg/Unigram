@@ -35,8 +35,20 @@ P:Microsoft.UI.Xaml.DependencyObject.Dispatcher;Always null outside UWP. Use Dis
 
 # Package identity. This flavour also runs unpackaged, and there each of these throws 0x80073D54,
 # "The process has no package identity". The shims that answer for them - AppPaths, AppIdentity,
-# ApiInfo, SettingsStore - are the only files that suppress RS0030.
+# ApiInfo, SettingsStore - and the storage shims below are the only files that suppress RS0030.
 
 P:Windows.ApplicationModel.Package.Current;Throws without package identity. AppPaths.InstalledPath for the payload, AppIdentity for Id and SignatureKind.
 P:Windows.Storage.ApplicationData.Current;Throws without package identity. AppPaths for the folders and their paths, SettingsStore.Local for LocalSettings.
 M:Windows.Storage.StorageFile.GetFileFromApplicationUriAsync(System.Uri);Fails without package identity. Open a path under AppPaths.InstalledPath or AppPaths.LocalPath instead.
+
+# Files and folders. The app names them FileItem and FolderItem: these types on UWP, the classes in
+# Telegram/Storage here. A StorageFile where a FileItem is expected already fails to compile, so the
+# ban is on the silent case - getting a WinRT file from nothing and never meeting a FileItem. The
+# types themselves cannot be banned: CsWinRT's generated marshalling names every one the app hands to
+# WinRT, and the analyzer also reports types it only infers, which every edge has.
+# KnownFolders, DownloadsFolder and StorageApplicationPermissions join the list when they are retired.
+
+M:Windows.Storage.StorageFile.GetFileFromPathAsync(System.String);Use FileItem.GetFileFromPathAsync.
+M:Windows.Storage.StorageFolder.GetFolderFromPathAsync(System.String);Use FolderItem.GetFolderFromPathAsync.
+T:Windows.Storage.FileIO;Use FileItemIO.
+T:Windows.Storage.PathIO;Use FileItemIO, or System.IO.File on a path.

@@ -12,18 +12,76 @@
 #include "BroadcastTimeRequestedEventArgs.h"
 #include "MediaChannelDescriptionsRequestedEventArgs.h"
 
+#include "Broadcast/BroadcastStream.h"
+
 #include "StaticThreads.h"
+
+#include "api/audio/create_audio_device_module.h"
+#include "api/environment/environment_factory.h"
+#include "modules/audio_device/include/audio_device_data_observer.h"
 
 #include "../Telegram.Native/AppModelPaths.h"
 
+#include <algorithm>
+#include <cstdint>
+#include <random>
+
 namespace winrt::Telegram::Native::Calls::implementation
 {
+    namespace
+    {
+        constexpr int64_t kStatusTickUs = 500000;
+
+        // The device thread's 10 ms playout block: the broadcast replaces the call's playout while it plays.
+        class BroadcastPlayoutObserver : public webrtc::AudioDeviceDataObserver
+        {
+        public:
+            explicit BroadcastPlayoutObserver(std::shared_ptr<broadcast_audio::Core> core)
+                : m_core(std::move(core))
+            {
+            }
+
+            void OnCaptureData(const void* audio_samples, const size_t num_samples, const size_t bytes_per_sample, const size_t num_channels, const uint32_t samples_per_sec) override
+            {
+            }
+
+            void OnRenderData(const void* audio_samples, const size_t num_samples, const size_t bytes_per_sample, const size_t num_channels, const uint32_t samples_per_sec) override
+            {
+                if (bytes_per_sample != num_channels * sizeof(int16_t) || samples_per_sec % 100 != 0 || num_samples != samples_per_sec / 100)
+                {
+                    return;
+                }
+
+                // The observer hands playout over as const, but the buffer is the device's own and is played after this returns.
+                m_core->render(static_cast<int16_t*>(const_cast<void*>(audio_samples)), num_samples, num_channels, samples_per_sec);
+            }
+
+        private:
+            const std::shared_ptr<broadcast_audio::Core> m_core;
+        };
+    }
+
     VoipGroupManager::VoipGroupManager(VoipGroupDescriptor descriptor)
     {
+        m_isScreencast = VoipVideoContentType::Screencast == descriptor.VideoContentType();
+        m_isStream = descriptor.IsStream();
+        m_isNoiseSuppressionEnabled = descriptor.IsNoiseSuppressionEnabled();
+
+        if (!m_isScreencast)
+        {
+            CreateBroadcast(descriptor);
+        }
+
+        // An RTMP stream has nobody to send to and nothing to receive but the stream: no engine at all.
+        if (m_isStream)
+        {
+            return;
+        }
+
         // Sharing a screen runs a second manager alongside the main one, and both would
         // otherwise interleave into the same file.
         auto logPath = AppModel::LocalPath()
-            + (VoipVideoContentType::Screencast == descriptor.VideoContentType()
+            + (m_isScreencast
                 ? hstring(L"\\tgcalls_screencast.txt")
                 : hstring(L"\\tgcalls_group.txt"));
 
@@ -50,26 +108,8 @@ namespace winrt::Telegram::Native::Calls::implementation
             },
             .initialInputDeviceId = winrt::to_string(descriptor.AudioInputId()),
             .initialOutputDeviceId = winrt::to_string(descriptor.AudioOutputId()),
-            .requestCurrentTime = [weakThis{ get_weak() }](std::function<void(int64_t)> done) {
-                if (auto strongThis = weakThis.get())
-                {
-                    return strongThis->OnRequestCurrentTime(done);
-                }
-            },
-            .requestAudioBroadcastPart = [weakThis{ get_weak() }](int64_t time, int64_t period, std::function<void(tgcalls::BroadcastPart&&)> done) {
-                if (auto strongThis = weakThis.get())
-                {
-                    return strongThis->OnRequestAudioBroadcastPart(time, period, done);
-                }
-            },
-            .requestVideoBroadcastPart = [weakThis{ get_weak() }](int64_t time, int64_t period, int32_t channel, tgcalls::VideoChannelDescription::Quality quality, std::function<void(tgcalls::BroadcastPart&&)> done) {
-                if (auto strongThis = weakThis.get())
-                {
-                    return strongThis->OnRequestVideoBroadcastPart(time, period, channel, quality, done);
-                }
-            },
             .videoContentType = (tgcalls::VideoContentType)descriptor.VideoContentType(),
-            .initialEnableNoiseSuppression = m_isNoiseSuppressionEnabled = descriptor.IsNoiseSuppressionEnabled(),
+            .initialEnableNoiseSuppression = m_isNoiseSuppressionEnabled,
         };
 
         if (descriptor.IsConference())
@@ -80,23 +120,49 @@ namespace winrt::Telegram::Native::Calls::implementation
                 {
                     return strongThis->OnE2EEncryptDecrypt(message, userId, encrypt, channelId);
                 }
-                };
+
+                return std::vector<uint8_t>();
+            };
             impl.requestMediaChannelDescriptions = [weakThis{ get_weak() }](std::vector<uint32_t> const& ssrcs, std::function<void(std::vector<tgcalls::MediaChannelDescription>&&)> done) {
                 if (auto strongThis = weakThis.get())
                 {
                     return strongThis->OnRequestMediaChannelDescriptions(ssrcs, done);
                 }
+
+                return std::shared_ptr<tgcalls::RequestMediaChannelDescriptionTask>();
             };
         }
 
         impl.videoCapture = GetVideoCaptureImpl(descriptor.VideoCapture());
 
-        m_impl = std::make_unique<tgcalls::GroupInstanceCustomImpl>(std::move(impl));
-
-        if (VoipVideoContentType::Screencast == descriptor.VideoContentType())
+        // tgcalls builds no platform audio device of its own: without this the call has none. A
+        // screencast is left without it, because only then does tgcalls give it its fake device.
+        if (!m_isScreencast)
         {
-            m_isScreencast = true;
+            // The broadcast is rendered over the device's playout here rather than through the
+            // engine's onPlayoutFrame, which GroupInstanceReferenceImpl does not call.
+            impl.createAudioDeviceModule = [core = m_core](webrtc::TaskQueueFactory*) {
+                auto module = webrtc::CreateAudioDeviceModule(webrtc::CreateEnvironment(), webrtc::AudioDeviceModule::kPlatformDefaultAudio);
+                if (core && module)
+                {
+                    return webrtc::CreateAudioDeviceWithDataObserver(module, std::make_unique<BroadcastPlayoutObserver>(core));
+                }
 
+                return module;
+            };
+        }
+
+        if (descriptor.IsReferenceImpl())
+        {
+            m_impl = std::make_unique<tgcalls::GroupInstanceReferenceImpl>(std::move(impl));
+        }
+        else
+        {
+            m_impl = std::make_unique<tgcalls::GroupInstanceCustomImpl>(std::move(impl));
+        }
+
+        if (m_isScreencast)
+        {
             auto audioProcessId = descriptor.AudioProcessId();
             if (audioProcessId == 0)
             {
@@ -133,12 +199,222 @@ namespace winrt::Telegram::Native::Calls::implementation
         Stop();
     }
 
+    void VoipGroupManager::CreateBroadcast(VoipGroupDescriptor const& descriptor)
+    {
+        m_outputDeviceId = winrt::to_string(descriptor.AudioOutputId());
+        m_queue = std::make_shared<broadcast::TaskQueue>();
+
+        if (!m_isStream)
+        {
+            m_core = std::make_shared<broadcast_audio::Core>();
+        }
+
+        // Frames are timed on the clock the session plays on: the core's, or the same steady clock for a stream.
+        std::function<int64_t()> nowUs = broadcast_audio::defaultClockMicroseconds;
+        m_video = std::make_shared<broadcast::VideoHub>(nowUs);
+
+        broadcast::HandoffHost host;
+        host.setEngineRtc = [this](bool rtc)
+        {
+            if (m_impl)
+            {
+                m_impl->setConnectionMode(rtc ? tgcalls::GroupConnectionMode::GroupConnectionModeRtc : tgcalls::GroupConnectionMode::GroupConnectionModeNone);
+            }
+        };
+
+        host.silence = [core = m_core]
+        {
+            if (core)
+            {
+                core->setActive(false);
+            }
+        };
+
+        host.startSession = [weakThis{ get_weak() }, queue = m_queue]
+        {
+            queue->Post([weakThis]
+            {
+                if (auto strongThis = weakThis.get())
+                {
+                    strongThis->StartSession();
+                }
+            });
+        };
+
+        host.stopSession = [weakThis{ get_weak() }, queue = m_queue]
+        {
+            queue->Post([weakThis]
+            {
+                if (auto strongThis = weakThis.get())
+                {
+                    strongThis->StopSession();
+                }
+            });
+        };
+
+        host.rejoined = [weakThis{ get_weak() }, queue = m_queue]
+        {
+            queue->Post([weakThis]
+            {
+                if (auto strongThis = weakThis.get())
+                {
+                    if (strongThis->m_session)
+                    {
+                        strongThis->m_session->Rejoined();
+                    }
+                }
+            });
+        };
+
+        host.rejoinRequested = [weakThis{ get_weak() }]
+        {
+            if (auto strongThis = weakThis.get())
+            {
+                strongThis->m_rejoinRequested(*strongThis, nullptr);
+            }
+        };
+
+        host.networkStateUpdated = [weakThis{ get_weak() }](bool connected, bool transitioning)
+        {
+            if (auto strongThis = weakThis.get())
+            {
+                strongThis->OnBroadcastNetworkStateUpdated(connected, transitioning);
+            }
+        };
+
+        m_handoff = std::make_unique<broadcast::Handoff>(std::move(host), !m_isStream);
+
+        m_queue->PostDelayed(kStatusTickUs, [weakThis{ get_weak() }]
+        {
+            if (auto strongThis = weakThis.get())
+            {
+                strongThis->Tick();
+            }
+        });
+    }
+
+    void VoipGroupManager::Tick()
+    {
+        if (m_handoff)
+        {
+            m_handoff->Tick();
+        }
+
+        m_queue->PostDelayed(kStatusTickUs, [weakThis{ get_weak() }]
+        {
+            if (auto strongThis = weakThis.get())
+            {
+                strongThis->Tick();
+            }
+        });
+    }
+
+    void VoipGroupManager::StartSession()
+    {
+        if (m_session)
+        {
+            return;
+        }
+
+        if (m_isStream)
+        {
+            m_session = std::make_shared<broadcast::StreamSession>(m_queue, m_video, MakeSessionHost(), m_outputDeviceId);
+        }
+        else
+        {
+            m_session = std::make_shared<broadcast::ListenerSession>(m_queue, m_core, m_video, MakeSessionHost());
+        }
+
+        m_session->SetRequestedVideoChannels(m_videoChannels);
+        m_session->Start();
+    }
+
+    void VoipGroupManager::StopSession()
+    {
+        if (m_session)
+        {
+            m_session->Stop();
+            m_session = nullptr;
+        }
+
+        std::lock_guard lock(m_levelsLock);
+        m_broadcastLevels.clear();
+    }
+
+    broadcast::SessionHost VoipGroupManager::MakeSessionHost()
+    {
+        broadcast::SessionHost host;
+
+        host.requestTime = [weakThis{ get_weak() }](std::function<void(int64_t)> answer)
+        {
+            if (auto strongThis = weakThis.get())
+            {
+                strongThis->OnBroadcastTimeRequested(std::move(answer));
+            }
+        };
+
+        host.requestPart = [weakThis{ get_weak() }](broadcast::PartRequest const& request, std::function<void(broadcast::PartAnswer&&)> answer)
+        {
+            if (auto strongThis = weakThis.get())
+            {
+                strongThis->OnBroadcastPartRequested(request, std::move(answer));
+            }
+        };
+
+        host.requestRejoin = [weakThis{ get_weak() }]
+        {
+            if (auto strongThis = weakThis.get())
+            {
+                if (strongThis->m_handoff)
+                {
+                    strongThis->m_handoff->RequestRejoin();
+                }
+            }
+        };
+
+        host.levels = [weakThis{ get_weak() }](std::vector<broadcast_audio::Level>&& levels)
+        {
+            if (auto strongThis = weakThis.get())
+            {
+                strongThis->OnBroadcastLevels(std::move(levels));
+            }
+        };
+
+        return host;
+    }
+
     void VoipGroupManager::Stop()
     {
         if (m_loopback)
         {
             m_loopback->Stop();
             m_loopback = nullptr;
+        }
+
+        // The broadcast goes first: the engine's playout must not reach a core whose session is going away, and the
+        // handoff must not call into an engine being stopped.
+        if (m_handoff)
+        {
+            m_handoff->Close();
+        }
+
+        if (m_core)
+        {
+            m_core->setActive(false);
+        }
+
+        // The session ends on the queue's thread: a stream's audio device must be stopped on the thread that made it.
+        if (m_queue)
+        {
+            m_queue->Close([this]
+            {
+                StopSession();
+            });
+        }
+
+        if (m_video)
+        {
+            m_video->Close();
         }
 
         if (m_impl)
@@ -148,11 +424,17 @@ namespace winrt::Telegram::Native::Calls::implementation
         }
     }
 
-    void VoipGroupManager::SetConnectionMode(VoipGroupConnectionMode connectionMode, bool keepBroadcastIfWasEnabled, bool isUnifiedBroadcast)
+    void VoipGroupManager::SetConnectionMode(VoipGroupConnectionMode connectionMode, bool keepBroadcastIfWasEnabled)
     {
-        if (m_impl)
+        if (m_handoff)
         {
-            m_impl->setConnectionMode((tgcalls::GroupConnectionMode)connectionMode, keepBroadcastIfWasEnabled, isUnifiedBroadcast);
+            m_handoff->SetConnectionMode(static_cast<broadcast::ConnectionMode>(connectionMode), keepBroadcastIfWasEnabled);
+        }
+        else if (m_impl)
+        {
+            m_impl->setConnectionMode(connectionMode == VoipGroupConnectionMode::Rtc
+                ? tgcalls::GroupConnectionMode::GroupConnectionModeRtc
+                : tgcalls::GroupConnectionMode::GroupConnectionModeNone);
         }
     }
 
@@ -163,6 +445,19 @@ namespace winrt::Telegram::Native::Calls::implementation
             m_impl->emitJoinPayload([completion](auto const& payload) {
                 completion(payload.audioSsrc, winrt::to_hstring(payload.json));
                 });
+        }
+        else if (m_isStream && m_queue)
+        {
+            // A stream joins without media: the server wants a payload, any ssrc, and nothing else in it.
+            m_queue->Post([completion]
+            {
+                std::random_device device;
+                std::uniform_int_distribution<int32_t> distribution(1, INT32_MAX - 2);
+                int32_t ssrc = distribution(device);
+
+                auto json = "{\"fingerprints\":[],\"ufrag\":\"\",\"pwd\":\"\",\"ssrc\":" + std::to_string(ssrc) + ",\"ssrc-groups\":[]}";
+                completion(ssrc, winrt::to_hstring(json));
+            });
         }
 
         // Nothing to join with once the instance is gone. Completing with an empty
@@ -188,10 +483,23 @@ namespace winrt::Telegram::Native::Calls::implementation
 
     void VoipGroupManager::AddIncomingVideoOutput(hstring endpointId, winrt::Telegram::Native::Calls::VoipVideoOutputSink sink)
     {
-        if (m_impl && sink)
+        if (sink == nullptr)
         {
-            auto implementation = winrt::get_self<VoipVideoOutputSink>(sink);
-            m_impl->addIncomingVideoOutput(winrt::to_string(endpointId), implementation->Sink());
+            return;
+        }
+
+        auto implementation = winrt::get_self<VoipVideoOutputSink>(sink);
+        auto endpoint = winrt::to_string(endpointId);
+
+        if (m_impl)
+        {
+            m_impl->addIncomingVideoOutput(endpoint, implementation->Sink());
+        }
+
+        // The same tile shows the call's video and the broadcast's, whichever is playing.
+        if (m_video)
+        {
+            m_video->AddSink(endpoint, implementation->Sink());
         }
     }
 
@@ -225,11 +533,30 @@ namespace winrt::Telegram::Native::Calls::implementation
 
     void VoipGroupManager::SetAudioOutputDevice(hstring id)
     {
+        auto device = winrt::to_string(id);
+
         if (m_impl)
         {
-            m_impl->setAudioOutputDevice(winrt::to_string(id));
+            m_impl->setAudioOutputDevice(device);
+        }
+
+        if (m_isStream && m_queue)
+        {
+            m_queue->Post([weakThis{ get_weak() }, device]
+            {
+                if (auto strongThis = weakThis.get())
+                {
+                    strongThis->m_outputDeviceId = device;
+
+                    if (auto stream = std::dynamic_pointer_cast<broadcast::StreamSession>(strongThis->m_session))
+                    {
+                        stream->SetOutputDevice(device);
+                    }
+                }
+            });
         }
     }
+
     void VoipGroupManager::SetAudioInputDevice(hstring id)
     {
         if (m_impl)
@@ -256,21 +583,32 @@ namespace winrt::Telegram::Native::Calls::implementation
 
     void VoipGroupManager::SetVolume(int32_t ssrc, double volume)
     {
-        if (m_impl && ssrc)
+        if (ssrc == 0)
+        {
+            return;
+        }
+
+        if (m_impl)
         {
             m_impl->setVolume(ssrc, volume);
+        }
+
+        // The core's control calls belong to the queue.
+        if (m_core && m_queue)
+        {
+            m_queue->Post([core = m_core, ssrc, volume]
+            {
+                core->setVolume(static_cast<uint32_t>(ssrc), static_cast<float>(volume));
+            });
         }
     }
 
     void VoipGroupManager::SetRequestedVideoChannels(IVector<VoipVideoChannelInfo> descriptions)
     {
-        if (m_impl == nullptr)
-        {
-            return;
-        }
-
         auto impl = std::vector<tgcalls::VideoChannelDescription>();
+        auto requests = std::vector<broadcast::VideoChannelRequest>();
         impl.reserve(descriptions.Size());
+        requests.reserve(descriptions.Size());
 
         for (const VoipVideoChannelInfo& x : descriptions)
         {
@@ -290,27 +628,97 @@ namespace winrt::Telegram::Native::Calls::implementation
                 item.ssrcGroups.push_back(std::move(groupImpl));
             }
 
+            requests.push_back(broadcast::VideoChannelRequest{
+                .endpointId = item.endpointId,
+                .minQuality = static_cast<broadcast::VideoQuality>(x.MinQuality()),
+                .maxQuality = static_cast<broadcast::VideoQuality>(x.MaxQuality())
+                });
+
             impl.push_back(std::move(item));
         }
 
-        m_impl->setRequestedVideoChannels(std::move(impl));
+        if (m_impl)
+        {
+            m_impl->setRequestedVideoChannels(std::move(impl));
+        }
+
+        if (m_queue && !m_isStream)
+        {
+            m_queue->Post([weakThis{ get_weak() }, requests = std::move(requests)]
+            {
+                if (auto strongThis = weakThis.get())
+                {
+                    strongThis->m_videoChannels = requests;
+
+                    if (strongThis->m_session)
+                    {
+                        strongThis->m_session->SetRequestedVideoChannels(requests);
+                    }
+                }
+            });
+        }
     }
 
 
 
     void VoipGroupManager::OnNetworkStateUpdated(tgcalls::GroupNetworkState state)
     {
-        auto args = winrt::make_self<GroupNetworkStateChangedEventArgs>(state.isConnected, state.isTransitioningFromBroadcastToRtc);
+        if (m_handoff)
+        {
+            // Called here, on the engine's thread: a kept broadcast must be silent before RTC audio plays.
+            m_handoff->RtcStateChanged(state.isConnected);
+        }
+        else
+        {
+            auto args = winrt::make_self<GroupNetworkStateChangedEventArgs>(state.isConnected, false);
+            m_networkStateUpdated(*this, *args);
+        }
+    }
+
+    void VoipGroupManager::OnBroadcastNetworkStateUpdated(bool connected, bool transitioning)
+    {
+        auto args = winrt::make_self<GroupNetworkStateChangedEventArgs>(connected, transitioning);
         m_networkStateUpdated(*this, *args);
+    }
+
+    void VoipGroupManager::OnBroadcastLevels(std::vector<broadcast_audio::Level>&& levels)
+    {
+        std::lock_guard lock(m_levelsLock);
+
+        // The levels of the engine's report window: the maximum, and voice if any had it.
+        for (auto const& level : levels)
+        {
+            auto existing = std::find_if(m_broadcastLevels.begin(), m_broadcastLevels.end(), [&](broadcast_audio::Level const& other)
+            {
+                return other.ssrc == level.ssrc;
+            });
+
+            if (existing == m_broadcastLevels.end())
+            {
+                m_broadcastLevels.push_back(level);
+            }
+            else
+            {
+                existing->level = std::max(existing->level, level.level);
+                existing->voice = existing->voice || level.voice;
+            }
+        }
     }
 
     void VoipGroupManager::OnAudioLevelsUpdated(tgcalls::GroupLevelsUpdate const& levels)
     {
+        std::vector<broadcast_audio::Level> broadcastLevels;
+
+        {
+            std::lock_guard lock(m_levelsLock);
+            broadcastLevels.swap(m_broadcastLevels);
+        }
+
         // Filled first and handed over whole: appending to the IVector would be a COM
         // call per participant, and this arrives about ten times a second for the whole
         // length of the call.
         auto participants = std::vector<winrt::Telegram::Native::Calls::VoipGroupParticipant>();
-        participants.reserve(levels.updates.size());
+        participants.reserve(levels.updates.size() + broadcastLevels.size());
 
         for (const tgcalls::GroupLevelUpdate& x : levels.updates)
         {
@@ -322,68 +730,76 @@ namespace winrt::Telegram::Native::Calls::implementation
                 });
         }
 
+        // The broadcast's speakers join the engine's report, which goes out every 100 ms in every mode.
+        for (auto const& level : broadcastLevels)
+        {
+            bool reported = std::any_of(levels.updates.begin(), levels.updates.end(), [&](tgcalls::GroupLevelUpdate const& x)
+            {
+                return x.ssrc == level.ssrc;
+            });
+
+            if (!reported)
+            {
+                participants.push_back(winrt::Telegram::Native::Calls::VoipGroupParticipant{
+                    .AudioSource = static_cast<int32_t>(level.ssrc),
+                        .Level = level.level,
+                        .IsSpeaking = level.voice,
+                        .IsMuted = false
+                    });
+            }
+        }
+
         m_audioLevelsUpdated(*this, winrt::single_threaded_vector(std::move(participants)));
     }
 
-    std::shared_ptr<tgcalls::BroadcastPartTask> VoipGroupManager::OnRequestCurrentTime(std::function<void(int64_t)> done)
+    void VoipGroupManager::OnBroadcastTimeRequested(std::function<void(int64_t)> answer)
     {
-        auto task = std::make_shared<BroadcastTimeTaskImpl>(std::move(done));
-        auto args = winrt::make_self<BroadcastTimeRequestedEventArgs>([task](int64_t time) { task->done(time); });
-
+        auto args = winrt::make_self<BroadcastTimeRequestedEventArgs>([answer](int64_t time) { answer(time); });
         m_broadcastTimeRequested(*this, *args);
-        return task;
     }
 
-    std::shared_ptr<tgcalls::BroadcastPartTask> VoipGroupManager::OnRequestVideoBroadcastPart(int64_t time, int64_t period, int32_t channel, tgcalls::VideoChannelDescription::Quality quality, std::function<void(tgcalls::BroadcastPart&&)> done)
+    void VoipGroupManager::OnBroadcastPartRequested(broadcast::PartRequest const& request, std::function<void(broadcast::PartAnswer&&)> answer)
     {
-        int scale = 0;
-        switch (period)
+        auto deferral = [answer](BroadcastPartStatus status, int64_t response, array_view<uint8_t const> data)
         {
-        case 1000: scale = 0; break;
-        case 500: scale = 1; break;
-        case 250: scale = 2; break;
-        case 125: scale = 3; break;
-        }
+            broadcast::PartAnswer part;
+            part.responseTimestampMs = response;
 
-        VoipVideoChannelQuality qualityImpl = VoipVideoChannelQuality::Thumbnail;
-        switch (quality)
+            switch (status)
+            {
+            case BroadcastPartStatus::Success:
+                part.status = data.size() ? broadcast::AnswerStatus::Data : broadcast::AnswerStatus::NotReady;
+                break;
+            case BroadcastPartStatus::ResyncNeeded:
+                part.status = broadcast::AnswerStatus::ResyncNeeded;
+                break;
+            case BroadcastPartStatus::RejoinNeeded:
+                part.status = broadcast::AnswerStatus::RejoinNeeded;
+                break;
+            default:
+                part.status = broadcast::AnswerStatus::NotReady;
+                break;
+            }
+
+            if (part.status == broadcast::AnswerStatus::Data)
+            {
+                part.data = std::make_shared<std::vector<uint8_t> const>(data.begin(), data.end());
+            }
+
+            answer(std::move(part));
+        };
+
+        // Parts are a second each: scale 0.
+        if (request.kind == broadcast::PartKind::Audio)
         {
-        case tgcalls::VideoChannelDescription::Quality::Thumbnail:
-            qualityImpl = VoipVideoChannelQuality::Thumbnail;
-            break;
-        case tgcalls::VideoChannelDescription::Quality::Medium:
-            qualityImpl = VoipVideoChannelQuality::Medium;
-            break;
-        case tgcalls::VideoChannelDescription::Quality::Full:
-            qualityImpl = VoipVideoChannelQuality::Full;
-            break;
+            auto args = winrt::make_self<AudioBroadcastPartRequestedEventArgs>(0, request.timestampMs, deferral);
+            m_audioBroadcastPartRequested(*this, *args);
         }
-
-        auto task = std::make_shared<BroadcastPartTaskImpl>(std::move(done));
-        auto args = winrt::make_self<VideoBroadcastPartRequestedEventArgs>(scale, time, channel, qualityImpl,
-            [task](int64_t time, int64_t response, array_view<uint8_t const> data) { task->done(time, response, data); });
-
-        m_videoBroadcastPartRequested(*this, *args);
-        return task;
-    }
-
-    std::shared_ptr<tgcalls::BroadcastPartTask> VoipGroupManager::OnRequestAudioBroadcastPart(int64_t time, int64_t period, std::function<void(tgcalls::BroadcastPart&&)> done)
-    {
-        int scale = 0;
-        switch (period)
+        else
         {
-        case 1000: scale = 0; break;
-        case 500: scale = 1; break;
-        case 250: scale = 2; break;
-        case 125: scale = 3; break;
+            auto args = winrt::make_self<VideoBroadcastPartRequestedEventArgs>(0, request.timestampMs, request.channelId, static_cast<VoipVideoChannelQuality>(request.quality), deferral);
+            m_videoBroadcastPartRequested(*this, *args);
         }
-
-        auto task = std::make_shared<BroadcastPartTaskImpl>(std::move(done));
-        auto args = winrt::make_self<AudioBroadcastPartRequestedEventArgs>(scale, time,
-            [task](int64_t time, int64_t response, array_view<uint8_t const> data) { task->done(time, response, data); });
-
-        m_audioBroadcastPartRequested(*this, *args);
-        return task;
     }
 
     std::shared_ptr<tgcalls::RequestMediaChannelDescriptionTask> VoipGroupManager::OnRequestMediaChannelDescriptions(const std::vector<uint32_t>& ssrcs, std::function<void(std::vector<tgcalls::MediaChannelDescription>&&)> done)
@@ -507,6 +923,20 @@ namespace winrt::Telegram::Native::Calls::implementation
     void VoipGroupManager::BroadcastTimeRequested(winrt::event_token const& token)
     {
         m_broadcastTimeRequested.remove(token);
+    }
+
+
+
+    winrt::event_token VoipGroupManager::RejoinRequested(Windows::Foundation::TypedEventHandler<
+        winrt::Telegram::Native::Calls::VoipGroupManager,
+        Windows::Foundation::IInspectable> const& value)
+    {
+        return m_rejoinRequested.add(value);
+    }
+
+    void VoipGroupManager::RejoinRequested(winrt::event_token const& token)
+    {
+        m_rejoinRequested.remove(token);
     }
 
 

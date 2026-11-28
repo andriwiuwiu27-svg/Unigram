@@ -8,16 +8,17 @@
              d:DesignHeight="300"
              d:DesignWidth="400">
 
-    <Grid Background="{ThemeResource SettingsItemBackground}"
-          BorderBrush="{ThemeResource SettingsItemBorderBrush}"
-          BorderThickness="1"
-          CornerRadius="4"
-          Margin="12,4,12,0"
-          Padding="12,8,12,4">
+    <Grid Padding="12,8,12,4">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
+        <Border x:Name="Divider"
+                BorderBrush="{ThemeResource NavigationViewContentGridBorderBrush}"
+                BorderThickness="0,0,0,1"
+                Margin="-12,-8,-12,-4"
+                Grid.ColumnSpan="2"
+                Grid.RowSpan="2" />
 
         <TextBlock Text="{CustomResource AccountFrozenAlertTitle}"
                    Style="{StaticResource BaseTextBlockStyle}"
@@ -34,6 +35,7 @@
                 FontWeight="SemiBold"
                 HorizontalAlignment="Stretch"
                 VerticalAlignment="Stretch"
+                CornerRadius="0"
                 Margin="-12,-8,-12,-4"
                 Grid.RowSpan="2" />
     </Grid>

@@ -6,6 +6,7 @@
 //
 
 using Telegram.Common;
+using Telegram.Controls;
 using Telegram.Navigation;
 using Telegram.Services;
 using Telegram.Td.Api;
@@ -34,7 +35,7 @@ namespace Telegram.ViewModels
         public async void Ask()
         {
             var confirm = await ShowPopupAsync(Strings.AskAQuestionInfo, Strings.AskAQuestion, Strings.AskButton, Strings.Cancel);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 var response = await ClientService.SendAsync(new GetSupportUser());
                 if (response is User user)
@@ -51,7 +52,7 @@ namespace Telegram.ViewModels
         public async void Logout()
         {
             var confirm = await ShowPopupAsync(Strings.AreYouSureLogout, Strings.AppName, Strings.OK, Strings.Cancel);
-            if (confirm != ContentDialogResult.Primary)
+            if (confirm != ModalPopupResult.Primary)
             {
                 return;
             }

@@ -22,6 +22,7 @@ using Telegram.ViewModels.Stories;
 using Telegram.Views.Stories.Popups;
 using Windows.Foundation;
 using Windows.System;
+using Windows.System.Display;
 using Windows.UI;
 using Windows.UI.Composition;
 using Windows.UI.Text;
@@ -163,6 +164,12 @@ namespace Telegram.Controls.Stories
         {
             if (_done)
             {
+                return;
+            }
+
+            if (ActiveCard?.TryCollapseCaption() is true)
+            {
+                e.Handled = true;
                 return;
             }
 
@@ -317,7 +324,8 @@ namespace Telegram.Controls.Stories
 
             viewModel.Aggregator.Subscribe<UpdateStoryStealthMode>(this, Handle)
                 .Subscribe<UpdateStoryPostSucceeded>(Handle)
-                .Subscribe<UpdateFailedStories>(Handle);
+                .Subscribe<UpdateFailedStories>(Handle)
+                .Subscribe<UpdateStoryChanged>(Handle);
 
             Update(viewModel, activeStories);
             UpdateStealthTimer();
@@ -348,6 +356,31 @@ namespace Telegram.Controls.Stories
             _dispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, UpdatePostState);
         }
 
+        private void Handle(UpdateStoryChanged update)
+        {
+            _dispatcherQueue.TryEnqueue(() => UpdateReactions(update.Story));
+        }
+
+        private void UpdateReactions(StoryViewModel story)
+        {
+            if (_viewModel == null || _index < 0 || _index >= _viewModel.Items.Count)
+            {
+                return;
+            }
+
+            if (story != _viewModel.Items[_index].SelectedItem)
+            {
+                return;
+            }
+
+            if (ChannelInteractions.Visibility == Visibility.Visible)
+            {
+                ChannelInteractions.Update(story);
+            }
+
+            ActiveCard?.UpdateSuggestedReactions(story);
+        }
+
         private void UpdatePostState()
         {
             if (_viewModel == null || _index < 0 || _index >= _viewModel.Items.Count)
@@ -369,8 +402,12 @@ namespace Telegram.Controls.Stories
                 DataContext = viewModel;
 
                 _index = viewModel.Items.IndexOf(activeStories);
-                _total = viewModel.Items.Count;
             }
+
+            // The peers grow as more are loaded.
+            _total = viewModel.Items.Count;
+
+            UpdateScreenCapture();
 
             for (int i = 0; i < _indexes.Length; i++)
             {
@@ -393,7 +430,7 @@ namespace Telegram.Controls.Stories
                         child.Completed += OnCompleted;
                         child.ContextRequested += Story_ContextRequested;
 
-                        Composer.DataContext = viewModel.Items[real];
+                        SetComposer(viewModel.Items[real]);
 
                         var selectedItem = viewModel.Items[real].SelectedItem;
                         if (selectedItem == null)
@@ -458,7 +495,68 @@ namespace Telegram.Controls.Stories
 
             if (_index == _total - 1 && _viewModel.Items is ISupportIncrementalLoading incremental && incremental.HasMoreItems)
             {
-                _ = incremental.LoadMoreItemsAsync(20);
+                LoadMoreItems(incremental);
+            }
+        }
+
+        private ActiveStoriesViewModel _composerViewModel;
+
+        private void SetComposer(ActiveStoriesViewModel viewModel)
+        {
+            if (_composerViewModel == viewModel)
+            {
+                return;
+            }
+
+            if (_composerViewModel != null)
+            {
+                _composerViewModel.MessageSent -= OnMessageSent;
+            }
+
+            _composerViewModel = viewModel;
+            Composer.DataContext = viewModel;
+
+            if (viewModel != null)
+            {
+                viewModel.MessageSent += OnMessageSent;
+            }
+        }
+
+        private async void OnMessageSent(object sender, EventArgs e)
+        {
+            if (sender is not ActiveStoriesViewModel activeStories)
+            {
+                return;
+            }
+
+            var confirm = await ToastPopup.ShowActionAsync(XamlRoot, Strings.MessageSent, Strings.ViewInChat, ToastPopupIcon.Forward);
+            if (confirm == ModalPopupResult.Primary && _viewModel != null)
+            {
+                TryHide(ModalPopupResult.Primary);
+                _viewModel.SendMessage(activeStories);
+            }
+        }
+
+        private bool _loadingMoreItems;
+
+        private async void LoadMoreItems(ISupportIncrementalLoading incremental)
+        {
+            if (_loadingMoreItems)
+            {
+                return;
+            }
+
+            _loadingMoreItems = true;
+
+            var viewModel = _viewModel;
+            await incremental.LoadMoreItemsAsync(20);
+
+            _loadingMoreItems = false;
+
+            // The side cards are laid out from the count, so show the peers that arrived.
+            if (_viewModel == viewModel && _total != viewModel.Items.Count && _index >= 0 && _index < viewModel.Items.Count)
+            {
+                Update(viewModel, viewModel.Items[_index]);
             }
         }
 
@@ -587,6 +685,8 @@ namespace Telegram.Controls.Stories
                 }
             }
 
+            _total = _viewModel.Items.Count;
+
             if (_index < _total - increment && direction == Direction.Forward)
             {
                 _index += increment;
@@ -691,7 +791,7 @@ namespace Telegram.Controls.Stories
                 return;
             }
 
-            TryHide(ContentDialogResult.None);
+            TryHide(ModalPopupResult.None);
         }
 
         private void TextArea_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -836,7 +936,7 @@ namespace Telegram.Controls.Stories
                 ActiveCard.Suspend(StoryPauseSource.Popup);
 
                 var confirm = await ViewModel.ShowPopupAsync(new StoryInteractionsPopup(), story, requestedTheme: ElementTheme.Dark);
-                if (await ContinuePopupAsync(confirm == ContentDialogResult.Primary, new PremiumStoryFeaturePermanentViewsHistory()))
+                if (await ContinuePopupAsync(confirm == ModalPopupResult.Primary, new PremiumStoryFeaturePermanentViewsHistory()))
                 {
                     ActiveCard.Resume(StoryPauseSource.Popup);
                 }
@@ -861,7 +961,7 @@ namespace Telegram.Controls.Stories
                 var popup = new Telegram.Views.Premium.Popups.FeaturesPopup(ViewModel.ClientService, null, new[] { new PremiumFeatureUpgradedStories() }, null, null, null, null, new PremiumFeatureUpgradedStories());
 
                 var confirm = await ViewModel.ShowPopupAsync(popup, requestedTheme: ElementTheme.Dark);
-                if (confirm == ContentDialogResult.Primary)
+                if (confirm == ModalPopupResult.Primary)
                 {
                     await ViewModel.NavigationService.ShowPromoAsync(new PremiumSourceStoryFeature(feature), ElementTheme.Dark);
                     return false;
@@ -893,6 +993,10 @@ namespace Telegram.Controls.Stories
         {
             _viewModel.NavigationService.Window.Activated += OnActivated;
 
+            _loaded = true;
+            _displayRequest.TryRequestActive();
+            UpdateScreenCapture();
+
             StoriesWindow_Loaded(sender, e);
         }
 
@@ -900,8 +1004,61 @@ namespace Telegram.Controls.Stories
         {
             _viewModel.NavigationService.Window.Activated -= OnActivated;
 
+            _loaded = false;
+            _displayRequest.TryRequestRelease();
+            UpdateScreenCapture();
+
+            if (_composerViewModel != null)
+            {
+                _composerViewModel.MessageSent -= OnMessageSent;
+                _composerViewModel = null;
+            }
+
             _viewModel?.Aggregator.Unsubscribe(this);
             _stealthTimer.Stop();
+        }
+
+        // Stories play with no input, so the screen is kept on for as long as the viewer is open.
+        private readonly DisplayRequest _displayRequest = new();
+
+        private bool _loaded;
+        private bool _screenCaptureDisabled;
+
+        // The side cards show their stories too, so any of them that can't be forwarded blocks
+        // capture. Checked only while loaded, so that a late update can't block it after closing.
+        private void UpdateScreenCapture()
+        {
+            var disable = false;
+
+            if (_loaded && _viewModel != null)
+            {
+                var last = Math.Min(_index + 3, _viewModel.Items.Count - 1);
+
+                for (int real = Math.Max(_index - 3, 0); real <= last; real++)
+                {
+                    if (_viewModel.Items[real].SelectedItem is { CanBeForwarded: false })
+                    {
+                        disable = true;
+                        break;
+                    }
+                }
+            }
+
+            if (_screenCaptureDisabled == disable)
+            {
+                return;
+            }
+
+            _screenCaptureDisabled = disable;
+
+            if (disable)
+            {
+                _viewModel.NavigationService.Window.DisableScreenCapture(GetHashCode());
+            }
+            else
+            {
+                _viewModel.NavigationService.Window.EnableScreenCapture(GetHashCode());
+            }
         }
 
         private void OnActivated(object sender, WindowActivatedEventArgs e)
@@ -963,16 +1120,11 @@ namespace Telegram.Controls.Stories
             //    ScrollingHost.Zoom(keyCode is 187 || args.VirtualKey is VirtualKey.Add);
             //    args.Handled = true;
             //}
-            //else if (args.VirtualKey is VirtualKey.Up && _mediaPlayer?.Source != null)
-            //{
-            //    _mediaPlayer.Volume = Math.Clamp(_mediaPlayer.Volume + 0.1, 0, 1);
-            //    args.Handled = true;
-            //}
-            //else if (args.VirtualKey is VirtualKey.Down && _mediaPlayer?.Source != null)
-            //{
-            //    _mediaPlayer.Volume = Math.Clamp(_mediaPlayer.Volume - 0.1, 0, 1);
-            //    args.Handled = true;
-            //}
+            else if (args.Key is VirtualKey.Up or VirtualKey.Down && args.Modifiers == VirtualKeyModifiers.None && FocusManager.GetFocusedElement(XamlRoot) is not RichEditBox)
+            {
+                ActiveCard?.ChangeVolume(args.Key is VirtualKey.Up ? 0.1 : -0.1);
+                args.Handled = true;
+            }
         }
 
         private void Story_ContextRequested(UIElement sender, ContextRequestedEventArgs args)
@@ -1021,8 +1173,9 @@ namespace Telegram.Controls.Stories
                 return;
             }
 
-            // Your own story can be replied to, in Saved Messages, but not reacted to.
-            if (story.CanBeReplied && !activeStories.IsMyStory)
+            // Your own story can be replied to, in Saved Messages, but not reacted to. A chat's story
+            // can't be replied to, and is reacted to all the same.
+            if ((story.CanBeReplied || story.Chat.Type is ChatTypeSupergroup) && !activeStories.IsMyStory)
             {
                 flyout.Opened += async (s, args) =>
                 {
@@ -1059,15 +1212,33 @@ namespace Telegram.Controls.Stories
 
             if (story.CanToggleIsPostedToChatPage)
             {
-                flyout.CreateFlyoutItem(ViewModel.ArchiveStory, story, story.IsPostedToChatPage ? Strings.ArchiveStory : Strings.SaveToProfile, story.IsPostedToChatPage ? Icons.StoriesPinnedOff : Icons.StoriesPinned);
+                var text = story.Chat.Type is ChatTypeSupergroup
+                    ? story.IsPostedToChatPage ? Strings.RemoveFromPosts : Strings.SaveToPosts
+                    : story.IsPostedToChatPage ? Strings.ArchiveStory : Strings.SaveToProfile;
+
+                flyout.CreateFlyoutItem(ViewModel.ArchiveStory, story, text, story.IsPostedToChatPage ? Icons.StoriesPinnedOff : Icons.StoriesPinned);
             }
 
-            if (story.Chat.Type is ChatTypePrivate && !activeStories.IsMyStory)
+            if (!activeStories.IsMyStory && activeStories.ChatId != activeStories.ClientService.Options.TelegramServiceNotificationsChatId)
             {
                 flyout.CreateFlyoutItem(ViewModel.MuteProfile, activeStories, muted ? Strings.NotificationsStoryUnmute2 : Strings.NotificationsStoryMute2, muted ? Icons.Alert : Icons.AlertOff);
             }
 
-            flyout.CreateFlyoutItem(ViewModel.ShowProfile, activeStories, archived ? Strings.UnarchiveStories : Strings.ArchivePeerStories, archived ? Icons.Unarchive : Icons.Archive);
+            if (archived)
+            {
+                flyout.CreateFlyoutItem(ViewModel.ShowProfile, activeStories, Strings.UnarchiveStories, Icons.Unarchive);
+            }
+            else if (!activeStories.IsMyStory)
+            {
+                if (activeStories.CanBeArchived)
+                {
+                    flyout.CreateFlyoutItem(ViewModel.HideProfile, activeStories, Strings.ArchivePeerStories, Icons.Archive);
+                }
+                else
+                {
+                    flyout.CreateFlyoutItem(ViewModel.RemoveFromRecent, activeStories, Strings.StoriesRemoveFromRecent, Icons.Delete);
+                }
+            }
 
             //if (activeStories.IsMyStory || story.ClientService.IsPremium || story.ClientService.IsPremiumAvailable)
             //{
@@ -1084,7 +1255,7 @@ namespace Telegram.Controls.Stories
                 flyout.CreateFlyoutItem(StealthStory, story, Strings.StealthModeButton, story.ClientService.IsPremium ? Icons.Stealth : Icons.StealthLocked);
             }
 
-            if (story.ClientService.TryGetUser(story.Chat, out User user) && user.HasActiveUsername(out _))
+            if (story.TryGetLinkUsername(out _))
             {
                 flyout.CreateFlyoutItem(CopyLink, story, Strings.CopyLink, Icons.Link);
             }
@@ -1190,7 +1361,7 @@ namespace Telegram.Controls.Stories
 
         private async void SaveStory(StoryViewModel story)
         {
-            if (story.ClientService.IsPremium)
+            if (story.ClientService.IsPremium || story.PosterChatId == story.ClientService.Options.MyId)
             {
                 ViewModel.SaveStory(story);
             }
@@ -1224,12 +1395,12 @@ namespace Telegram.Controls.Stories
             return toast;
         }
 
-        public Task<ContentDialogResult> ShowActionAsync(FrameworkElement target, object text, ToastPlacementMode placement, ElementTheme requestedTheme = ElementTheme.Dark)
+        public Task<ModalPopupResult> ShowActionAsync(FrameworkElement target, object text, ToastPlacementMode placement, ElementTheme requestedTheme = ElementTheme.Dark)
         {
             var toast = ToastPopup.ShowImpl(XamlRoot, null as FormattedText, null, placement, requestedTheme, target: target);
             if (toast?.Content is Grid content)
             {
-                var tsc = new TaskCompletionSource<ContentDialogResult>();
+                var tsc = new TaskCompletionSource<ModalPopupResult>();
                 var undo = new Button()
                 {
                     Content = text,
@@ -1246,7 +1417,7 @@ namespace Telegram.Controls.Stories
                 {
                     Logger.Info("closed");
 
-                    tsc.TrySetResult(ContentDialogResult.Primary);
+                    tsc.TrySetResult(ModalPopupResult.Primary);
                     undo.Click -= handler;
 
                     toast.IsOpen = false;
@@ -1254,7 +1425,7 @@ namespace Telegram.Controls.Stories
 
                 void closed(ToastPopup sender, object e)
                 {
-                    tsc.TrySetResult(ContentDialogResult.None);
+                    tsc.TrySetResult(ModalPopupResult.None);
                     sender.Closed -= closed;
 
                     ActiveCard.Resume(StoryPauseSource.Toast);
@@ -1270,7 +1441,7 @@ namespace Telegram.Controls.Stories
                 return tsc.Task;
             }
 
-            return Task.FromResult(ContentDialogResult.None);
+            return Task.FromResult(ModalPopupResult.None);
         }
 
         private void Toast_Closed(ToastPopup sender, object args)
@@ -1313,7 +1484,7 @@ namespace Telegram.Controls.Stories
 
         private void BackButton_Click(object sender, RoutedEventArgs e)
         {
-            TryHide(ContentDialogResult.Primary);
+            TryHide(ModalPopupResult.Primary);
         }
 
         private bool _backGesture;
@@ -1326,7 +1497,7 @@ namespace Telegram.Controls.Stories
                 return;
             }
 
-            TryHide(ContentDialogResult.Primary);
+            TryHide(ModalPopupResult.Primary);
         }
 
         private void Layer_PointerPressed(object sender, PointerRoutedEventArgs e)

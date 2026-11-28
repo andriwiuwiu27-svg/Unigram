@@ -6,6 +6,7 @@
 //
 
 using System.Threading.Tasks;
+using Telegram.Controls;
 using Telegram.Navigation.Services;
 using Telegram.Services;
 using Telegram.Td.Api;
@@ -70,7 +71,7 @@ namespace Telegram.ViewModels.Business
             var popup = new SendLocationPopup(Session, business: true);
 
             var confirm = await ShowPopupAsync(popup);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 if (popup.Media is InputMessageLocation location)
                 {
@@ -86,7 +87,7 @@ namespace Telegram.ViewModels.Business
         public async void Clear()
         {
             var confirm = await ShowPopupAsync(Strings.BusinessLocationClearMessage, Strings.BusinessLocationClearTitle, Strings.Remove, Strings.Cancel, destructive: true);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 Address = string.Empty;
                 Location = new Location();

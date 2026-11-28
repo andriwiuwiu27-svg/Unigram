@@ -517,10 +517,9 @@ namespace Telegram.Navigation
             _context.Close();
         }
 
-        // Counted rather than a flag, because popups nest: MessagePopup.ShowNestedAsync opens a
-        // ModalPopup over a ContentPopup that is still up - that is the whole reason the nested
-        // variants exist - and the inner one closing must not tell the window, or the page under
-        // it, that there is no popup any more. Only the outermost open and close are forwarded.
+        // Counted rather than a flag, because popups nest: one opens over another that is still
+        // up, and the inner one closing must not tell the window, or the page under it, that there
+        // is no popup any more. Only the outermost open and close are forwarded.
         private int _popupDepth;
 
         public void PopupOpened()
@@ -1243,18 +1242,19 @@ namespace Telegram.Navigation
         /// </summary>
         private void RaiseClosed()
         {
-            // We forcefully close any ContentDialog still open.
+            // We forcefully close any popup still open.
             if (_xamlRoot != null)
             {
                 foreach (var popup in VisualTreeHelper.GetOpenPopupsForXamlRoot(_xamlRoot))
                 {
-                    if (popup.Child is ContentDialog dialog)
+                    if (popup.Child is ModalPopup modal)
                     {
-                        dialog.Hide();
+                        modal.Hide();
                     }
                 }
             }
 
+            _closed = true;
             Closed?.Invoke(this, EventArgs.Empty);
         }
 
@@ -1321,7 +1321,7 @@ namespace Telegram.Navigation
             {
                 return standalonePage.NavigationService;
             }
-            else if (content is Page { DataContext: ViewModelBase viewModel })
+            else if (content is NavigationPage { DataContext: ViewModelBase viewModel })
             {
                 return viewModel.NavigationService;
             }
@@ -1443,9 +1443,13 @@ namespace Telegram.Navigation
         private UIElement _lockedContent;
         private PasscodeWindow _locked;
 
+        // A closed window stays in All until its view is released, so ForEach still reaches it.
+        // Locking it would unload its root, and Unlock would load it again after its Window is gone.
+        private bool _closed;
+
         public void Lock(bool biometrics)
         {
-            if (_locked != null)
+            if (_locked != null || _closed)
             {
                 return;
             }
@@ -1473,6 +1477,8 @@ namespace Telegram.Navigation
 
             Logger.Info("Hiding passcode lock");
 
+            // Before the content's PopupClosed below, which may colour the buttons itself.
+            _locked.RestoreCaptionButtons();
             SetContent(_lockedContent);
 
             _locked = null;
@@ -1510,18 +1516,23 @@ namespace Telegram.Navigation
                     case AuthorizationStateWaitPhoneNumber:
                     case AuthorizationStateWaitOtherDeviceConfirmation:
                         service.Navigate(typeof(AuthorizationPage));
+                        AddSignInBackStack(service, false);
                         break;
                     case AuthorizationStateWaitCode:
-                        service.Navigate(typeof(AuthorizationCodePage), navigationStackEnabled: false);
+                        service.Navigate(typeof(AuthorizationCodePage));
+                        AddSignInBackStack(service, true);
                         break;
                     case AuthorizationStateWaitEmailAddress:
-                        service.Navigate(typeof(AuthorizationEmailAddressPage), navigationStackEnabled: false);
+                        service.Navigate(typeof(AuthorizationEmailAddressPage));
+                        AddSignInBackStack(service, true);
                         break;
                     case AuthorizationStateWaitEmailCode:
-                        service.Navigate(typeof(AuthorizationEmailCodePage), navigationStackEnabled: false);
+                        service.Navigate(typeof(AuthorizationEmailCodePage));
+                        AddSignInBackStack(service, true);
                         break;
                     case AuthorizationStateWaitRegistration:
-                        service.Navigate(typeof(AuthorizationRegistrationPage), navigationStackEnabled: false);
+                        service.Navigate(typeof(AuthorizationRegistrationPage));
+                        AddSignInBackStack(service, true);
                         break;
                     case AuthorizationStateWaitPassword waitPassword:
                         if (!string.IsNullOrEmpty(waitPassword.RecoveryEmailAddressPattern))
@@ -1529,16 +1540,36 @@ namespace Telegram.Navigation
                             await service.ShowPopupAsync(string.Format(Strings.RestoreEmailSent, waitPassword.RecoveryEmailAddressPattern), Strings.AppName, Strings.OK);
                         }
 
-                        service.Navigate(typeof(AuthorizationPasswordPage), navigationStackEnabled: false);
+                        service.Navigate(typeof(AuthorizationPasswordPage));
+                        AddSignInBackStack(service, true);
                         break;
                 }
             }
             catch { }
         }
 
+        /// <summary>
+        /// A window opened on a sign in step gets the back stack that signing in leaves: back
+        /// reaches the phone number, and when another account is signed in BlankPage below it
+        /// destroys this one and switches to that. Entries rather than navigations, because a live
+        /// AuthorizationPage asks for a QR code, which logs out of the step on screen.
+        /// </summary>
+        private static void AddSignInBackStack(INavigationService service, bool phoneNumber)
+        {
+            if (LifetimeService.Current.HasAnotherAccount(service.Session))
+            {
+                service.AddToBackStack(typeof(BlankPage));
+            }
+
+            if (phoneNumber)
+            {
+                service.AddToBackStack(typeof(AuthorizationPage));
+            }
+        }
+
         private async void Activate(IActivatedEventArgs args, INavigationService service)
         {
-            service ??= Current.RootNavigationService;
+            service ??= RootNavigationService;
 
             if (service == null || args == null)
             {
@@ -1550,13 +1581,29 @@ namespace Telegram.Navigation
             }
             else if (args is IProtocolActivatedEventArgs protocol)
             {
+                // The projection converts the URI to System.Uri on read, and that rejects some
+                // links Windows activated us with (an unparsable host, for one).
+                string uri;
+                try
+                {
+                    uri = protocol.Uri.ToString();
+                }
+                catch (UriFormatException ex)
+                {
+                    Logger.Error(ex);
+                    uri = null;
+                }
+
                 if (service?.Frame?.Content is MainPage page)
                 {
-                    page.Activate(protocol.Uri.ToString());
+                    if (uri != null)
+                    {
+                        page.Activate(uri);
+                    }
                 }
                 else
                 {
-                    service.NavigateToMain(protocol.Uri.ToString());
+                    service.NavigateToMain(uri ?? string.Empty);
                 }
             }
             else if (args is FileActivatedEventArgs file)
@@ -1570,11 +1617,10 @@ namespace Telegram.Navigation
                     service.NavigateToMain(string.Empty);
                 }
 
-                if (file.Files[0] is StorageFile activated)
+                if (file.Files[0].ToFileSystemItem() is FileItem item)
                 {
                     // TODO: WinUI - most likely XamlRoot is going to be null at this stage.
                     // As well, Content may be null too.
-                    var item = activated.ToFileItem();
                     var clientService = service.Session.Resolve<IClientService>();
                     var theme = await ThemeCustomInfo.FromFileAsync(clientService, item);
                     if (theme != null)
@@ -1616,7 +1662,7 @@ namespace Telegram.Navigation
         // The actions walk a copy. Dispatching to a window from its own thread runs the action
         // inline, and on a host where every window shares one thread that is every window: an
         // action that closes its window then removes it from All while All is being walked.
-        private static WindowContext[] Snapshot()
+        public static WindowContext[] Snapshot()
         {
             lock (_allLock)
             {
@@ -1717,7 +1763,7 @@ namespace Telegram.Navigation
 
             for (int i = services.Count - 1; i >= 0; i--)
             {
-                services[i].FrameFacade.RaiseShortcutInvoked(args);
+                services[i].RaiseShortcutInvoked(args);
 
                 if (args.Handled)
                 {
@@ -1778,8 +1824,10 @@ namespace Telegram.Navigation
 
                 // The coordinator is app-wide rather than per session, so a call ringing on an
                 // account other than the one on screen is answered too.
+                // Ctrl+Home also reaches here mid-call, and the system call throws Element not found
+                // when told an outgoing or already answered call was accepted.
                 case ShortcutCommand.CallAccept:
-                    if (LifetimeService.Current.Voip.ActiveCall is VoipCall accept)
+                    if (LifetimeService.Current.Voip.ActiveCall is VoipCall { IsOutgoing: false, State: CallStatePending } accept)
                     {
                         accept.Accept(false);
                         args.Handled = true;
@@ -1868,11 +1916,6 @@ namespace Telegram.Navigation
                         return;
                     }
                 }
-                else if (popup.Child is ContentDialog dialog)
-                {
-                    dialog.Hide();
-                    return;
-                }
                 else if (popup.Child is ToolTip toolTip)
                 {
                     toolTip.IsOpen = false;
@@ -1883,8 +1926,8 @@ namespace Telegram.Navigation
                 }
                 else if (popup.Child is ModalPopup modal)
                 {
-                    // Escape reaches a ContentDialog on its own, but a ModalPopup lives in a
-                    // popup of its own that no accelerator scope covers, so the window routes it.
+                    // A ModalPopup lives in a popup of its own that no accelerator scope covers,
+                    // so the window routes Escape to it.
                     if (modal.CancelRequested())
                     {
                         handled = args.Handled = true;
@@ -1906,7 +1949,7 @@ namespace Telegram.Navigation
 
             for (int i = services.Count - 1; i >= 0; i--)
             {
-                services[i].FrameFacade.RaiseBackRequested(args);
+                services[i].RaiseBackRequested(args);
 
                 if (handled = args.Handled)
                 {
@@ -1932,7 +1975,7 @@ namespace Telegram.Navigation
 
             foreach (var service in services)
             {
-                service.FrameFacade.RaiseForwardRequested(args);
+                service.RaiseForwardRequested(args);
                 if (args.Handled)
                 {
                     return true;

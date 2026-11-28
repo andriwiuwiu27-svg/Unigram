@@ -94,7 +94,7 @@ namespace Telegram.ViewModels.Settings
             {
                 var totalCount = 0u;
 
-                var response = await _clientService.SendAsync(new SearchGiftsForResale(_gift.Gift.Id, new GiftForResaleOrderPrice(), false, false, Array.Empty<UpgradedGiftAttributeId>(), _nextOffset, 24));
+                var response = await _clientService.SendAsync(new SearchGiftsForResale(_gift.Gift.Id, new GiftForResaleOrderPrice(), false, false, false, false, Array.Empty<UpgradedGiftAttributeId>(), _nextOffset, 24));
                 if (response is GiftsForResale gifts)
                 {
                     foreach (var gift in gifts.Gifts)
@@ -221,23 +221,18 @@ namespace Telegram.ViewModels.Settings
 
             if (SelectedItemView is GiftForResale giftForResale)
             {
-                var confirm = await NavigationService.ShowPopupAsync(new TransferGiftPopup(ClientService, giftForResale, null));
-                if (confirm == ContentDialogResult.Primary)
+                var response = await TransferGiftPopup.BuyAsync(ClientService, NavigationService, giftForResale.Gift, null, ClientService.MyId, string.Empty.AsFormattedText(), false);
+                if (response is GiftResaleResultOk)
                 {
-                    // TODO: text, isPrivate
-                    var response = await ClientService.SendPaymentAsync(giftForResale.Gift.ResaleParameters.StarCount, new SendResoldGift(giftForResale.Gift.Name, ClientService.MyId, new GiftResalePriceStar(giftForResale.Gift.ResaleParameters.StarCount), string.Empty.AsFormattedText(), false));
-                    if (response is GiftResaleResultOk)
-                    {
-                        ContinueImpl(giftForResale, null);
-                    }
-                    else if (response is Error error)
-                    {
-                        ToastPopup.ShowError(XamlRoot, error);
-                    }
-                    else if (response is ErrorStarsNeeded)
-                    {
-                        NavigationService.ShowPopup(new BuyPopup(), BuyStarsArgs.ForChannel(giftForResale.Gift.ResaleParameters.StarCount, 0));
-                    }
+                    ContinueImpl(giftForResale, null);
+                }
+                else if (response is Error error)
+                {
+                    ToastPopup.ShowError(XamlRoot, error);
+                }
+                else if (response is ErrorStarsNeeded)
+                {
+                    NavigationService.ShowPopup(new BuyPopup(), BuyStarsArgs.ForChannel(giftForResale.Gift.ResaleParameters.StarCount, 0));
                 }
             }
             else

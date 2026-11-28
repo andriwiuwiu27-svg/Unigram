@@ -5,6 +5,8 @@
 // file LICENSE or copy at https://www.gnu.org/licenses/gpl-3.0.txt)
 //
 
+using Telegram.Navigation;
+using Telegram.Navigation.Services;
 using Telegram.Td.Api;
 using Telegram.ViewModels.Settings;
 using Windows.UI.Xaml.Navigation;
@@ -18,10 +20,11 @@ namespace Telegram.Views.Settings
         public SettingsNotificationsPage()
         {
             InitializeComponent();
+            Transition = PageTransition.Entrance;
             Title = Strings.NotificationsAndSounds;
         }
 
-        protected override void OnNavigatedTo(NavigationEventArgs e)
+        protected override void OnNavigatedTo(NavigatedEventArgs e)
         {
             BackgroundControl.Update(ViewModel.ClientService, ViewModel.Aggregator);
         }

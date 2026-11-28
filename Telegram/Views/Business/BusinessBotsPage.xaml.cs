@@ -9,6 +9,7 @@ using Microsoft.UI.Xaml.Controls;
 using Telegram.Common;
 using Telegram.Controls.Cells;
 using Telegram.Controls.Media;
+using Telegram.Navigation.Services;
 using Telegram.Td.Api;
 using Telegram.ViewModels.Business;
 using Telegram.ViewModels.Folders;
@@ -29,13 +30,13 @@ namespace Telegram.Views.Business
             Title = Strings.BusinessBots;
         }
 
-        protected override void OnNavigatedTo(NavigationEventArgs e)
+        protected override void OnNavigatedTo(NavigatedEventArgs e)
         {
             ViewModel.PropertyChanged += OnPropertyChanged;
             OnPropertyChanged(null, new System.ComponentModel.PropertyChangedEventArgs(nameof(ViewModel.BotUserId)));
         }
 
-        protected override void OnNavigatedFrom(NavigationEventArgs e)
+        protected override void OnNavigatedFrom(NavigatedEventArgs e)
         {
             ViewModel.PropertyChanged -= OnPropertyChanged;
         }

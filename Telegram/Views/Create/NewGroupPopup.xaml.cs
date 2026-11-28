@@ -113,13 +113,16 @@ namespace Telegram.Views.Create
             }
             else
             {
+                // Stays open under the picker, so cancelling it comes back here.
+                args.Cancel = true;
+
                 var users = await ChooseChatsPopup.PickUsersAsync(ViewModel.ClientService, ViewModel.NavigationService, Strings.SelectContacts, allowEmptySelection: true);
                 if (users == null)
                 {
-                    await this.ShowQueuedAsync(XamlRoot);
                     return;
                 }
 
+                Hide();
                 ViewModel.Create(users);
             }
         }

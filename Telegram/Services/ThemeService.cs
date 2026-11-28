@@ -10,6 +10,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Telegram.Controls;
 using Telegram.Navigation;
 using Telegram.Navigation.Services;
 using Telegram.Services.Settings;
@@ -260,7 +261,7 @@ namespace Telegram.Services
         public async Task CreateThemeAsync(INavigationService navigation, ThemeInfoBase theme, ThemeSettings settings = null)
         {
             var confirm = await navigation.ShowPopupAsync(Strings.CreateNewThemeAlert, Strings.NewTheme, Strings.CreateTheme, Strings.Cancel);
-            if (confirm != ContentDialogResult.Primary)
+            if (confirm != ModalPopupResult.Primary)
             {
                 return;
             }
@@ -275,7 +276,7 @@ namespace Telegram.Services
             input.SecondaryButtonText = Strings.Cancel;
 
             confirm = await navigation.ShowPopupAsync(input);
-            if (confirm != ContentDialogResult.Primary)
+            if (confirm != ModalPopupResult.Primary)
             {
                 return;
             }

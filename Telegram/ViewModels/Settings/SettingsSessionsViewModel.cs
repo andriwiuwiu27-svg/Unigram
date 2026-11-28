@@ -10,6 +10,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Telegram.Collections;
 using Telegram.Common;
+using Telegram.Controls;
 using Telegram.Navigation;
 using Telegram.Navigation.Services;
 using Telegram.Services;
@@ -154,7 +155,7 @@ namespace Telegram.ViewModels.Settings
             popup.MaxLength = 32;
 
             var confirm = await ShowPopupAsync(popup);
-            if (confirm == ContentDialogResult.Primary && popup.Text != AppSettings.Diagnostics.DeviceName)
+            if (confirm == ModalPopupResult.Primary && popup.Text != AppSettings.Diagnostics.DeviceName)
             {
                 session.DeviceModel = popup.Text;
                 RaisePropertyChanged(nameof(Current));
@@ -167,7 +168,7 @@ namespace Telegram.ViewModels.Settings
         public async void TerminateOthers()
         {
             var terminate = await ShowPopupAsync(Strings.AreYouSureSessions, Strings.AreYouSureSessionsTitle, Strings.Terminate, Strings.Cancel);
-            if (terminate == ContentDialogResult.Primary)
+            if (terminate == ModalPopupResult.Primary)
             {
                 var response = await ClientService.SendAsync(new TerminateAllOtherSessions());
                 if (response is Ok)
@@ -196,7 +197,7 @@ namespace Telegram.ViewModels.Settings
             var dialog = new SettingsSessionPopup(session);
 
             var confirm = await ShowPopupAsync(dialog);
-            if (confirm != ContentDialogResult.Primary)
+            if (confirm != ModalPopupResult.Primary)
             {
                 if (session.CanAcceptCalls != dialog.CanAcceptCalls)
                 {
@@ -214,7 +215,7 @@ namespace Telegram.ViewModels.Settings
             }
 
             var terminate = await ShowPopupAsync(Strings.TerminateSessionQuestion, Strings.AppName, Strings.OK, Strings.Cancel);
-            if (terminate == ContentDialogResult.Primary)
+            if (terminate == ModalPopupResult.Primary)
             {
                 var response = await ClientService.SendAsync(new TerminateSession(session.Id));
                 if (response is Ok)

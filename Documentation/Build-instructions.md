@@ -7,6 +7,9 @@ The following tools and SDKs are mandatory for the project development:
         * C++ Clang Compiler for Windows
     * Universal Windows Platform deveopment
 	    * Windows 11 SDK (10.0.26100.0)
+* [Rust](https://rustup.rs), through rustup, with `cargo` on PATH. Message widgets build their
+  JavaScript engine from `Libraries\nova-safe`: rustup installs the toolchain it pins and the build
+  adds each platform's target, so the first build of a platform takes a few minutes longer.
  
 ## Getting started
 
@@ -30,6 +33,16 @@ namespace Telegram
 }
 ```
 5. Replace `your_api_id` and `your_api_hash` with the data obtained from step 2.
+6. Run `Bootstrap.ps1` from the repository root. It needs [CMake and PHP](#tdlib) and
+   [Rust](https://rustup.rs) on PATH, and does everything the sections below describe: it
+   initializes the submodules, finds or clones vcpkg, applies `Libraries\tdjson\tdjson.patch` to
+   TDLib, builds TDLib for both the UWP and the desktop triplets, and builds wallet-engine.
+   ```shell
+   > powershell -ExecutionPolicy ByPass -File .\Bootstrap.ps1
+   ```
+   It builds for this machine's architecture; pass `-Arch x64,ARM64` for both, or `-Target uwp` to
+   build only what `Telegram.slnx` needs. The first run takes an hour or more. Running it again
+   rebuilds only what changed, and `-WhatIf` shows what it would do.
 
 ## Dependencies
 
@@ -95,6 +108,9 @@ Two extra tools are needed for the code generation step:
 - **CMake** 4.4 or later, on PATH. Earlier versions have no Visual Studio 18 generator and will
   silently fall back to an older toolset.
 - **PHP**, with `php.exe` on PATH.
+
+TDLib also needs **gperf**, but there is nothing to install: it is a host tool in the manifest, and
+`build.ps1` installs it with the rest before the step that runs it.
 
 Then, from `Libraries\tdjson`:
 

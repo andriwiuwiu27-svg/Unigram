@@ -6,6 +6,7 @@
 //
 
 using Telegram.Controls.Cells;
+using Telegram.Navigation;
 using Telegram.Td.Api;
 using Telegram.ViewModels.Settings;
 using Windows.UI.Xaml.Controls;
@@ -19,6 +20,7 @@ namespace Telegram.Views.Settings
         public SettingsSessionsPage()
         {
             InitializeComponent();
+            Transition = PageTransition.Entrance;
             Title = Strings.SessionsTitle;
         }
 

@@ -7,10 +7,12 @@
 
 using System;
 using Telegram.Common;
+using Windows.UI;
 using Windows.UI.Input;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Input;
+using Windows.UI.Xaml.Media;
 
 namespace Telegram.Controls
 {
@@ -22,6 +24,10 @@ namespace Telegram.Controls
         public TabbedPageHeader()
         {
             InitializeComponent();
+
+#if !WINUI3
+            LayoutRoot.Background = new SolidColorBrush(Colors.Transparent);
+#endif
 
             _recognizer = new GestureRecognizer();
             _recognizer.GestureSettings = GestureSettings.HoldWithMouse;

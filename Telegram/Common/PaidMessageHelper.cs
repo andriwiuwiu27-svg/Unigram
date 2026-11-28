@@ -78,7 +78,7 @@ namespace Telegram.Common
             };
 
             var confirm = await navigationService.ShowPopupAsync(popup);
-            if (confirm != ContentDialogResult.Primary)
+            if (confirm != ModalPopupResult.Primary)
             {
                 return false;
             }

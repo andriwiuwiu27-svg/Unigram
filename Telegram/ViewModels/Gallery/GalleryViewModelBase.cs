@@ -304,6 +304,27 @@ namespace Telegram.ViewModels.Gallery
             NavigationService.NavigateToChat(message.ChatId, message: message.Id);
         }
 
+        /// <summary>
+        /// The topic the gallery was opened in, so that editing sends from it.
+        /// </summary>
+        protected virtual MessageTopic Topic => null;
+
+        public void Edit()
+        {
+            var message = _selectedItem as GalleryMessage;
+            if (message == null || !message.CanBeEdited)
+            {
+                return;
+            }
+
+            FirstItem = null;
+
+            NavigationService.NavigateToChat(message.ChatId, topic: Topic, state: new NavigationState
+            {
+                { "edit_media", message.Message }
+            });
+        }
+
         public virtual async void Forward()
         {
             if (_selectedItem is GalleryMessage message)

@@ -6,6 +6,7 @@
                         xmlns:controls="using:Telegram.Controls"
                         xmlns:cells="using:Telegram.Controls.Cells"
                         xmlns:local="using:Telegram.Controls.Stories"
+                        xmlns:messages="using:Telegram.Controls.Messages"
                         xmlns:common="using:Telegram.Common"
                         mc:Ignorable="d"
                         d:DesignHeight="300"
@@ -26,15 +27,8 @@
                                 <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
                             <Grid Margin="0,-4">
-                                <Image x:Name="Presenter"
-                                       Width="70"
-                                       Height="70" />
                                 <controls:CustomEmojiIcon x:Name="Icon"
-                                                          x:Load="False"
-                                                          Width="52"
-                                                          Height="52"
-                                                          FrameSize="52,52"
-                                                          IsViewportAware="False" />
+                                                          CleanOnSourceChanged="False" />
                                 <Popup x:Name="Overlay"
                                        IsHitTestVisible="False"
                                        Margin="-70"
@@ -43,7 +37,6 @@
                             </Grid>
 
                             <controls:AnimatedTextBlock x:Name="Count"
-                                                        x:Load="False"
                                                         Foreground="{TemplateBinding Foreground}"
                                                         FontWeight="SemiBold"
                                                         VerticalAlignment="Center"
@@ -105,7 +98,7 @@
 
             <local:StoryProgress x:Name="Progress"
                                  VerticalAlignment="Top"
-                                 Margin="8,6,6,0"
+                                 Margin="8,6,8,0"
                                  Canvas.ZIndex="1" />
 
             <Grid x:Name="InfoPanel"
@@ -124,78 +117,139 @@
                 <HyperlinkButton Click="Photo_Click"
                                  Style="{StaticResource EmptyHyperlinkButtonStyle}"
                                  AutomationProperties.Name="{CustomResource AccDescrProfilePicture}"
-                                 Width="32"
-                                 Height="32"
-                                 HorizontalAlignment="Center"
-                                 VerticalAlignment="Top"
-                                 Margin="8,0,8,0"
-                                 Canvas.ZIndex="1">
-                    <controls:ProfilePicture x:Name="Photo"
-                                             Size="32" />
+                                 HorizontalAlignment="Left"
+                                 Canvas.ZIndex="1"
+                                 Grid.ColumnSpan="2">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition />
+                        </Grid.ColumnDefinitions>
+                        <controls:ProfilePicture x:Name="Photo"
+                                                 Size="32"
+                                                 VerticalAlignment="Top"
+                                                 Margin="8,0,8,0" />
+
+                        <Grid VerticalAlignment="Center"
+                              Margin="0,-2,0,0"
+                              Grid.Column="1">
+                            <Grid.RowDefinitions>
+                                <RowDefinition />
+                                <RowDefinition />
+                            </Grid.RowDefinitions>
+
+                            <Grid HorizontalAlignment="Left">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock x:Name="Title"
+                                           Foreground="{ThemeResource PageHeaderForegroundBrush}"
+                                           Style="{StaticResource BaseTextBlockStyle}"
+                                           FontFamily="{ThemeResource EmojiThemeFontFamilyWithSymbols}"
+                                           TextWrapping="NoWrap"
+                                           TextTrimming="CharacterEllipsis"
+                                           MaxLines="1" />
+
+                                <controls:IdentityIcon x:Name="Identity"
+                                                       VerticalAlignment="Bottom"
+                                                       Margin="4,0,0,2"
+                                                       Grid.Column="1" />
+
+                                <TextBlock x:Name="Position"
+                                           Foreground="{ThemeResource PageHeaderDisabledBrush}"
+                                           Style="{StaticResource CaptionTextBlockStyle}"
+                                           VerticalAlignment="Bottom"
+                                           Margin="8,0,0,1"
+                                           Visibility="Collapsed"
+                                           Typography.NumeralAlignment="Tabular"
+                                           Grid.Column="2" />
+                            </Grid>
+
+                            <Grid Grid.Row="1">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition />
+                                </Grid.ColumnDefinitions>
+                                <Border x:Name="LiveBadge"
+                                        VerticalAlignment="Bottom"
+                                        Background="#FF2C55"
+                                        BorderBrush="{ThemeResource SolidBackgroundFillColorBaseBrush}"
+                                        BorderThickness="2"
+                                        CornerRadius="8"
+                                        Height="16"
+                                        MinWidth="16"
+                                        Margin="0,0,4,0"
+                                        Visibility="Collapsed">
+                                    <TextBlock Foreground="#FFFFFF"
+                                               Text="{CustomResource LiveStoryBadge}"
+                                               TextLineBounds="Tight"
+                                               TextAlignment="Center"
+                                               OpticalMarginAlignment="TrimSideBearings"
+                                               FontSize="9"
+                                               Padding="4,0,4,0"
+                                               VerticalAlignment="Center"
+                                               Typography.NumeralAlignment="Tabular" />
+                                </Border>
+
+                                <TextBlock x:Name="PinnedIcon"
+                                           Text="&#xEA8A;"
+                                           Foreground="{ThemeResource PageHeaderDisabledBrush}"
+                                           FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                           FontSize="12"
+                                           VerticalAlignment="Bottom"
+                                           Margin="0,0,4,2"
+                                           Visibility="Collapsed"
+                                           Grid.Column="1" />
+
+                                <TextBlock x:Name="Subtitle"
+                                           Foreground="{ThemeResource PageHeaderDisabledBrush}"
+                                           Style="{StaticResource CaptionTextBlockStyle}"
+                                           TextWrapping="NoWrap"
+                                           TextTrimming="CharacterEllipsis"
+                                           VerticalAlignment="Bottom"
+                                           Grid.Column="2" />
+
+                                <HyperlinkButton x:Name="SourceButton"
+                                                 Click="Source_Click"
+                                                 Style="{StaticResource EmptyHyperlinkButtonStyle}"
+                                                 VerticalAlignment="Bottom"
+                                                 Visibility="Collapsed"
+                                                 Grid.Column="2">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock x:Name="SourceIcon"
+                                                   Text="&#xF7B3;"
+                                                   Foreground="{ThemeResource PageHeaderDisabledBrush}"
+                                                   FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                                   FontSize="14"
+                                                   VerticalAlignment="Center"
+                                                   Margin="0,0,4,0" />
+                                        <controls:ProfilePicture x:Name="SourcePhoto"
+                                                                 Size="16"
+                                                                 VerticalAlignment="Center"
+                                                                 Margin="0,0,4,0"
+                                                                 Grid.Column="1" />
+                                        <TextBlock x:Name="SourceText"
+                                                   Foreground="{ThemeResource PageHeaderDisabledBrush}"
+                                                   Style="{StaticResource CaptionTextBlockStyle}"
+                                                   FontFamily="{ThemeResource EmojiThemeFontFamilyWithSymbols}"
+                                                   TextWrapping="NoWrap"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   VerticalAlignment="Center"
+                                                   Grid.Column="2" />
+                                    </Grid>
+                                </HyperlinkButton>
+                            </Grid>
+                        </Grid>
+                    </Grid>
                 </HyperlinkButton>
-
-                <Grid Grid.Column="1"
-                      VerticalAlignment="Center"
-                      Margin="0,-2,0,0">
-                    <Grid.RowDefinitions>
-                        <RowDefinition />
-                        <RowDefinition />
-                    </Grid.RowDefinitions>
-
-                    <Grid HorizontalAlignment="Left">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock x:Name="Title"
-                                   Foreground="{ThemeResource PageHeaderForegroundBrush}"
-                                   Style="{StaticResource BaseTextBlockStyle}"
-                                   FontFamily="{ThemeResource EmojiThemeFontFamilyWithSymbols}"
-                                   TextWrapping="NoWrap"
-                                   TextTrimming="CharacterEllipsis"
-                                   MaxLines="1" />
-
-                        <controls:IdentityIcon x:Name="Identity"
-                                               VerticalAlignment="Bottom"
-                                               Margin="4,0,0,2"
-                                               Grid.Column="1" />
-                    </Grid>
-
-                    <Grid Grid.Row="1">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition />
-                        </Grid.ColumnDefinitions>
-                        <Border x:Name="LiveBadge"
-                                VerticalAlignment="Bottom"
-                                Background="#FF2C55"
-                                BorderBrush="{ThemeResource SolidBackgroundFillColorBaseBrush}"
-                                BorderThickness="2"
-                                CornerRadius="8"
-                                Height="16"
-                                MinWidth="16"
-                                Margin="0,0,4,0"
-                                Visibility="Collapsed">
-                            <TextBlock Foreground="#FFFFFF"
-                                       Text="{CustomResource LiveStoryBadge}"
-                                       TextLineBounds="Tight"
-                                       TextAlignment="Center"
-                                       OpticalMarginAlignment="TrimSideBearings"
-                                       FontSize="9"
-                                       Padding="4,0,4,0"
-                                       VerticalAlignment="Center"
-                                       Typography.NumeralAlignment="Tabular" />
-                        </Border>
-
-                        <TextBlock x:Name="Subtitle"
-                                   Foreground="{ThemeResource PageHeaderDisabledBrush}"
-                                   Style="{StaticResource CaptionTextBlockStyle}"
-                                   TextWrapping="NoWrap"
-                                   TextTrimming="CharacterEllipsis"
-                                   VerticalAlignment="Bottom"
-                                   Grid.Column="1" />
-                    </Grid>
-                </Grid>
 
                 <Border x:Name="Privacy"
                         Width="24"
@@ -250,6 +304,23 @@
 
             <Canvas x:Name="AreasPanel" />
 
+            <StackPanel x:Name="UnsupportedPanel"
+                        x:Load="False"
+                        VerticalAlignment="Center"
+                        Margin="72,0">
+                <TextBlock Text="{CustomResource StoryUnsupported}"
+                           Foreground="#FFFFFF"
+                           FontWeight="SemiBold"
+                           FontSize="16"
+                           TextAlignment="Center"
+                           TextWrapping="Wrap" />
+                <Button Click="Unsupported_Click"
+                        Content="{CustomResource UpdateTelegram}"
+                        Style="{StaticResource AccentButtonStyle}"
+                        HorizontalAlignment="Stretch"
+                        Margin="0,24,0,0" />
+            </StackPanel>
+
             <Grid x:Name="CaptionRoot">
                 <Grid.RowDefinitions>
                     <RowDefinition />
@@ -268,52 +339,73 @@
                 </Rectangle>
 
                 <Rectangle x:Name="CaptionOverlay"
-                           Visibility="Collapsed"
                            Fill="#7F000000"
+                           IsHitTestVisible="False"
+                           PointerPressed="CaptionOverlay_PointerPressed"
+                           Tapped="CaptionOverlay_Tapped"
                            Grid.RowSpan="2" />
 
                 <Grid x:Name="CaptionPanel"
-                      SizeChanged="SizeMore_SizeChanged"
+                      Background="Transparent"
+                      SizeChanged="CaptionPanel_SizeChanged"
+                      Tapped="CaptionPanel_Tapped"
+                      PointerWheelChanged="CaptionPanel_PointerWheelChanged"
                       Padding="12,8"
                       Grid.Row="1">
-
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
+                        <RowDefinition />
                     </Grid.RowDefinitions>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <controls:FormattedTextBlock x:Name="Caption"
-                                                 MaxLines="2"
-                                                 TextTrimming="CharacterEllipsis"
-                                                 OverflowContentTarget="{x:Bind Overflow}"
-                                                 TextEntityClick="Caption_TextEntityClick"
-                                                 Grid.ColumnSpan="2" />
-                    <RichTextBlockOverflow x:Name="Overflow"
-                                           HorizontalAlignment="Left"
+
+                    <HyperlinkButton x:Name="RepostPanel"
+                                     Click="RepostPanel_Click"
+                                     Style="{StaticResource EmptyHyperlinkButtonStyle}"
+                                     HorizontalAlignment="Left"
+                                     Margin="0,0,0,8"
+                                     Visibility="Collapsed">
+                        <Border x:Name="RepostBackground"
+                                Background="#40000000"
+                                BorderBrush="#FFFFFF"
+                                CornerRadius="11"
+                                Padding="7,0,10,0"
+                                Height="22">
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock x:Name="RepostTitle"
+                                           Foreground="#FFFFFF"
+                                           FontFamily="{ThemeResource EmojiThemeFontFamilyWithSymbols}"
+                                           FontWeight="SemiBold"
+                                           FontSize="14"
+                                           TextWrapping="NoWrap"
+                                           TextTrimming="CharacterEllipsis"
+                                           MaxLines="1" />
+                                <TextBlock x:Name="RepostText"
+                                           Foreground="#FFFFFF"
+                                           FontSize="14"
+                                           TextWrapping="NoWrap"
+                                           TextTrimming="CharacterEllipsis"
                                            MaxLines="1"
-                                           Grid.Row="1" />
+                                           Visibility="Collapsed" />
+                            </StackPanel>
+                        </Border>
+                    </HyperlinkButton>
 
-                    <TextBlock x:Name="ShowMore"
-                               FontWeight="SemiBold"
-                               HorizontalAlignment="Left"
-                               SizeChanged="SizeMore_SizeChanged"
-                               Grid.Column="1"
-                               Grid.Row="1">
-                        <Run />
-                        <Run Text="{CustomResource ShowMore}" />
-                    </TextBlock>
+                    <ScrollViewer x:Name="CaptionScroll"
+                                  VerticalScrollBarVisibility="Auto"
+                                  VerticalScrollMode="Auto"
+                                  HorizontalScrollBarVisibility="Disabled"
+                                  HorizontalScrollMode="Disabled"
+                                  Margin="0,0,-12,0"
+                                  Visibility="Collapsed"
+                                  Grid.Row="1">
+                        <messages:MessageTextBlock x:Name="Caption"
+                                                   TextEntityClick="Caption_TextEntityClick"
+                                                   Margin="0,0,12,0" />
+                    </ScrollViewer>
 
+                    <messages:MessageTextBlock x:Name="CaptionCollapsed"
+                                               TextEntityClick="Caption_TextEntityClick"
+                                               Grid.Row="1" />
                 </Grid>
-
-                <HyperlinkButton x:Name="CaptionExpand"
-                                 Click="Caption_Click"
-                                 HorizontalAlignment="Stretch"
-                                 VerticalAlignment="Stretch"
-                                 Opacity="0"
-                                 Grid.Row="1" />
             </Grid>
 
             <Grid x:Name="MessagesRoot">

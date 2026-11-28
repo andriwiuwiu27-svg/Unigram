@@ -10,6 +10,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Telegram.Common;
+using Telegram.Controls;
 using Telegram.Entities;
 using Telegram.Services;
 using Telegram.Services.Factories;
@@ -308,6 +309,33 @@ namespace Telegram.ViewModels
             catch { }
         }
 
+        /// <summary>
+        /// Opens a message's media in the send popup with the editor up, to go out as a reply to it.
+        /// </summary>
+        public async void EditAndReply(Message message)
+        {
+            if (message.ChatId != _chat?.Id)
+            {
+                return;
+            }
+
+            var storage = await CreateRemoteMediaAsync(message.GetFile(), message.Content is MessageAnimation);
+
+            // The view model is pointed at whichever chat is open, which may have changed meanwhile.
+            if (storage == null || message.ChatId != _chat?.Id)
+            {
+                return;
+            }
+
+            // Not the composer's: its reply and draft are left for the user to send on their own.
+            var composer = new ComposerSnapshot
+            {
+                ReplyTo = new InputMessageReplyToMessage(message.Id, null, 0, string.Empty)
+            };
+
+            SendFilesAsync(StorageMediaSource.FromMedia(new[] { storage }), string.Empty.AsFormattedText(), true, composer, true);
+        }
+
         public async void EditCurrent()
         {
             var header = _composerHeader;
@@ -371,7 +399,7 @@ namespace Telegram.ViewModels
 
             TextField?.FocusInput(FocusState.Programmatic);
 
-            if (confirm != ContentDialogResult.Primary)
+            if (confirm != ModalPopupResult.Primary)
             {
                 TextField?.SetText(formattedText);
                 return;

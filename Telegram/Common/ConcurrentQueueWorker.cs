@@ -43,28 +43,44 @@ namespace Telegram.Common
             {
                 while (true)
                 {
-                    if (taskQueue.Count > 0 && MaxConcurrentCount >= _concurrentCount)
+                    Func<Task> nextTaskAction = null;
+
+                    // Test and claim in one step: apart, every spinning runner passes the test
+                    // before any of them increments, and a limit of one runs them all at once.
+                    lock (o)
                     {
-                        if (taskQueue.Count > 1)
+                        if (taskQueue.Count > 0 && MaxConcurrentCount >= _concurrentCount)
                         {
-                            Logger.Info(taskQueue.Count);
+                            if (taskQueue.Count > 1)
+                            {
+                                Logger.Info(taskQueue.Count);
+                            }
+
+                            if (taskQueue.TryDequeue(out nextTaskAction))
+                            {
+                                Interlocked.Increment(ref _concurrentCount);
+                            }
                         }
+                    }
 
-                        if (taskQueue.TryDequeue(out Func<Task> nextTaskAction))
+                    if (nextTaskAction != null)
+                    {
+                        // A task that throws must still free its slot, or every runner after it spins forever.
+                        try
                         {
-                            Interlocked.Increment(ref _concurrentCount);
-
                             await nextTaskAction();
-
+                        }
+                        finally
+                        {
                             lock (o)
                             {
                                 mre.Reset();
                                 Interlocked.Decrement(ref _concurrentCount);
                                 mre.Set();
                             }
-
-                            break;
                         }
+
+                        break;
                     }
                 }
             });

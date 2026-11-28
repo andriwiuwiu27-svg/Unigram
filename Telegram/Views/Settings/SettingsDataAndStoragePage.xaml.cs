@@ -7,6 +7,7 @@
 
 using System.Text;
 using Telegram.Converters;
+using Telegram.Navigation;
 using Telegram.Services;
 using Telegram.Services.Settings;
 using Telegram.ViewModels.Settings;
@@ -21,6 +22,7 @@ namespace Telegram.Views.Settings
         public SettingsDataAndStoragePage()
         {
             InitializeComponent();
+            Transition = PageTransition.Entrance;
             Title = Strings.DataSettings;
         }
 

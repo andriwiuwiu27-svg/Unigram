@@ -27,6 +27,7 @@ using Telegram.Services;
 using Windows.ApplicationModel.Activation;
 using Windows.ApplicationModel.Core;
 using Windows.System;
+using Windows.UI.Xaml;
 using Windows.UI.Xaml.Automation.Peers;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Media;
@@ -530,10 +531,26 @@ namespace Telegram
                 return;
             }
 
-            if (AppSettings.Diagnostics.ShowMemoryUsage && WindowContext.Current?.XamlRoot != null)
+            if (AppSettings.Diagnostics.ShowMemoryUsage)
             {
-                _ = MessagePopup.ShowAsync(WindowContext.Current.XamlRoot, args.Exception.ToString(), "Unhandled exception", "OK");
+                var window = GetReportWindow();
+                if (window?.XamlRoot != null)
+                {
+                    _ = MessagePopup.ShowAsync(window.XamlRoot, args.Exception.ToString(), "Unhandled exception", "OK");
+                }
             }
+        }
+
+        // Every WinUI window shares one thread, so there is no window of the thread to ask for. A
+        // report built off the UI thread gets none, as before: reading its XamlRoot there throws.
+        private static WindowContext GetReportWindow()
+        {
+#if WINUI3
+            var context = WindowContext.Active ?? WindowContext.Main;
+            return context != null && context.Dispatcher.HasThreadAccess ? context : null;
+#else
+            return WindowContext.Current;
+#endif
         }
 
         /// <summary>
@@ -544,7 +561,22 @@ namespace Telegram
         /// </summary>
         private static void MitigateToolTipCrash()
         {
-            var xamlRoot = WindowContext.Current?.XamlRoot;
+#if WINUI3
+            // The tooltip's owner can be in any window, and they all share this thread.
+            foreach (var context in WindowContext.Snapshot())
+            {
+                if (context.Dispatcher.HasThreadAccess)
+                {
+                    MitigateToolTipCrash(context.XamlRoot);
+                }
+            }
+#else
+            MitigateToolTipCrash(WindowContext.Current?.XamlRoot);
+#endif
+        }
+
+        private static void MitigateToolTipCrash(XamlRoot xamlRoot)
+        {
             if (xamlRoot == null)
             {
                 return;
@@ -728,12 +760,13 @@ namespace Telegram
                 $"Memory total: {memoryUsageTotal}\n" +
                 $"Update count: {count}\n";
 
-            if (WindowContext.Current != null)
+            var window = GetReportWindow();
+            if (window != null)
             {
                 var reader = AutomationPeer.ListenerExists(AutomationEvents.LiveRegionChanged);
-                var scaling = (WindowContext.Current.RasterizationScale * 100).ToString("N0");
+                var scaling = (window.RasterizationScale * 100).ToString("N0");
                 var text = (BootStrapper.Current.TextScaleFactor * 100).ToString("N0");
-                var size = WindowContext.Current.Bounds;
+                var size = window.Bounds;
 
                 var ratio = AppSettings.DialogsWidthRatio;
                 var width = MasterDetailPanel.CountDialogsWidthFromRatio(size.Width, ratio);

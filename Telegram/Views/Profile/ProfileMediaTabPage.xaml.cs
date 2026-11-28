@@ -10,6 +10,7 @@ using System.Numerics;
 using Telegram.Common;
 using Telegram.Composition;
 using Telegram.Controls.Cells;
+using Telegram.Navigation.Services;
 using Telegram.Navigation;
 using Telegram.Td.Api;
 using Telegram.ViewModels;
@@ -29,7 +30,7 @@ namespace Telegram.Views.Profile
             InitializeComponent();
         }
 
-        protected override void OnNavigatedTo(NavigationEventArgs e)
+        protected override void OnNavigatedTo(NavigatedEventArgs e)
         {
             base.OnNavigatedTo(e);
 

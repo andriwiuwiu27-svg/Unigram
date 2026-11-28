@@ -11,6 +11,8 @@ using Telegram.Common;
 using Telegram.Controls;
 using Telegram.Controls.Cells.Revenue;
 using Telegram.Converters;
+using Telegram.Navigation;
+using Telegram.Navigation.Services;
 using Telegram.Td.Api;
 using Telegram.ViewModels.Stars;
 using Telegram.Views.Chats;
@@ -29,17 +31,18 @@ namespace Telegram.Views.Stars
         public StarsPage()
         {
             InitializeComponent();
+            Transition = PageTransition.Entrance;
             Title = Strings.TelegramStars;
         }
 
-        protected override void OnNavigatedTo(NavigationEventArgs e)
+        protected override void OnNavigatedTo(NavigatedEventArgs e)
         {
             UpdateOwnedStarCount(ViewModel.OwnedStarCount);
 
             ViewModel.PropertyChanged += OnPropertyChanged;
         }
 
-        protected override void OnNavigatedFrom(NavigationEventArgs e)
+        protected override void OnNavigatedFrom(NavigatedEventArgs e)
         {
             ViewModel.PropertyChanged -= OnPropertyChanged;
         }

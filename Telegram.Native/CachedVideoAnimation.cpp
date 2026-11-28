@@ -190,11 +190,12 @@ namespace winrt::Telegram::Native::implementation
         }
     }
 
-    void CachedVideoAnimation::RenderSync(IBuffer bitmap, double skipBefore, double& seconds, bool& completed)
+    bool CachedVideoAnimation::RenderSync(IBuffer bitmap, double skipBefore, double& seconds, bool& completed)
     {
         uint8_t* pixels = bitmap.data();
         bool rendered;
         RenderSync(pixels, skipBefore, seconds, completed, &rendered);
+        return rendered;
     }
 
     void CachedVideoAnimation::RenderSync(uint8_t* pixels, double skipBefore, double& seconds, bool& completed, bool* rendered)
@@ -203,6 +204,8 @@ namespace winrt::Telegram::Native::implementation
         {
             *rendered = false;
         }
+
+        completed = false;
 
         if (pixels == nullptr)
         {
@@ -310,7 +313,8 @@ namespace winrt::Telegram::Native::implementation
         }
         else
         {
-            completed = true;
+            // Not finished is no frame yet: the decoder stopped inside an edit list's lead-in.
+            completed = m_producer->IsFinished();
         }
     }
 

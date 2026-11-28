@@ -92,6 +92,12 @@ namespace Telegram.Entities
         }
 
         /// <summary>
+        /// Whether <see cref="StorageMedia.OriginalFile"/> is on Telegram as an animation, which can
+        /// carry a sound track that is never played.
+        /// </summary>
+        public bool IsOriginalAnimation { get; set; }
+
+        /// <summary>
         /// The longest side of the cropped output at each quality level, lowest first. No level
         /// scales the crop up. The lowest is called 240p though it is 480 long, as it is
         /// elsewhere in Telegram.

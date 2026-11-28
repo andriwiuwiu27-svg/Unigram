@@ -185,6 +185,8 @@ namespace Telegram.Common
                     return FindFirstMediaInList(slideshow.Blocks, kind);
                 case PageBlockBlockQuote blockquote:
                     return FindFirstMediaInList(blockquote.Blocks, kind);
+                case PageBlockExpandableBlockQuote expandable:
+                    return FindFirstMediaInList(expandable.Blocks, kind);
                 case PageBlockEmbeddedPost ep:
                     return FindFirstMediaInList(ep.Blocks, kind);
 
@@ -274,6 +276,9 @@ namespace Telegram.Common
                     return;
                 case PageBlockBlockQuote blockquote:
                     CollectMediaInList(blockquote.Blocks, kind, result);
+                    return;
+                case PageBlockExpandableBlockQuote expandable:
+                    CollectMediaInList(expandable.Blocks, kind, result);
                     return;
                 case PageBlockEmbeddedPost ep:
                     CollectMediaInList(ep.Blocks, kind, result);
@@ -386,17 +391,14 @@ namespace Telegram.Common
                     CollectLinksFromRichText(pq.Text, result);
                     CollectLinksFromRichText(pq.Credit, result);
                     return;
-                // Text and credit like a pull quote, not a list of blocks like a
-                // block quote — the expandable one holds rich text directly.
-                case PageBlockExpandableBlockQuote eq:
-                    CollectLinksFromRichText(eq.Text, result);
-                    CollectLinksFromRichText(eq.Credit, result);
-                    return;
-
                 // Container blocks
                 case PageBlockBlockQuote bq:
                     CollectLinksFromBlocks(bq.Blocks, result);
                     CollectLinksFromRichText(bq.Credit, result);
+                    return;
+                case PageBlockExpandableBlockQuote eq:
+                    CollectLinksFromBlocks(eq.Blocks, result);
+                    CollectLinksFromRichText(eq.Credit, result);
                     return;
                 case PageBlockList list:
                     if (list.Items != null)
@@ -700,18 +702,14 @@ namespace Telegram.Common
                     pieces.Add(pq.Text);
                     if (!IsEmpty(pq.Credit)) pieces.Add(pq.Credit);
                     return;
-                // Holds rich text directly (like a pull quote), not a list of
-                // blocks like PageBlockBlockQuote — the "expandable" part is a
-                // rendering affordance and has no text projection.
-                case PageBlockExpandableBlockQuote eq:
-                    pieces.Add(eq.Text);
-                    if (!IsEmpty(eq.Credit)) pieces.Add(eq.Credit);
-                    return;
-
                 // Container blocks
                 case PageBlockBlockQuote bq:
                     CollectRichTextFromBlocks(bq.Blocks, pieces);
                     if (!IsEmpty(bq.Credit)) pieces.Add(bq.Credit);
+                    return;
+                case PageBlockExpandableBlockQuote eq:
+                    CollectRichTextFromBlocks(eq.Blocks, pieces);
+                    if (!IsEmpty(eq.Credit)) pieces.Add(eq.Credit);
                     return;
                 case PageBlockList list:
                     if (list.Items != null)
@@ -1677,7 +1675,7 @@ namespace Telegram.Common
                     }
                     break;
                 case PageBlockExpandableBlockQuote expandable:
-                    AddQuoteNode(expandable.Text, nodes);
+                    CollectQuoteNodes(expandable.Blocks, nodes);
                     AddQuoteNode(expandable.Credit, nodes);
                     break;
                 case PageBlockBlockQuote blockQuote:
@@ -2281,75 +2279,55 @@ namespace Telegram.Common
                     }
 
                 case PageBlockBlockQuote quote:
-                    {
-                        // A credit can't live in a block-quote entity; the body must be paragraphs.
-                        if (!IsEmpty(quote.Credit))
-                        {
-                            return false;
-                        }
-
-                        int start = text.Length;
-                        var body = quote.Blocks;
-                        if (body != null)
-                        {
-                            for (int i = 0; i < body.Count; i++)
-                            {
-                                if (body[i] is not PageBlockParagraph para)
-                                {
-                                    return false;
-                                }
-
-                                if (i > 0)
-                                {
-                                    text.Append('\n');
-                                }
-
-                                if (!TryAppendRichText(para.Text, text, entities))
-                                {
-                                    return false;
-                                }
-                            }
-                        }
-
-                        int length = text.Length - start;
-                        if (length > 0)
-                        {
-                            entities.Add(new TextEntity(start, length, new TextEntityTypeBlockQuote()));
-                        }
-
-                        return true;
-                    }
+                    return TryAppendQuote(quote.Blocks, quote.Credit, false, text, entities);
 
                 case PageBlockExpandableBlockQuote quote:
-                    {
-                        // Unlike the plain block quote this one holds RichText directly, so it maps
-                        // 1:1 onto the expandable-blockquote entity — no paragraph-shape requirement.
-                        // A credit still can't be carried.
-                        if (!IsEmpty(quote.Credit))
-                        {
-                            return false;
-                        }
-
-                        int start = text.Length;
-                        if (!TryAppendRichText(quote.Text, text, entities))
-                        {
-                            return false;
-                        }
-
-                        int length = text.Length - start;
-                        if (length > 0)
-                        {
-                            entities.Add(new TextEntity(start, length, new TextEntityTypeExpandableBlockQuote()));
-                        }
-
-                        return true;
-                    }
+                    return TryAppendQuote(quote.Blocks, quote.Credit, true, text, entities);
 
                 default:
                     // Any other block type (heading/footer/list/table/media/document/button-row/
                     // divider/anchor/…) = loss.
                     return false;
             }
+        }
+
+        // A credit can't live in a block-quote entity; the body must be paragraphs.
+        private static bool TryAppendQuote(Vector<PageBlock> body, RichText credit, bool expandable, StringBuilder text, MutableVector<TextEntity> entities)
+        {
+            if (!IsEmpty(credit))
+            {
+                return false;
+            }
+
+            int start = text.Length;
+            if (body != null)
+            {
+                for (int i = 0; i < body.Count; i++)
+                {
+                    if (body[i] is not PageBlockParagraph para)
+                    {
+                        return false;
+                    }
+
+                    if (i > 0)
+                    {
+                        text.Append('\n');
+                    }
+
+                    if (!TryAppendRichText(para.Text, text, entities))
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            int length = text.Length - start;
+            if (length > 0)
+            {
+                entities.Add(new TextEntity(start, length, expandable ? new TextEntityTypeExpandableBlockQuote() : new TextEntityTypeBlockQuote()));
+            }
+
+            return true;
         }
 
         private static bool TryAppendInputBlocks(Vector<InputPageBlock> blocks, StringBuilder text, MutableVector<TextEntity> entities)
@@ -2403,66 +2381,10 @@ namespace Telegram.Common
                     }
 
                 case InputPageBlockBlockQuote quote:
-                    {
-                        if (!IsEmpty(quote.Credit))
-                        {
-                            return false;
-                        }
-
-                        int start = text.Length;
-                        var body = quote.Blocks;
-                        if (body != null)
-                        {
-                            for (int i = 0; i < body.Count; i++)
-                            {
-                                if (body[i] is not InputPageBlockParagraph para)
-                                {
-                                    return false;
-                                }
-
-                                if (i > 0)
-                                {
-                                    text.Append('\n');
-                                }
-
-                                if (!TryAppendRichText(para.Text, text, entities))
-                                {
-                                    return false;
-                                }
-                            }
-                        }
-
-                        int length = text.Length - start;
-                        if (length > 0)
-                        {
-                            entities.Add(new TextEntity(start, length, new TextEntityTypeBlockQuote()));
-                        }
-
-                        return true;
-                    }
+                    return TryAppendInputQuote(quote.Blocks, quote.Credit, false, text, entities);
 
                 case InputPageBlockExpandableBlockQuote quote:
-                    {
-                        // Holds RichText directly — see the display-side twin above.
-                        if (!IsEmpty(quote.Credit))
-                        {
-                            return false;
-                        }
-
-                        int start = text.Length;
-                        if (!TryAppendRichText(quote.Text, text, entities))
-                        {
-                            return false;
-                        }
-
-                        int length = text.Length - start;
-                        if (length > 0)
-                        {
-                            entities.Add(new TextEntity(start, length, new TextEntityTypeExpandableBlockQuote()));
-                        }
-
-                        return true;
-                    }
+                    return TryAppendInputQuote(quote.Blocks, quote.Credit, true, text, entities);
 
                 default:
                     return false;
@@ -2578,6 +2500,44 @@ namespace Telegram.Common
         /// mapped to their <c>richText*</c> equivalents, with nested/overlapping ranges
         /// resolved into a nested <see cref="RichText"/> tree.
         /// </summary>
+        private static bool TryAppendInputQuote(Vector<InputPageBlock> body, RichText credit, bool expandable, StringBuilder text, MutableVector<TextEntity> entities)
+        {
+            if (!IsEmpty(credit))
+            {
+                return false;
+            }
+
+            int start = text.Length;
+            if (body != null)
+            {
+                for (int i = 0; i < body.Count; i++)
+                {
+                    if (body[i] is not InputPageBlockParagraph para)
+                    {
+                        return false;
+                    }
+
+                    if (i > 0)
+                    {
+                        text.Append('\n');
+                    }
+
+                    if (!TryAppendRichText(para.Text, text, entities))
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            int length = text.Length - start;
+            if (length > 0)
+            {
+                entities.Add(new TextEntity(start, length, expandable ? new TextEntityTypeExpandableBlockQuote() : new TextEntityTypeBlockQuote()));
+            }
+
+            return true;
+        }
+
         public static Vector<PageBlock> ToPageBlocks(FormattedText text)
         {
             var blocks = new MutableVector<PageBlock>();
@@ -2616,20 +2576,10 @@ namespace Telegram.Common
                         blocks.Add(new PageBlockPreformatted(BuildRichText(s, be.Offset, end, inline), pc.Language ?? string.Empty));
                         break;
                     case TextEntityTypeExpandableBlockQuote _:
-                        // pageBlockExpandableBlockQuote holds RichText directly, so the span
-                        // stays one node (newlines and all) instead of being split into
-                        // paragraphs — which makes this the exact inverse of TryAppendBlock.
-                        blocks.Add(new PageBlockExpandableBlockQuote(
-                            BuildRichText(s, be.Offset, end, inline), new RichTextPlain(string.Empty)));
+                        blocks.Add(new PageBlockExpandableBlockQuote(QuoteParagraphs(s, be.Offset, end, inline), new RichTextPlain(string.Empty)));
                         break;
                     default: // BlockQuote
-                        var inner = new MutableVector<PageBlock>();
-                        AppendParagraphs(inner, s, be.Offset, end, inline);
-                        if (inner.Count == 0)
-                        {
-                            inner.Add(new PageBlockParagraph(new RichTextPlain(string.Empty)));
-                        }
-                        blocks.Add(new PageBlockBlockQuote(inner, new RichTextPlain(string.Empty)));
+                        blocks.Add(new PageBlockBlockQuote(QuoteParagraphs(s, be.Offset, end, inline), new RichTextPlain(string.Empty)));
                         break;
                 }
 
@@ -2642,6 +2592,17 @@ namespace Telegram.Common
             }
 
             return blocks;
+        }
+
+        private static MutableVector<PageBlock> QuoteParagraphs(string s, int start, int end, List<TextEntity> inline)
+        {
+            var inner = new MutableVector<PageBlock>();
+            AppendParagraphs(inner, s, start, end, inline);
+            if (inner.Count == 0)
+            {
+                inner.Add(new PageBlockParagraph(new RichTextPlain(string.Empty)));
+            }
+            return inner;
         }
 
         private static bool IsBlockEntity(TextEntityType type)
@@ -2834,7 +2795,6 @@ namespace Telegram.Common
                 (PageBlockFooter a, PageBlockFooter b) => Compare(a.Footer, b.Footer),
                 (PageBlockThinking a, PageBlockThinking b) => Compare(a.Text, b.Text),
                 (PageBlockPullQuote a, PageBlockPullQuote b) => Compare(a.Text, b.Text) && Compare(a.Credit, b.Credit),
-                (PageBlockExpandableBlockQuote a, PageBlockExpandableBlockQuote b) => Compare(a.Text, b.Text) && Compare(a.Credit, b.Credit),
                 (PageBlockMathematicalExpression a, PageBlockMathematicalExpression b) => string.Equals(a.Expression, b.Expression),
 
                 // Atomic
@@ -2857,6 +2817,7 @@ namespace Telegram.Common
                 (PageBlockCover a, PageBlockCover b) => Compare(a.Cover, b.Cover),
                 (PageBlockList a, PageBlockList b) => Compare(a.Items, b.Items),
                 (PageBlockBlockQuote a, PageBlockBlockQuote b) => Compare(a.Blocks, b.Blocks) && Compare(a.Credit, b.Credit),
+                (PageBlockExpandableBlockQuote a, PageBlockExpandableBlockQuote b) => Compare(a.Blocks, b.Blocks) && Compare(a.Credit, b.Credit),
                 (PageBlockCollage a, PageBlockCollage b) => Compare(a.Blocks, b.Blocks) && Compare(a.Caption, b.Caption),
                 (PageBlockSlideshow a, PageBlockSlideshow b) => Compare(a.Blocks, b.Blocks) && Compare(a.Caption, b.Caption),
                 (PageBlockEmbeddedPost a, PageBlockEmbeddedPost b) => string.Equals(a.Url, b.Url) && string.Equals(a.Author, b.Author) && a.Date == b.Date && Compare(a.Blocks, b.Blocks) && Compare(a.Caption, b.Caption),
@@ -3205,7 +3166,7 @@ namespace Telegram.Common
                 case PageBlockPullQuote x:
                     return new InputPageBlockPullQuote(x.Text, x.Credit);
                 case PageBlockExpandableBlockQuote x:
-                    return new InputPageBlockExpandableBlockQuote(x.Text, x.Credit);
+                    return new InputPageBlockExpandableBlockQuote(ToInputBlocks(x.Blocks), x.Credit);
                 case PageBlockDocument x:
                     return new InputPageBlockDocument(ToInputDocument(x.Document), x.Caption);
                 case PageBlockButtonRow x:

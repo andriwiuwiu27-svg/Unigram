@@ -191,8 +191,8 @@
 
         <controls:GlyphToggleButton x:Name="DrawTab"
                                     Click="DrawTab_Click"
-                                    Glyph="&#xF7AC;"
-                                    CheckedGlyph="&#xF7AC;"
+                                    Glyph="&#xF7BD;"
+                                    CheckedGlyph="&#xF7BD;"
                                     Content="{CustomResource PhotoEditorDraw}"
                                     Style="{StaticResource EditorTabStyle}" />
 

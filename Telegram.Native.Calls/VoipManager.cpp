@@ -9,6 +9,8 @@
 
 #include "../Telegram.Native/AppModelPaths.h"
 
+#include "api/audio/create_audio_device_module.h"
+#include "api/environment/environment_factory.h"
 #include "api/media_stream_interface.h"
 #include "api/create_peerconnection_factory.h"
 #include "api/peer_connection_interface.h"
@@ -27,15 +29,12 @@
 
 #include "api/video/video_frame.h"
 #include "api/video/video_source_interface.h"
-#include "media/base/video_adapter.h"
-#include "media/base/video_broadcaster.h"
 
 namespace winrt::Telegram::Native::Calls::implementation
 {
     // Every version tgcalls::Meta::Create can build. These have internal linkage, so they
     // belong in exactly one translation unit: from a header, a second includer would
     // register the whole set again.
-    const auto RegisterTag = tgcalls::Register<tgcalls::InstanceImpl>();
     const auto RegisterTagV2_4_0_1 = tgcalls::Register<tgcalls::InstanceV2Impl>();
     const auto RegisterTagV2_4_1_2 = tgcalls::Register<tgcalls::InstanceV2ReferenceImpl>();
     const auto RegisterTagV2_14_0_0 = tgcalls::Register<tgcalls::InstanceV2CompatImpl>();
@@ -70,7 +69,6 @@ namespace winrt::Telegram::Native::Calls::implementation
             .maxApiLayer = 92,
             .enableHighBitrateVideo = false,
             .preferredVideoCodecs = std::vector<std::string>(),
-            .protocolVersion = tgcalls::ProtocolVersion::V1,
             .customParameters = winrt::to_string(descriptor.CustomParameters())
         };
 
@@ -229,6 +227,11 @@ namespace winrt::Telegram::Native::Calls::implementation
         // The descriptor carries whichever capture is active when the call turns ready,
         // which is a screen capture if the user started sharing before that happened.
         descriptorImpl.videoCapture = GetVideoCaptureImpl(descriptor.VideoCapture());
+
+        // tgcalls builds no platform audio device of its own: without this the call has none.
+        descriptorImpl.createAudioDeviceModule = [](webrtc::TaskQueueFactory*) {
+            return webrtc::CreateAudioDeviceModule(webrtc::CreateEnvironment(), webrtc::AudioDeviceModule::kPlatformDefaultAudio);
+        };
 
         m_impl = tgcalls::Meta::Create(descriptorImpl.version, std::move(descriptorImpl));
     }

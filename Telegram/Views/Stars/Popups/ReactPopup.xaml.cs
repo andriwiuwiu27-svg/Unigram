@@ -28,7 +28,7 @@ using Windows.UI.Xaml.Media;
 
 namespace Telegram.Views.Stars.Popups
 {
-    public sealed partial class ReactPopup : ContentPopup
+    public sealed partial class ReactPopup : ModalPopup
     {
         private readonly IClientService _clientService;
         private readonly MessageViewModel _message;
@@ -76,7 +76,7 @@ namespace Telegram.Views.Stars.Popups
             Closed += OnClosed;
         }
 
-        private void OnOpened(ContentDialog sender, ContentDialogOpenedEventArgs args)
+        private void OnOpened(ModalPopup sender, ModalPopupOpenedEventArgs args)
         {
             var markdown = ClientEx.ParseMarkdown(Strings.Gift2MessageStarsInfoLink);
 
@@ -116,7 +116,7 @@ namespace Telegram.Views.Stars.Popups
             _message.Delegate.NavigationService.ShowPopup(new BuyPopup(), BuyStarsArgs.ForPurposeChat(_message.ChatId));
         }
 
-        private void OnClosed(ContentDialog sender, ContentDialogClosedEventArgs args)
+        private void OnClosed(ModalPopup sender, ModalPopupClosedEventArgs args)
         {
             _balance?.IsOpen = false;
         }
@@ -219,7 +219,7 @@ namespace Telegram.Views.Stars.Popups
 
         private void Purchase_Click(object sender, RoutedEventArgs e)
         {
-            Hide(ContentDialogResult.Primary);
+            Hide(ModalPopupResult.Primary);
         }
 
         private void SettingsFooter_Click(object sender, TextUrlClickEventArgs e)

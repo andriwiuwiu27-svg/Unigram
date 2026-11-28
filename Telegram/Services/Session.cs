@@ -247,7 +247,7 @@ namespace Telegram.Services
                     else if (window.Content is RootWindow root && root.NavigationService?.Session == this)
                     {
                         root.NavigationService.Block();
-                        ContentPopup.Block(root.NavigationService.XamlRoot);
+                        ModalPopup.Block(root.NavigationService.XamlRoot);
                     }
                 });
             }

@@ -9,6 +9,7 @@ using System;
 using System.Text;
 using System.Threading.Tasks;
 using Telegram.Common;
+using Telegram.Controls;
 using Telegram.Navigation;
 using Telegram.Navigation.Services;
 using Telegram.Services;
@@ -745,7 +746,7 @@ namespace Telegram.ViewModels.Supergroups
                 }
 
                 var confirm = await ShowPopupAsync(builder.ToString(), Strings.EditAdminTransferAlertTitle, primary, Strings.Cancel);
-                if (confirm == ContentDialogResult.Primary && canTransfer is CanTransferOwnershipResultPasswordNeeded)
+                if (confirm == ModalPopupResult.Primary && canTransfer is CanTransferOwnershipResultPasswordNeeded)
                 {
                     NavigationService.NavigateToPasswordSetup();
                 }
@@ -753,13 +754,13 @@ namespace Telegram.ViewModels.Supergroups
             else if (canTransfer is CanTransferOwnershipResultOk)
             {
                 var confirm = await ShowPopupAsync(string.Format(Strings.EditAdminTransferReadyAlertText, chat.Title, user.FullName()), supergroup.IsChannel ? Strings.EditAdminChannelTransfer : Strings.EditAdminGroupTransfer, Strings.EditAdminTransferChangeOwner, Strings.Cancel);
-                if (confirm != ContentDialogResult.Primary)
+                if (confirm != ModalPopupResult.Primary)
                 {
                     return;
                 }
 
                 var result = await ShowInputNestedAsync(InputPopupType.Password, Strings.PleaseEnterCurrentPasswordTransfer, Strings.TwoStepVerification, Strings.LoginPassword, Strings.OK, Strings.Cancel);
-                if (result.Result != ContentDialogResult.Primary)
+                if (result.Result != ModalPopupResult.Primary)
                 {
                     return;
                 }

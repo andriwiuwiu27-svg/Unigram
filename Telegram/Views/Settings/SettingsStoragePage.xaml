@@ -12,7 +12,7 @@
                   ShowHeader="False"
                   mc:Ignorable="d">
 
-    <Page.Resources>
+    <UserControl.Resources>
         <DataTemplate x:Key="StorageChartItemTemplate"
                       x:DataType="controls:StorageChartItem">
             <controls:FauxCheckBox Click="StorageChartItem_Checked"
@@ -111,15 +111,7 @@
                 </ItemsControl>
             </controls:SettingsExpander>
         </DataTemplate>
-    </Page.Resources>
-
-    <Page.Transitions>
-        <TransitionCollection>
-            <NavigationThemeTransition>
-                <SlideNavigationTransitionInfo Effect="FromRight" />
-            </NavigationThemeTransition>
-        </TransitionCollection>
-    </Page.Transitions>
+    </UserControl.Resources>
 
     <Grid Background="{ThemeResource SettingsPageBackground}">
         <controls:TableListView x:Name="ScrollingHost"

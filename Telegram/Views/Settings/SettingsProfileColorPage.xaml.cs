@@ -9,6 +9,8 @@ using System;
 using System.Collections.Specialized;
 using Telegram.Common;
 using Telegram.Controls;
+using Telegram.Navigation;
+using Telegram.Navigation.Services;
 using Telegram.Td.Api;
 using Telegram.ViewModels.Settings;
 using Telegram.Views.Profile;
@@ -71,15 +73,15 @@ namespace Telegram.Views.Settings
             clipper.StartAnimation("Opacity", fadeIn);
         }
 
-        protected override void OnNavigatedTo(NavigationEventArgs e)
+        protected override void OnNavigatedTo(NavigatedEventArgs e)
         {
             if (ViewModel.SelectedTab is SettingsProfileColorTabViewModelBase tab)
             {
-                MediaFrame.Navigate(tab.Type, null, new SuppressNavigationTransitionInfo());
+                MediaFrame.Navigate(tab.Type, null, PageTransition.None);
             }
         }
 
-        protected override void OnNavigatedFrom(NavigationEventArgs e)
+        protected override void OnNavigatedFrom(NavigatedEventArgs e)
         {
             if (_notifyCollectionChanged != null)
             {
@@ -97,7 +99,7 @@ namespace Telegram.Views.Settings
         private long _itemsSourceToken;
         private long _selectionModeToken;
 
-        private void OnNavigating(object sender, NavigatingCancelEventArgs e)
+        private void OnNavigating(object sender, NavigatingEventArgs e)
         {
             if (_notifyCollectionChanged != null)
             {
@@ -112,7 +114,7 @@ namespace Telegram.Views.Settings
             }
         }
 
-        private void OnNavigated(object sender, NavigationEventArgs e)
+        private void OnNavigated(object sender, NavigatedEventArgs e)
         {
             if (e.Content is SettingsProfileColorNameTabPage nameColor)
             {
@@ -244,12 +246,9 @@ namespace Telegram.Views.Settings
         {
             if (sender is TopNavView navigation && e.ClickedItem is SettingsProfileColorTabViewModelBase page && page.Type != MediaFrame.Content?.GetType())
             {
-                var transition = new SlideNavigationTransitionInfo
-                {
-                    Effect = navigation.SelectedIndex < navigation.Items.IndexOf(e.ClickedItem)
-                        ? SlideNavigationTransitionEffect.FromRight
-                        : SlideNavigationTransitionEffect.FromLeft
-                };
+                var transition = navigation.SelectedIndex < navigation.Items.IndexOf(e.ClickedItem)
+                    ? PageTransition.Forward
+                    : PageTransition.Backward;
 
                 MediaFrame.Navigate(page.Type, null, transition);
             }

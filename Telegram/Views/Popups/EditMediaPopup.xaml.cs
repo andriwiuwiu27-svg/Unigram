@@ -110,6 +110,14 @@ namespace Telegram.Views.Popups
                 return;
             }
 
+            // An animation already on Telegram stays one, and its sound track, if any, is never played.
+            if (video.IsOriginalAnimation)
+            {
+                TrimToolbar.IsMuted = true;
+                TrimToolbar.CanMute = false;
+                return;
+            }
+
             QualityButton.Visibility = Visibility.Visible;
 
             var state = video.EditState;
@@ -420,7 +428,7 @@ namespace Telegram.Views.Popups
                 video.Quality = _quality;
             }
 
-            Hide(ContentDialogResult.Primary);
+            Hide(ModalPopupResult.Primary);
         }
 
         // Closing asks first only when it would drop something: the edit, as Done would write it,
@@ -440,13 +448,13 @@ namespace Telegram.Views.Popups
 
                 _confirming = false;
 
-                if (confirm != ContentDialogResult.Primary)
+                if (confirm != ModalPopupResult.Primary)
                 {
                     return;
                 }
             }
 
-            Hide(ContentDialogResult.Secondary);
+            Hide(ModalPopupResult.Secondary);
         }
 
         // The edit as Done writes it, from what the layers last saved.

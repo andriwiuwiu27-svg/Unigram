@@ -12,6 +12,7 @@ using Telegram.Controls;
 using Telegram.Controls.Cells;
 using Telegram.Controls.Drawers;
 using Telegram.Controls.Media;
+using Telegram.Navigation.Services;
 using Telegram.Td;
 using Telegram.Td.Api;
 using Telegram.ViewModels;
@@ -38,7 +39,7 @@ namespace Telegram.Views.Folders
             InitializeComponent();
         }
 
-        protected override void OnNavigatedTo(NavigationEventArgs e)
+        protected override void OnNavigatedTo(NavigatedEventArgs e)
         {
             EmojiPanel.DataContext = EmojiDrawerViewModel.Create(ViewModel.Session);
             TagPreviewText.DataContext = ViewModel;
@@ -51,7 +52,7 @@ namespace Telegram.Views.Folders
             ViewModel.PropertyChanged += OnPropertyChanged;
         }
 
-        protected override void OnNavigatedFrom(NavigationEventArgs e)
+        protected override void OnNavigatedFrom(NavigatedEventArgs e)
         {
             ViewModel.PropertyChanged -= OnPropertyChanged;
         }

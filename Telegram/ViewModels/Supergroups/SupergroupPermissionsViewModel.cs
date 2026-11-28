@@ -474,7 +474,7 @@ namespace Telegram.ViewModels.Supergroups
                 else
                 {
                     NavigationService.GoBack();
-                    NavigationService.Frame.ForwardStack.Clear();
+                    NavigationService.ClearForwardStack();
                     return;
                 }
             }
@@ -525,7 +525,7 @@ namespace Telegram.ViewModels.Supergroups
             }
 
             NavigationService.GoBack();
-            NavigationService.Frame.ForwardStack.Clear();
+            NavigationService.ClearForwardStack();
         }
 
         public void AddRestricted()

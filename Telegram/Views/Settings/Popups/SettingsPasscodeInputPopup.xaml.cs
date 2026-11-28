@@ -64,7 +64,7 @@ namespace Telegram.Views.Settings.Popups
         {
             if (IsSimple && First.Password.Length == 4 && First.Password.All(x => x is >= '0' and <= '9') && First.Password.Equals(Confirm.Password))
             {
-                Hide(ContentDialogResult.Primary);
+                Hide(ModalPopupResult.Primary);
             }
         }
 
@@ -80,7 +80,7 @@ namespace Telegram.Views.Settings.Popups
                 }
                 else
                 {
-                    Hide(ContentDialogResult.Primary);
+                    Hide(ModalPopupResult.Primary);
                 }
 
                 e.Handled = true;

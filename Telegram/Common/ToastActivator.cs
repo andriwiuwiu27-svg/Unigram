@@ -17,25 +17,28 @@ using Telegram.Navigation;
 namespace Telegram.Common
 {
     /// <summary>
-    /// What a package's manifest gives its toasts, provided by the process itself: something for
-    /// the shell to call when one is clicked. The shell finds this CLSID through the
-    /// AppUserModelId key's CustomActivator and calls the class object registered here - or, with
-    /// the app not running, starts LocalServer32 and waits for the new process to register it.
+    /// Something for the shell to call when a toast is clicked. Packaged, the manifest names this
+    /// CLSID and its ExeServer; unpackaged, the AppUserModelId key's CustomActivator names it and
+    /// <see cref="Register"/> writes LocalServer32. Either way the shell calls the class object
+    /// registered here - or, with the app not running, starts the server and waits for the new
+    /// process to register it.
     ///
-    /// Every button comes here too, not only clicks on the toast: a desktop app gets no
-    /// activationType='background', so a reply arrives exactly the way a click does.
+    /// Every button comes here too, not only clicks on the toast: a full trust process gets no
+    /// in-process background activation, so a reply arrives exactly the way a click does.
     /// </summary>
     internal static partial class ToastActivator
     {
-        // The debug build's is its own for the same reason as its application id (Toast.cs).
+        // Packaged, the one Telegram.WinUI.csproj puts in the manifest. Unpackaged, the debug
+        // build's is its own for the same reason as its application id (Toast.cs).
+        public static readonly Guid Clsid = ApiInfo.HasPackageIdentity ? new(PackagedClsid)
 #if DEBUG
-        public static readonly Guid Clsid = new("B7E1C4A2-5D3F-4E8B-9A61-2C0F7D9E4B35");
+            : new("B7E1C4A2-5D3F-4E8B-9A61-2C0F7D9E4B35");
 #else
-        public static readonly Guid Clsid = new("3542F50C-8B9A-4A2B-A47D-9E5EAF762103");
+            : new("3542F50C-8B9A-4A2B-A47D-9E5EAF762103");
 #endif
 
-        // LocalServer32's. Nothing reads it: a cold start is an ordinary launch, and the click
-        // arrives through the class object once Program has registered it.
+        // The server's, packaged or not. Nothing reads it: a cold start is an ordinary launch, and
+        // the click arrives through the class object once Program has registered it.
         public const string CommandLineArgument = "-ToastActivated";
 
         private const uint CLSCTX_LOCAL_SERVER = 0x4;
@@ -57,8 +60,9 @@ namespace Telegram.Common
         /// </summary>
         public static void Register()
         {
-            using (var server = Registry.CurrentUser.CreateSubKey(@"Software\Classes\CLSID\" + Clsid.ToString("B") + @"\LocalServer32"))
+            if (!ApiInfo.HasPackageIdentity)
             {
+                using var server = Registry.CurrentUser.CreateSubKey(@"Software\Classes\CLSID\" + Clsid.ToString("B") + @"\LocalServer32");
                 server.SetValue(null, $"\"{Environment.ProcessPath}\" {CommandLineArgument}");
             }
 

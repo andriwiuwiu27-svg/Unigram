@@ -11,6 +11,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Telegram.Collections;
 using Telegram.Common;
+using Telegram.Controls;
 using Telegram.Navigation;
 using Telegram.Navigation.Services;
 using Telegram.Services;
@@ -113,7 +114,7 @@ namespace Telegram.ViewModels.Profile
             }
 
             var confirm = await ShowPopupAsync(message, title, primary, Strings.Cancel);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 Items.Remove(topic);
                 ClientService.Send(new DeleteSavedMessagesTopicHistory(topic.Id));

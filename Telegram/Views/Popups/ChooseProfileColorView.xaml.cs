@@ -284,11 +284,6 @@ namespace Telegram.Views.Popups
 
         private void UpdateProfileAccentColor(Chat chat, int colorId, long customEmojiId, EmojiStatusTypeUpgradedGift upgradedGift)
         {
-            if (ApiInfo.IsPackagedRelease)
-            {
-                Debug.Assert(WindowContext.Current.ActualTheme == ActualTheme);
-            }
-
             _actualTheme = ActualTheme;
 
             if (colorId != -1 || upgradedGift != null)

@@ -10,6 +10,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Telegram.Common;
+using Telegram.Controls;
 using Telegram.Converters;
 using Telegram.Native.Calls;
 using Telegram.Navigation;
@@ -204,7 +205,7 @@ namespace Telegram.ViewModels.Settings
         public async void ResetAutoDownload()
         {
             var confirm = await ShowPopupAsync(Strings.ResetAutomaticMediaDownloadAlert, Strings.AppName, Strings.OK, Strings.Cancel);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 //var response = await ClientService.SendAsync(new GetAutoDownloadSettingsPresets());
                 //if (response is AutoDownloadSettingsPresets presets)
@@ -225,7 +226,7 @@ namespace Telegram.ViewModels.Settings
         public async void ClearDrafts()
         {
             var confirm = await ShowPopupAsync(Strings.AreYouSureClearDrafts, Strings.AreYouSureClearDraftsTitle, Strings.Delete, Strings.Cancel, destructive: true);
-            if (confirm != ContentDialogResult.Primary)
+            if (confirm != ModalPopupResult.Primary)
             {
                 return;
             }

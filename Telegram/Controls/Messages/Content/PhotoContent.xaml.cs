@@ -327,11 +327,15 @@ namespace Telegram.Controls.Messages.Content
                 var width = 0;
                 var height = 0;
 
-                if (photoSize.Width > MaxWidth || photoSize.Height > MaxHeight)
+                // AlbumContent sets an album child's MaxWidth to infinity.
+                var maxWidth = _album ? MessageAlbumBase.MAX_WIDTH : MaxWidth;
+                var maxHeight = _album ? MessageAlbumBase.MAX_HEIGHT : MaxHeight;
+
+                if (photoSize.Width > maxWidth || photoSize.Height > maxHeight)
                 {
-                    double ratioX = MaxWidth / photoSize.Width;
-                    double ratioY = MaxHeight / photoSize.Height;
-                    double ratio = Math.Max(ratioX, ratioY);
+                    double ratioX = maxWidth / photoSize.Width;
+                    double ratioY = maxHeight / photoSize.Height;
+                    double ratio = Math.Min(1, _album ? Math.Max(ratioX, ratioY) : Math.Min(ratioX, ratioY));
 
                     width = (int)(photoSize.Width * ratio);
                     height = (int)(photoSize.Height * ratio);
@@ -432,7 +436,6 @@ namespace Telegram.Controls.Messages.Content
                 MessageGame game when !primary => game.Game.Photo != null,
                 MessageText text when text.LinkPreview != null && !primary => text.LinkPreview.HasPhoto(),
                 MessageInvoice invoice when invoice.PaidMedia is PaidMediaPhoto => true,
-                MessagePoll poll when poll.Media is PollMediaPhoto && !primary => true,
                 MessageSponsored { Content: MessagePhoto } when !primary => true,
                 _ => false,
             };
@@ -499,10 +502,6 @@ namespace Telegram.Controls.Messages.Content
             else if (content is MessageInvoice invoice && invoice.PaidMedia is PaidMediaPhoto paidMediaPhoto)
             {
                 return paidMediaPhoto.Photo;
-            }
-            else if (content is MessagePoll poll && poll.Media is PollMediaPhoto pollPhoto)
-            {
-                return pollPhoto.Photo;
             }
             else if (content is MessageSponsored { Content: MessagePhoto sponsored })
             {

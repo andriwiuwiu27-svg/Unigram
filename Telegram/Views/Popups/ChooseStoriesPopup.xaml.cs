@@ -15,7 +15,7 @@ using Windows.UI.Xaml.Controls;
 
 namespace Telegram.Views.Popups
 {
-    public sealed partial class ChooseStoriesPopup : ContentPopup
+    public sealed partial class ChooseStoriesPopup : ModalPopup
     {
         public ChooseStoriesPopup(ChatStoriesViewModel viewModel)
         {

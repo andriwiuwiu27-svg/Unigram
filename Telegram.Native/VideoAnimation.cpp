@@ -111,7 +111,7 @@ namespace winrt::Telegram::Native::implementation
 
                 if (info->fd == INVALID_HANDLE_VALUE)
                 {
-                    info->fd = CreateFile2FromAppW(info->file.FilePath().data(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, OPEN_EXISTING, nullptr);
+                    info->fd = FileHelper::CreateFile2(info->file.FilePath().data(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, OPEN_EXISTING, nullptr);
                     if (info->fd == INVALID_HANDLE_VALUE)
                     {
                         return AVERROR_EOF;
@@ -549,8 +549,14 @@ namespace winrt::Telegram::Native::implementation
     bool VideoAnimation::RenderSync(IBuffer bitmap, int32_t w, int32_t h, bool preview, double& seconds)
     {
         uint8_t* pixels = bitmap.data();
-        bool completed;
-        auto result = RenderSync(pixels, w, h, preview, seconds, completed);
+        bool completed = false;
+        bool result;
+
+        // Its callers want a single frame and do not poll, so the lead-in is decoded here at once.
+        do
+        {
+            result = RenderSync(pixels, w, h, preview, seconds, completed);
+        } while (!result && !completed);
 
         return result;
     }
@@ -576,9 +582,13 @@ namespace winrt::Telegram::Native::implementation
         int ret = 0;
         int32_t triesCount = preview ? 50 : 6;
         int32_t skipped = 0;
+        int32_t leadIn = 0;
+        bool discarded = false;
+        bool later = false;
 
         if (!fmt_ctx || !video_dec_ctx || !pkt || !frame)
         {
+            completed = true;
             return false;
         }
 
@@ -591,6 +601,7 @@ namespace winrt::Telegram::Native::implementation
                 {
                     if (pkt->stream_index == video_stream_idx)
                     {
+                        discarded = (pkt->flags & AV_PKT_FLAG_DISCARD) != 0;
                         waiting = Waiting::SendPacket;
                     }
                     else
@@ -633,6 +644,7 @@ namespace winrt::Telegram::Native::implementation
                     else
                     {
                         // Send NULL packet to flush decoder
+                        discarded = false;
                         ret = avcodec_send_packet(video_dec_ctx, nullptr);
                         if (ret >= 0)
                         {
@@ -776,8 +788,18 @@ namespace winrt::Telegram::Native::implementation
                 }
             }
 
-            // Decrement tries only if we haven't decoded any frames yet
-            if (!has_decoded_frames)
+            // A packet an edit list cuts yields no frame by design, libavcodec drops it, so it is not
+            // a try: it has its own budget, and running out of that means come back, not give up.
+            // Never with a refused packet still to send, which Cleanup would drop.
+            if (discarded)
+            {
+                if (++leadIn >= MaxLeadInPackets && waiting == Waiting::ReadFrame)
+                {
+                    later = true;
+                    break;
+                }
+            }
+            else if (!has_decoded_frames)
             {
                 triesCount--;
             }
@@ -799,13 +821,13 @@ namespace winrt::Telegram::Native::implementation
             waiting = Waiting::ReadFrame;
         }
 
-        // If we stopped due to tries exhaustion without decoding, mark as completed
-        if (!has_decoded_frames && triesCount <= 0)
+        // Reached only without a frame; pixels is untouched. Every way here but the lead-in is final,
+        // and callers tell the two apart by completed.
+        if (!later)
         {
             completed = true;
         }
 
-        // Reached only on giving up; pixels is untouched.
         return false;
     }
 

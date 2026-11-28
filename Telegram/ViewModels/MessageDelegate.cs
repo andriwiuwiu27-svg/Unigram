@@ -516,6 +516,11 @@ namespace Telegram.ViewModels
         /// <summary>
         /// Only available when created through DialogViewModel
         /// </summary>
+        public virtual void AddPollOption(MessageViewModel message, FormattedText text, InputPollMedia media) { }
+
+        /// <summary>
+        /// Only available when created through DialogViewModel
+        /// </summary>
         public virtual void OpenViaBot(long viaBotUserId) { }
 
         /// <summary>
@@ -572,16 +577,18 @@ namespace Telegram.ViewModels
 
             foreach (var block in media)
             {
+                // TDLib documents the media of all three blocks as nullable, and a block without one
+                // has nothing to show in the gallery.
                 GalleryMedia item;
-                if (block is PageBlockPhoto photo)
+                if (block is PageBlockPhoto { Photo: not null } photo)
                 {
                     item = new GalleryMedia(ClientService, photo.Photo, photo.Caption?.ToFormattedText());
                 }
-                else if (block is PageBlockVideo video)
+                else if (block is PageBlockVideo { Video: not null } video)
                 {
                     item = new GalleryMedia(ClientService, video.Video, video.Caption?.ToFormattedText());
                 }
-                else if (block is PageBlockAnimation animation)
+                else if (block is PageBlockAnimation { Animation: not null } animation)
                 {
                     item = new GalleryMedia(ClientService, animation.Animation, animation.Caption?.ToFormattedText());
                 }
@@ -773,6 +780,8 @@ namespace Telegram.ViewModels
 
         public override void VotePoll(MessageViewModel message, Vector<int> options) => _viewModel.VotePoll(message, options);
 
+        public override void AddPollOption(MessageViewModel message, FormattedText text, InputPollMedia media) => _viewModel.AddPollOption(message, text, media);
+
         public override void OpenViaBot(long viaBotUserId) => _viewModel.OpenViaBot(viaBotUserId);
 
         public override void OpenChat(long chatId, bool profile = false) => _viewModel.OpenChat(chatId, profile);
@@ -855,6 +864,42 @@ namespace Telegram.ViewModels
             if (TryGetMediaKind(message.Content, out var kind))
             {
                 OpenPageBlockMedia(_viewModel.Blocks, kind, target);
+            }
+        }
+    }
+
+    /// <summary>
+    /// The delegate of the media in a poll, which reaches the content controls as a message of its
+    /// own: the chat would look that message up to build the gallery, so the medium opens alone,
+    /// as protected as the poll that holds it.
+    /// </summary>
+    public partial class PollMediaDelegate : DialogMessageDelegate
+    {
+        private readonly bool _protect;
+
+        public PollMediaDelegate(DialogMessageDelegate delegato, bool protect)
+            : base(delegato.ViewModel)
+        {
+            _protect = protect;
+        }
+
+        public override void OpenMedia(MessageViewModel message, FrameworkElement target, double timestamp = 0)
+        {
+            var media = message.Content switch
+            {
+                MessageAnimation animation => new GalleryMedia(ClientService, animation.Animation, animation.Caption, _protect),
+                MessagePhoto photo => new GalleryMedia(ClientService, photo.Photo, photo.Caption, _protect),
+                MessageVideo video => new GalleryMedia(ClientService, video.Video, video.Caption, _protect),
+                _ => null
+            };
+
+            if (media != null)
+            {
+                OpenMedia(media, target);
+            }
+            else
+            {
+                base.OpenMedia(message, target, timestamp);
             }
         }
     }

@@ -6,8 +6,11 @@
 //
 
 using System;
+using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Numerics;
+using System.Text;
 using System.Threading.Tasks;
 using Telegram.Common;
 using Telegram.Controls;
@@ -16,6 +19,7 @@ using Telegram.Converters;
 using Telegram.Navigation;
 using Telegram.Navigation.Services;
 using Telegram.Services;
+using Telegram.Services.Wallet;
 using Telegram.Streams;
 using Telegram.Td;
 using Telegram.Td.Api;
@@ -25,12 +29,17 @@ using Telegram.Views.Chats.Popups;
 using Telegram.Views.Gifts.Popups;
 using Telegram.Views.Popups;
 using Telegram.Views.Premium.Popups;
+using Telegram.Views.Wallet;
+using Windows.ApplicationModel.DataTransfer;
 using Windows.Foundation;
+using Windows.UI;
+using Windows.UI.Composition;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Controls.Primitives;
 using Windows.UI.Xaml.Documents;
 using Windows.UI.Xaml.Hosting;
+using Windows.UI.Xaml.Input;
 using Windows.UI.Xaml.Media;
 
 namespace Telegram.Views.Stars.Popups
@@ -50,10 +59,16 @@ namespace Telegram.Views.Stars.Popups
 
         private readonly MessageSender _sendGiftTo;
 
+        /// <summary>
+        /// Opened from the gift's message: the header names its sender and shows its text.
+        /// </summary>
+        private readonly bool _fromMessage;
+
         // The profile list the popup was opened from, if any: pinning edits that list's order.
         private readonly ProfileGiftsTabViewModel _profile;
 
         private TaskCompletionSource<long> _resaleStarCount;
+        private bool _resaleShown;
 
         private TaskCompletionSource<UpgradedGiftValueInfo> _valueInfo;
 
@@ -82,11 +97,26 @@ namespace Telegram.Views.Stars.Popups
         // the owner_id of an upgraded one. Recomputed when the gift is upgraded in place.
         private bool _owned;
 
-        public ReceivedGiftPopup(IClientService clientService, INavigationService navigationService, ReceivedGift gift, MessageSender receiverId, MessageSender sendGiftTo, ProfileGiftsTabViewModel profile = null)
+        // A gift on the blockchain stays with the Telegram account that hosts it; that account can
+        // wear and share it, but nothing that would move it.
+        private bool _hosted;
+
+        // Opened from the wallet holding the gift: its actions are the wallet's, on its card.
+        private TonNft _collectible;
+        private IWalletCollectibleHost _collectibleHost;
+
+        // Opened from a wallet transaction that moved or traded the gift: the sheet describes the
+        // transaction, and offers none of the gift's own actions.
+        private TonWalletTransaction _walletTransaction;
+        private bool _walletStatus;
+        private string _walletAddress;
+
+        public ReceivedGiftPopup(IClientService clientService, INavigationService navigationService, ReceivedGift gift, MessageSender receiverId, MessageSender sendGiftTo, ProfileGiftsTabViewModel profile = null, bool fromMessage = false)
         {
             InitializeComponent();
 
             _profile = profile;
+            _fromMessage = fromMessage;
 
             _clientService = clientService;
             _navigationService = navigationService;
@@ -116,7 +146,364 @@ namespace Telegram.Views.Stars.Popups
             {
                 InitializeValue(upgraded.Gift);
                 InitializeUpgraded(clientService, gift, upgraded.Gift);
+
+                // The sale price depends on the subtitle InitializeUpgraded has just decided on.
+                UpdateVisibility();
             }
+        }
+
+        /// <summary>
+        /// Shows the gift as <paramref name="collectible"/>, held by the wallet behind
+        /// <paramref name="host"/>: transfer, card colour and sticker for actions, and a choice
+        /// to show it among the user's gifts in place of the links to the blockchain.
+        /// </summary>
+        public void ShowAsCollectible(TonNft collectible, IWalletCollectibleHost host)
+        {
+            if (_gift.Gift is not SentGiftUpgraded upgraded)
+            {
+                return;
+            }
+
+            _collectible = collectible;
+            _collectibleHost = host;
+
+            UpgradedButtons.Visibility = Visibility.Visible;
+            TransferButton.Opacity = 1;
+
+            var color = host.IsCardColor(collectible);
+
+            // Left in place when it cannot colour the card, so that it can say which gifts can.
+            WearButton.Glyph = Icons.ColorFilled24;
+            WearButton.Content = color ? Strings.WalletGiftRemoveColor : Strings.WalletGiftApplyColor;
+            WearButton.Opacity = color || upgraded.Gift.CanBeTonWalletCardBackground ? 1 : 0.5;
+
+            var onCard = host.IsOnCard(collectible);
+
+            ResellButton.Glyph = onCard ? Icons.PaymentDismissFilled : Icons.PaymentFilled;
+            ResellButton.Content = onCard ? Strings.WalletGiftRemoveFromCard : Strings.WalletGiftAddToCard;
+
+            UpgradedBlockchain.Visibility = Visibility.Collapsed;
+            CollectibleDisplay.IsChecked = upgraded.Gift.HostId != null;
+            CollectibleDisplay.Visibility = Visibility.Visible;
+
+            PrimaryButtonText = GetUpgradedPrimaryButtonText(upgraded.Gift);
+        }
+
+        /// <summary>
+        /// An upgraded gift known by itself rather than from anyone's list, as the received gift
+        /// this popup takes.
+        /// </summary>
+        public static ReceivedGift Wrap(UpgradedGift gift)
+        {
+            var text = gift.OriginalDetails?.Text ?? string.Empty.AsFormattedText();
+            return new ReceivedGift(string.Empty, null, text, 0, true, false, false, false, false, false, false, 0, new SentGiftUpgraded(gift), Array.Empty<int>(), 0, 0, false, 0, 0, 0, 0, 0, string.Empty, 0);
+        }
+
+        /// <summary>
+        /// The gift a wallet transaction moved or traded, with the transaction in place of the
+        /// gift's details. <paramref name="gift"/> is the one the transaction carries, as it was.
+        /// </summary>
+        public static ReceivedGiftPopup FromWalletTransaction(IClientService clientService, INavigationService navigationService, UpgradedGift gift, TonWalletTransaction transaction)
+        {
+            var popup = new ReceivedGiftPopup(clientService, navigationService, Wrap(gift), null, null);
+            popup.ShowAsWalletTransaction(transaction);
+            return popup;
+        }
+
+        private void ShowAsWalletTransaction(TonWalletTransaction transaction)
+        {
+            if (_gift.Gift is not SentGiftUpgraded upgraded)
+            {
+                return;
+            }
+
+            _walletTransaction = transaction;
+
+            // Whoever holds the gift now, nothing here acts for them.
+            _owned = false;
+            _hosted = false;
+
+            UpgradedButtons.Visibility = Visibility.Collapsed;
+            UpgradedBlockchain.Visibility = Visibility.Collapsed;
+            UpgradedTableRoot.Visibility = Visibility.Collapsed;
+            UpgradedCaptionRoot.Visibility = Visibility.Collapsed;
+            Info.Visibility = Visibility.Collapsed;
+            TransactionRoot.Visibility = Visibility.Visible;
+
+            UpgradedPublisher.Visibility = Visibility.Collapsed;
+            UpgradedSubtitle.Visibility = Visibility.Visible;
+
+            if (TryGetWalletGiftAction(transaction.Type, upgraded.Gift, out var action))
+            {
+                ShowWalletGiftAction(transaction, action);
+            }
+            else if (transaction.Type is TonWalletTransactionTypeTelegramGiftTransfer transfer)
+            {
+                ShowWalletGiftTransfer(transaction, transfer);
+            }
+
+            if (transaction.Date != 0)
+            {
+                TransactionDateRow.Content = Formatter.DateAt(transaction.Date);
+            }
+            else
+            {
+                TransactionDateRow.Visibility = Visibility.Collapsed;
+            }
+
+            UpdateVisibility();
+
+            PrimaryButtonText = Strings.OK;
+        }
+
+        private void ShowWalletGiftAction(TonWalletTransaction transaction, WalletGiftAction action)
+        {
+            // The status is the subtitle, and the pill a price would be in says it again.
+            var status = ToStatus(action.Kind);
+
+            UpgradedSubtitle.Text = status;
+            ResaleStarCount.Text = status;
+            _walletStatus = true;
+
+            if (action.Amount != 0 && action.Kind is not WalletGiftKind.RemovedFromSale and not WalletGiftKind.Repriced)
+            {
+                var amount = Math.Abs(action.Amount);
+
+                TransactionAmountText.Text = (action.Amount > 0 ? "+" : "-") + Formatter.Grams(amount, true);
+                TransactionConverted.Text = ConvertGrams(amount);
+                TransactionAmount.Visibility = Visibility.Visible;
+            }
+
+            var trade = action.Kind is WalletGiftKind.Bought or WalletGiftKind.Sold or WalletGiftKind.OfferAccepted;
+
+            if (trade && action.Price > 0)
+            {
+                TransactionShareRow.Header = action.Kind == WalletGiftKind.Bought && action.Fee > 0
+                    ? Strings.GiftOnchainRowSellerShare
+                    : Strings.GiftOnchainRowPrice;
+                TransactionShareRow.Content = Formatter.Grams(action.Price);
+                TransactionShareRow.Visibility = Visibility.Visible;
+            }
+
+            if (trade && action.Fee > 0)
+            {
+                TransactionPlatformFee.Text = Formatter.Grams(action.Fee);
+                TransactionPlatformFeePercent.Text = action.Price > 0
+                    ? " (" + FormatPercent(action.Fee, action.Price) + "%)"
+                    : string.Empty;
+                TransactionPlatformFeeRow.Visibility = Visibility.Visible;
+            }
+
+            ShowWalletFee(transaction.FeeAmount, Strings.GiftOnchainRowNetworkFee);
+
+            if (action.Price > 0 && action.Kind is WalletGiftKind.PutOnSale or WalletGiftKind.Repriced)
+            {
+                TransactionPriceRow.Header = action.Kind == WalletGiftKind.Repriced
+                    ? Strings.GiftOnchainRowNewPrice
+                    : Strings.GiftOnchainRowPrice;
+                TransactionPriceRow.Content = Formatter.Grams(action.Price);
+                TransactionPriceRow.Visibility = Visibility.Visible;
+            }
+
+            if (action.Kind == WalletGiftKind.Repriced && action.OldPrice > 0)
+            {
+                TransactionOldPrice.Text = Formatter.Grams(action.OldPrice);
+                TransactionOldPriceRow.Visibility = Visibility.Visible;
+            }
+
+            if (action.Kind == WalletGiftKind.OfferSent && action.ExpirationDate > 0)
+            {
+                TransactionExpirationRow.Content = Formatter.DateAt(action.ExpirationDate);
+                TransactionExpirationRow.Visibility = Visibility.Visible;
+            }
+
+            // -1 is a fine TDLib does not know, which is not the same as none.
+            if (action.Kind == WalletGiftKind.OfferCancelled && action.Fine >= 0)
+            {
+                TransactionCancellationFeeRow.Content = Formatter.Grams(action.Fine);
+                TransactionCancellationFeeRow.Visibility = Visibility.Visible;
+            }
+
+            if (action.Counterparty != null && !string.IsNullOrEmpty(action.CounterpartyAddress))
+            {
+                // The tail stays whole so the address is cut in the middle, however much of it fits.
+                var address = action.CounterpartyAddress;
+                var split = Math.Max(0, address.Length - 6);
+
+                _walletAddress = address;
+
+                TransactionAddressRow.Header = action.Counterparty;
+                TransactionAddressStart.Text = address.Substring(0, split);
+                TransactionAddressEnd.Text = address.Substring(split);
+                TransactionAddressRow.Visibility = Visibility.Visible;
+            }
+        }
+
+        private void ShowWalletGiftTransfer(TonWalletTransaction transaction, TonWalletTransactionTypeTelegramGiftTransfer transfer)
+        {
+            // Outgoing is from the wallet to the profile.
+            UpgradedSubtitle.Text = transfer.IsOutgoing
+                ? Strings.WalletMovedToProfile
+                : Strings.WalletMovedFromProfile;
+
+            // The other side of a move between the profile and the wallet is the user's own account.
+            if (_clientService.TryGetUser(_clientService.Options.MyId, out User user))
+            {
+                TransactionPeerRow.Header = transfer.IsOutgoing ? Strings.WalletRecipient : Strings.WalletSender;
+                TransactionPeerPhoto.Source = ProfilePictureSource.User(_clientService, user);
+                TransactionPeerTitle.Text = user.FullName();
+                TransactionPeerRow.Visibility = Visibility.Visible;
+            }
+
+            ShowWalletFee(transaction.FeeAmount, Strings.WalletFee);
+        }
+
+        private void ShowWalletFee(long fee, string header)
+        {
+            if (fee == 0)
+            {
+                return;
+            }
+
+            var amount = Math.Abs(fee);
+            var converted = ConvertGrams(amount);
+
+            TransactionFeeRow.Header = header;
+            TransactionFee.Text = Formatter.Grams(amount);
+            TransactionFeeConverted.Text = converted.Length > 0 ? " ~" + converted : string.Empty;
+            TransactionFeeRow.Visibility = Visibility.Visible;
+        }
+
+        private string ConvertGrams(long nanograms)
+        {
+            var state = _clientService.Session.Resolve<IWalletService>().State;
+
+            return WalletHelper.TryToCurrency(_clientService, state, nanograms, out var amount)
+                ? Formatter.FormatAmountExact(amount, WalletHelper.CurrencyDecimals, state?.Currency ?? "USD")
+                : string.Empty;
+        }
+
+        // Whole when it is within a twentieth of one, which is what a fee set in basis points
+        // usually comes to; one decimal otherwise.
+        private static string FormatPercent(long part, long whole)
+        {
+            var percent = part * 100.0 / whole;
+            var rounded = Math.Round(percent);
+
+            return Math.Abs(percent - rounded) < 0.05
+                ? rounded.ToString("0", CultureInfo.InvariantCulture)
+                : percent.ToString("0.0", CultureInfo.InvariantCulture);
+        }
+
+        private void TransactionPeer_Click(Hyperlink sender, HyperlinkClickEventArgs args)
+        {
+            Hide();
+            _navigationService.NavigateToSender(new MessageSenderUser(_clientService.Options.MyId));
+        }
+
+        private void TransactionAddress_Click(object sender, RoutedEventArgs e)
+        {
+            if (_walletAddress != null)
+            {
+                var dataPackage = new DataPackage();
+                dataPackage.SetText(_walletAddress);
+                ClipboardEx.TrySetContent(dataPackage);
+
+                ToastPopup.Show(XamlRoot, Strings.WalletAddressCopied, ToastPopupIcon.Copied);
+            }
+        }
+
+        private enum WalletGiftKind
+        {
+            Bought,
+            Sold,
+            OfferAccepted,
+            PutOnSale,
+            RemovedFromSale,
+            OfferSent,
+            OfferCancelled,
+            OfferDeclined,
+            OfferExpired,
+            Repriced
+        }
+
+        /// <param name="Amount">Signed nanograms the transaction moved, the header's amount.</param>
+        /// <param name="Price">The price, or for a sale what the buyer paid before the platform's share.</param>
+        /// <param name="Fine">The cancellation fine, -1 when unknown.</param>
+        /// <param name="Counterparty">The label of the other side's address row, null for none.</param>
+        private readonly record struct WalletGiftAction(WalletGiftKind Kind, long Amount, long Price, long Fee, long OldPrice, int ExpirationDate, long Fine, string Counterparty, string CounterpartyAddress);
+
+        private static bool TryGetWalletGiftAction(TonWalletTransactionType type, UpgradedGift gift, out WalletGiftAction action)
+        {
+            switch (type)
+            {
+                case TonWalletTransactionTypeTelegramGiftPurchase purchase:
+                    action = new WalletGiftAction(WalletGiftKind.Bought, purchase.Amount, Math.Abs(purchase.Amount), 0, 0, 0, -1, Strings.GiftOnchainRowSeller, null);
+                    return true;
+                case TonWalletTransactionTypeTelegramGiftSale sale:
+                    // The platform's share comes out of the price before the rest reaches the
+                    // seller, so what the buyer paid is worked back from what arrived.
+                    var gross = Math.Abs(sale.Amount);
+                    var fee = 0L;
+
+                    if (sale.Amount > 0 && gift.FeeBasisPoints > 0 && gift.FeeBasisPoints < 10000)
+                    {
+                        gross = (long)Math.Round(sale.Amount * 10000m / (10000 - gift.FeeBasisPoints), MidpointRounding.AwayFromZero);
+                        fee = gross - sale.Amount;
+                    }
+
+                    action = new WalletGiftAction(WalletGiftKind.Sold, sale.Amount, gross, fee, 0, 0, -1, Strings.GiftOnchainRowBuyer, null);
+                    return true;
+                case TonWalletTransactionTypeTelegramGiftListing listing when listing.OldPrice > 0:
+                    action = new WalletGiftAction(WalletGiftKind.Repriced, listing.Amount, listing.Price, 0, listing.OldPrice, 0, -1, null, null);
+                    return true;
+                case TonWalletTransactionTypeTelegramGiftListing listing:
+                    action = new WalletGiftAction(WalletGiftKind.PutOnSale, listing.Amount, listing.Price, 0, 0, 0, -1, null, null);
+                    return true;
+                case TonWalletTransactionTypeTelegramGiftDelisting delisting:
+                    action = new WalletGiftAction(WalletGiftKind.RemovedFromSale, delisting.Amount, 0, 0, 0, 0, -1, null, null);
+                    return true;
+                case TonWalletTransactionTypeTelegramGiftOfferCreation creation:
+                    action = new WalletGiftAction(WalletGiftKind.OfferSent, -Math.Abs(creation.Amount), creation.Price, creation.ServiceFeeAmount, 0, creation.ExpirationDate, -1, Strings.WalletRecipient, creation.CounterpartyAddress);
+                    return true;
+                case TonWalletTransactionTypeTelegramGiftOfferAcceptance acceptance when acceptance.IsBuyer:
+                    // The buyer reads it as a purchase: the price went to the seller, the fee on top.
+                    action = new WalletGiftAction(WalletGiftKind.Bought, -(acceptance.Price + acceptance.ServiceFeeAmount), acceptance.Price, acceptance.ServiceFeeAmount, 0, 0, -1, Strings.GiftOnchainRowSeller, acceptance.CounterpartyAddress);
+                    return true;
+                case TonWalletTransactionTypeTelegramGiftOfferAcceptance acceptance:
+                    action = new WalletGiftAction(WalletGiftKind.OfferAccepted, acceptance.Price, acceptance.Price, acceptance.ServiceFeeAmount, 0, 0, -1, Strings.GiftOnchainRowBuyer, acceptance.CounterpartyAddress);
+                    return true;
+                case TonWalletTransactionTypeTelegramGiftOfferCancellation cancellation:
+                    action = new WalletGiftAction(WalletGiftKind.OfferCancelled, Math.Abs(cancellation.RefundAmount), cancellation.Price, 0, 0, 0, cancellation.FineAmount, Strings.WalletRecipient, cancellation.CounterpartyAddress);
+                    return true;
+                case TonWalletTransactionTypeTelegramGiftOfferDecline decline:
+                    action = new WalletGiftAction(WalletGiftKind.OfferDeclined, Math.Abs(decline.RefundAmount), decline.Price, 0, 0, 0, -1, Strings.WalletRecipient, decline.CounterpartyAddress);
+                    return true;
+                case TonWalletTransactionTypeTelegramGiftOfferExpiration expiration:
+                    action = new WalletGiftAction(WalletGiftKind.OfferExpired, Math.Abs(expiration.RefundAmount), expiration.Price, 0, 0, 0, -1, Strings.WalletRecipient, expiration.CounterpartyAddress);
+                    return true;
+                default:
+                    action = default;
+                    return false;
+            }
+        }
+
+        private static string ToStatus(WalletGiftKind kind)
+        {
+            return kind switch
+            {
+                WalletGiftKind.Bought => Strings.WalletOnchainGiftStatusPurchased,
+                WalletGiftKind.Sold => Strings.WalletOnchainGiftStatusSold,
+                WalletGiftKind.OfferAccepted => Strings.WalletOnchainGiftStatusOfferAccepted,
+                WalletGiftKind.PutOnSale => Strings.WalletOnchainGiftStatusPutOnSale,
+                WalletGiftKind.RemovedFromSale => Strings.WalletOnchainGiftStatusRemovedFromSale,
+                WalletGiftKind.OfferSent => Strings.WalletOnchainGiftOfferSent,
+                WalletGiftKind.OfferCancelled => Strings.WalletOnchainGiftOfferCancelled,
+                WalletGiftKind.OfferDeclined => Strings.WalletOnchainGiftOfferDeclined,
+                WalletGiftKind.OfferExpired => Strings.WalletOnchainGiftOfferExpired,
+                WalletGiftKind.Repriced => Strings.WalletOnchainGiftStatusPriceChanged,
+                _ => string.Empty
+            };
         }
 
         private void UpdateOwned()
@@ -127,9 +514,12 @@ namespace Telegram.Views.Stars.Popups
                 SentGiftUpgraded upgraded => IsOwned(_clientService, upgraded.Gift.OwnerId),
                 _ => false
             };
+
+            _hosted = _gift?.Gift is SentGiftUpgraded { Gift.HostId: not null } hosted
+                && IsOwned(_clientService, hosted.Gift.HostId);
         }
 
-        private void UpdateVisibility()
+        private void UpdateVisibility(bool animate = false)
         {
             var upgraded = (_gift?.Gift as SentGiftUpgraded)?.Gift;
             var details = _page == GiftPage.Details;
@@ -157,8 +547,11 @@ namespace Telegram.Views.Stars.Popups
             UpgradedRoot.Visibility = upgraded != null ? Visibility.Visible : Visibility.Collapsed;
 
             Ribbon.Visibility = details && upgraded?.IsCrafted is true ? Visibility.Visible : Visibility.Collapsed;
-            ResaleStarCountRoot.Visibility = details && upgraded?.ResaleParameters != null ? Visibility.Visible : Visibility.Collapsed;
-            MoreButton.Visibility = details && (upgraded != null || CanToggleSaved || _gift?.CanBeDeleted is true) ? Visibility.Visible : Visibility.Collapsed;
+            // The price takes the subtitle's place, so a gift whose header has no subtitle shows none.
+            // Opened from a wallet transaction, the pill holds the transaction's status instead.
+            var pill = _walletTransaction != null ? _walletStatus : upgraded?.ResaleParameters != null;
+            ShowResalePrice(details && pill && UpgradedSubtitle.Visibility == Visibility.Visible, animate);
+            MoreButton.Visibility = details && (upgraded != null || CanToggleSaved || _gift?.CanBeDeleted is true || ProfileOwner != null) ? Visibility.Visible : Visibility.Collapsed;
             MoreButton.RequestedTheme = upgradedHeader ? ElementTheme.Dark : ElementTheme.Default;
         }
 
@@ -317,7 +710,7 @@ namespace Telegram.Views.Stars.Popups
 
             // A prepaid upgrade is part of what the gift cost, unless it was bought afterwards.
             var value = gift.StarCount + (receivedGift.IsUpgradeSeparate ? 0 : receivedGift.PrepaidUpgradeStarCount);
-            StarCount.Text = value.ToString("N0");
+            StarCount.Text = Icons.PremiumStar + " " + value.ToString("N0");
 
             if (gift.OverallLimits != null && !receivedGift.WasRefunded)
             {
@@ -468,9 +861,20 @@ namespace Telegram.Views.Stars.Popups
 
             UpgradedHeader.Update(clientService, gift);
             UpgradedAnimatedPhoto.Source = DelayedFileSource.FromSticker(clientService, gift.Model.Sticker);
-            UpgradedTitle.Text = gift.Title;
+            UpgradedTitle.Inlines.Clear();
+            UpgradedTitle.Inlines.Add(new Run { Text = gift.Title + " " });
+            UpgradedTitle.Inlines.Add(new Run
+            {
+                Text = "#" + gift.Number.ToString("N0"),
+                FontSize = UpgradedTitle.FontSize * 0.85,
+                Foreground = new SolidColorBrush(Color.FromArgb(0xBE, 0xFF, 0xFF, 0xFF))
+            });
 
             Ribbon.Text = Strings.GiftCrafted;
+            ResaleStarCountRoot.Background = new SolidColorBrush(QrShareColors.Mix(gift.Backdrop.Colors.EdgeColor.ToColor(), gift.Backdrop.Colors.SymbolColor.ToColor(), 0.25f));
+
+            // TDLib still names a private gift's sender to its receiver; the header leaves it out for everyone.
+            var from = _fromMessage && !receivedGift.IsPrivate ? receivedGift.SenderId : null;
 
             if (clientService.TryGetChat(gift.PublisherChatId, out Chat publisherChat)
                 && clientService.TryGetSupergroup(publisherChat, out Supergroup publisher)
@@ -483,17 +887,85 @@ namespace Telegram.Views.Stars.Popups
             else
             {
                 UpgradedPublisher.Visibility = Visibility.Collapsed;
-                UpgradedSubtitle.Visibility = Visibility.Visible;
-                UpgradedSubtitle.Text = Locale.Declension(Strings.R.Gift2CollectionNumber, gift.Number);
+
+                if (from != null)
+                {
+                    UpgradedSubtitle.Visibility = Visibility.Visible;
+                    TextBlockHelper.SetMarkdown(UpgradedSubtitle, string.Format(Strings.UniqueGiftFrom, clientService.GetTitle(from, true)));
+                }
+                else if (gift.PublisherChatId == 0)
+                {
+                    UpgradedSubtitle.Visibility = Visibility.Visible;
+                    UpgradedSubtitle.Text = gift.Model.Name;
+                }
+                else
+                {
+                    // A publisher without a public username gets no line, and no subtitle either.
+                    UpgradedSubtitle.Visibility = Visibility.Collapsed;
+                }
             }
 
-            if (clientService.TryGetUser(gift.OwnerId, out User user))
+            if (_fromMessage && receivedGift.Text?.Text.Length > 0)
+            {
+                UpgradedMessage.Visibility = Visibility.Visible;
+                UpgradedMessageText.SetText(clientService, receivedGift.Text);
+
+                if (from != null)
+                {
+                    UpgradedMessagePhoto.Visibility = Visibility.Visible;
+                    UpgradedMessagePhoto.Source = ProfilePictureSource.MessageSender(clientService, from);
+                }
+                else
+                {
+                    UpgradedMessagePhoto.Visibility = Visibility.Collapsed;
+                }
+            }
+            else
+            {
+                UpgradedMessage.Visibility = Visibility.Collapsed;
+            }
+
+            var hosted = gift.HostId != null;
+            var holder = HolderOf(gift);
+
+            if (gift.OwnerAddress.Length > 0)
+            {
+                // The tail stays whole so the address is cut in the middle, however much of it fits.
+                var split = Math.Max(0, gift.OwnerAddress.Length - 6);
+
+                UpgradedOwnerAddress.Header = hosted ? Strings.Gift2HostAddress : Strings.Gift2Owner;
+                UpgradedOwnerAddress.Visibility = Visibility.Visible;
+                UpgradedOwnerAddressStart.Text = gift.OwnerAddress.Substring(0, split);
+                UpgradedOwnerAddressEnd.Text = gift.OwnerAddress.Substring(split);
+            }
+            else
+            {
+                UpgradedOwnerAddress.Visibility = Visibility.Collapsed;
+            }
+
+            UpgradedOwner.Header = hosted ? Strings.Gift2Host : Strings.Gift2Owner;
+            UpgradedOwner.Visibility = hosted || gift.OwnerAddress.Length == 0
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+
+            if (gift.OwnerAddress.Length > 0 && gift.GiftAddress.Length > 0)
+            {
+                // Above the table when a Telegram account hosts the gift, below it otherwise.
+                Grid.SetRow(UpgradedBlockchain, hosted ? 0 : 3);
+                UpgradedBlockchain.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                UpgradedBlockchain.Visibility = Visibility.Collapsed;
+            }
+
+            if (clientService.TryGetUser(holder, out User user))
             {
                 UpgradedFromPhoto.Source = ProfilePictureSource.User(clientService, user);
                 UpgradedFromPhoto.Visibility = Visibility.Visible;
                 UpgradedFromTitle.Text = user.FullName();
             }
-            else if (clientService.TryGetChat(gift.OwnerId, out Chat chat))
+            else if (clientService.TryGetChat(holder, out Chat chat))
             {
                 UpgradedFromPhoto.Source = ProfilePictureSource.Chat(clientService, chat);
                 UpgradedFromPhoto.Visibility = Visibility.Visible;
@@ -543,60 +1015,68 @@ namespace Telegram.Views.Stars.Popups
                 var date = Formatter.Date(gift.OriginalDetails.Date);
                 var dateText = date.AsFormattedText();
 
-                FormattedText text = null;
+                FormattedText text;
 
-                if (gift.OriginalDetails.Text.Text.Length > 0)
+                var comment = gift.OriginalDetails.Text.Text.Length > 0;
+                var self = gift.OriginalDetails.SenderId.AreTheSame(gift.OriginalDetails.ReceiverId);
+
+                if (self)
                 {
-                    if (senderName.Length > 0 && receiverName.Length > 0)
-                    {
-                        text = ClientEx.Format(Strings.Gift2AttributeOriginalDetailsComment, senderText, receiverText, dateText, gift.OriginalDetails.Text);
-                    }
-                    else if (senderName.Length > 0)
-                    {
-                        text = ClientEx.Format(Strings.Gift2AttributeOriginalDetailsSelfComment, senderText, dateText, gift.OriginalDetails.Text);
-                    }
-                    else if (receiverName.Length > 0)
-                    {
-                        text = ClientEx.Format(Strings.Gift2AttributeOriginalDetailsNoSenderComment, receiverText, dateText, gift.OriginalDetails.Text);
-                    }
+                    text = comment
+                        ? ClientEx.Format(Strings.Gift2AttributeOriginalDetailsSelfComment, senderText, dateText, gift.OriginalDetails.Text)
+                        : ClientEx.Format(Strings.Gift2AttributeOriginalDetailsSelf, senderText, dateText);
                 }
-                else if (senderName.Length > 0 && receiverName.Length > 0)
+                else if (senderText != null)
                 {
-                    text = ClientEx.Format(Strings.Gift2AttributeOriginalDetails, senderText, receiverText, dateText);
+                    text = comment
+                        ? ClientEx.Format(Strings.Gift2AttributeOriginalDetailsComment, senderText, receiverText, dateText, gift.OriginalDetails.Text)
+                        : ClientEx.Format(Strings.Gift2AttributeOriginalDetails, senderText, receiverText, dateText);
                 }
-                else if (senderName.Length > 0)
+                else
                 {
-                    text = ClientEx.Format(Strings.Gift2AttributeOriginalDetailsSelf, senderText, dateText);
-                }
-                else if (receiverName.Length > 0)
-                {
-                    text = ClientEx.Format(Strings.Gift2AttributeOriginalDetailsNoSender, receiverText, dateText);
+                    text = comment
+                        ? ClientEx.Format(Strings.Gift2AttributeOriginalDetailsNoSenderComment, receiverText, dateText, gift.OriginalDetails.Text)
+                        : ClientEx.Format(Strings.Gift2AttributeOriginalDetailsNoSender, receiverText, dateText);
                 }
 
                 UpgradedCaption.SetText(clientService, text);
             }
 
-            if (_owned && receivedGift.ReceivedGiftId.Length > 0)
+            if ((_owned || _hosted) && receivedGift.ReceivedGiftId.Length > 0)
             {
-                UpdateUpgradedInfo(receivedGift, gift);
-
                 UpgradedButtons.Visibility = Visibility.Visible;
-                UpgradedCaptionRemove.Visibility = receivedGift.DropOriginalDetailsStarCount > 0
-                    ? Visibility.Visible
-                    : Visibility.Collapsed;
 
-                if (gift.ResaleParameters != null)
+                // The host's Transfer stays in place, dimmed, and explains itself when clicked.
+                TransferButton.Opacity = _owned ? 1 : 0.5;
+
+                if (_owned)
                 {
-                    ResellButton.Glyph = Icons.TagOffFilled;
-                    ResellButton.Content = Strings.Gift2ActionUnlist;
+                    UpdateUpgradedInfo(receivedGift, gift);
+
+                    UpgradedCaptionRemove.Visibility = receivedGift.DropOriginalDetailsStarCount > 0
+                        ? Visibility.Visible
+                        : Visibility.Collapsed;
+
+                    if (gift.ResaleParameters != null)
+                    {
+                        ResellButton.Glyph = Icons.TagOffFilled;
+                        ResellButton.Content = Strings.Gift2ActionUnlist;
+                    }
+                    else
+                    {
+                        ResellButton.Glyph = Icons.TagFilled;
+                        ResellButton.Content = Strings.Gift2ActionResell;
+                    }
                 }
                 else
                 {
-                    ResellButton.Glyph = Icons.TagFilled;
-                    ResellButton.Content = Strings.Gift2ActionResell;
+                    Info.Visibility = Visibility.Collapsed;
+
+                    ResellButton.Glyph = Icons.ShareFilled;
+                    ResellButton.Content = Strings.Gift2ActionShare;
                 }
 
-                UpdateWearButton(IsWorn(gift));
+                UpdateWearButton(IsWorn(_clientService, gift));
             }
             else
             {
@@ -605,7 +1085,7 @@ namespace Telegram.Views.Stars.Popups
 
             if (gift.ResaleParameters != null)
             {
-                ResaleStarCount.Text = gift.ResaleParameters.StarCount.ToString("N0");
+                UpdateResalePrice(gift);
             }
 
             PrimaryButtonText = GetUpgradedPrimaryButtonText(gift);
@@ -627,8 +1107,11 @@ namespace Telegram.Views.Stars.Popups
         private string GetUpgradedPrimaryButtonText(UpgradedGift gift)
         {
             // Opened from a link, the current user's own gift arrives without a received gift identifier.
-            return gift.ResaleParameters != null && !_owned
-                ? Locale.Declension(Strings.R.ResellGiftBuy, gift.ResaleParameters.StarCount).ReplaceStar(Icons.Premium)
+            // Held by the wallet it was opened from, a sale is the user's own.
+            return gift.ResaleParameters != null && !_owned && _collectible == null && _walletTransaction == null
+                ? GiftHelper.IsResaleInGrams(gift)
+                    ? string.Format(Strings.ResellGiftBuyTON, GiftHelper.FormatResaleGrams(gift, true)).ReplaceStar(Icons.Gram14)
+                    : Locale.Declension(Strings.R.ResellGiftBuy, gift.ResaleParameters.StarCount).ReplaceStar(Icons.Premium)
                 : _nextUpgrade != null
                 ? Strings.Gift2UpgradeNext
                 : Strings.OK;
@@ -636,7 +1119,7 @@ namespace Telegram.Views.Stars.Popups
 
         private void InitializeResaleStarCount(long regularGiftId)
         {
-            _clientService.Send(new SearchGiftsForResale(regularGiftId, new GiftForResaleOrderPrice(), false, false, Array.Empty<UpgradedGiftAttributeId>(), string.Empty, 1), result =>
+            _clientService.Send(new SearchGiftsForResale(regularGiftId, new GiftForResaleOrderPrice(), false, false, false, false, Array.Empty<UpgradedGiftAttributeId>(), string.Empty, 1), result =>
             {
                 if (result is GiftsForResale gifts && gifts.Gifts.Count > 0)
                 {
@@ -664,11 +1147,19 @@ namespace Telegram.Views.Stars.Popups
             Subtitle.Text = Strings.Gift2SoldOutSheetSubtitle;
             Subtitle.Foreground = BootStrapper.Current.Resources["SystemFillColorCriticalBrush"] as Brush;
 
-            FirstSale.Visibility = Visibility.Visible;
-            LastSale.Visibility = Visibility.Visible;
+            if (gift.FirstSendDate != 0)
+            {
+                FirstSale.Visibility = Visibility.Visible;
+                FirstSale.Content = Formatter.DateAt(gift.FirstSendDate);
+            }
 
-            FirstSale.Content = Formatter.DateAt(gift.FirstSendDate);
-            LastSale.Content = Formatter.DateAt(gift.LastSendDate);
+            if (gift.LastSendDate != 0)
+            {
+                LastSale.Visibility = Visibility.Visible;
+                LastSale.Content = Formatter.DateAt(gift.LastSendDate);
+            }
+
+            StarCountRoot.Header = Strings.Gift2SoldOutSheetValue;
 
             Convert.Visibility = Visibility.Collapsed;
             Info.Visibility = Visibility.Collapsed;
@@ -678,10 +1169,43 @@ namespace Telegram.Views.Stars.Popups
 
             Date.Visibility = Visibility.Collapsed;
 
-            StarCount.Text = gift.StarCount.ToString("N0");
+            StarCount.Text = Icons.PremiumStar + " " + gift.StarCount.ToString("N0");
 
             Availability.Visibility = Visibility.Visible;
             Availability.Content = gift.RemainingText();
+
+            PrimaryButtonText = Strings.OK;
+        }
+
+        /// <summary>
+        /// The upgrade page on its own, telling the sender what an upgrade would give the recipient.
+        /// </summary>
+        public ReceivedGiftPopup(IClientService clientService, INavigationService navigationService, GiftUpgradePreview preview, string receiverName)
+        {
+            InitializeComponent();
+
+            _clientService = clientService;
+            _navigationService = navigationService;
+
+            _preview = preview;
+            _page = GiftPage.Upgrade;
+
+            UpdateVisibility();
+
+            UpgradedTitle.Text = Strings.Gift2LearnMoreTitle;
+            UpgradedSubtitle.Text = string.Format(Strings.Gift2LearnMoreText, receiverName);
+
+            UpgradeText1.Content = Strings.Gift2UpgradeFeature1Title;
+            UpgradeText1.Badge = Strings.Gift2UpgradeFeature1TextLearn;
+            UpgradeText2.Content = Strings.Gift2UpgradeFeature2Title;
+            UpgradeText2.Badge = Strings.Gift2UpgradeFeature2TextLearn;
+            UpgradeText3.Content = Strings.Gift2UpgradeFeature3Title;
+            UpgradeText3.Badge = Strings.Gift2UpgradeFeature3TextLearn;
+
+            KeepOriginalDetails.Visibility = Visibility.Collapsed;
+
+            UpgradedAnimatedPhoto.LoopCompleted += OnLoopCompleted;
+            UpdateGift();
 
             PrimaryButtonText = Strings.OK;
         }
@@ -719,7 +1243,7 @@ namespace Telegram.Views.Stars.Popups
 
                 if (upgradable is false)
                 {
-                    Hide(ContentDialogResult.Primary);
+                    Hide(ModalPopupResult.Primary);
                 }
                 else if (_page == GiftPage.Details)
                 {
@@ -732,7 +1256,7 @@ namespace Telegram.Views.Stars.Popups
                     Upgrade2();
                 }
             }
-            else if (_gift?.Gift is SentGiftUpgraded { Gift.ResaleParameters: not null } && !_owned)
+            else if (_gift?.Gift is SentGiftUpgraded { Gift.ResaleParameters: not null } && !_owned && _collectible == null && _walletTransaction == null)
             {
                 BuyResale();
             }
@@ -743,7 +1267,7 @@ namespace Telegram.Views.Stars.Popups
             }
             else
             {
-                Hide(ContentDialogResult.Primary);
+                Hide(ModalPopupResult.Primary);
             }
         }
 
@@ -777,7 +1301,7 @@ namespace Telegram.Views.Stars.Popups
                 var id = _gift.ReceivedGiftId;
 
                 _gift.ReceivedGiftId = result.ReceivedGiftId;
-                _gift.ExportDate = result.ExportDate;
+                _gift.MintDate = result.MintDate;
                 _gift.NextResaleDate = result.NextResaleDate;
                 _gift.NextTransferDate = result.NextTransferDate;
                 _gift.DropOriginalDetailsStarCount = result.DropOriginalDetailsStarCount;
@@ -817,7 +1341,7 @@ namespace Telegram.Views.Stars.Popups
                     _navigationService.NavigateToChat(chat);
 
                     var confirm = await ToastPopup.ShowActionAsync(XamlRoot, text, Strings.StarsGiftUpgradeCompletedMoreButton, ToastPopupIcon.Gift);
-                    if (confirm == ContentDialogResult.Primary)
+                    if (confirm == ModalPopupResult.Primary)
                     {
                         _navigationService.NavigateToSender(receiverId, new NavigationState { { "open_gifts", true }, { "open_gifts_upgradable", true } });
                     }
@@ -877,12 +1401,12 @@ namespace Telegram.Views.Stars.Popups
                 var message = Locale.Declension(Strings.R.Gift2ConvertText2, (long)diff.TotalDays, _clientService.GetTitle(_gift.SenderId), Locale.Declension(Strings.R.StarsCount, _gift.SellStarCount));
 
                 var confirm = await MessagePopup.ShowNestedAsync(XamlRoot, message, Strings.Gift2ConvertTitle, Strings.Gift2ConvertButton, Strings.Cancel);
-                if (confirm == ContentDialogResult.Primary)
+                if (confirm == ModalPopupResult.Primary)
                 {
                     var response = await _clientService.SendAsync(new SellGift(_gift.ReceivedGiftId));
                     if (response is Ok)
                     {
-                        Hide(ContentDialogResult.Secondary);
+                        Hide(ModalPopupResult.Secondary);
 
                         _aggregator.Publish(new UpdateGiftIsSold(_gift.ReceivedGiftId));
 
@@ -906,13 +1430,13 @@ namespace Telegram.Views.Stars.Popups
         {
             if (receivedGift.IsSaved)
             {
-                Info.Text = gift.OwnerId is MessageSenderUser
+                Info.Text = HolderOf(gift) is MessageSenderUser
                     ? Strings.Gift2ProfileVisible4
                     : Strings.Gift2ChannelProfileVisible3;
             }
             else
             {
-                Info.Text = gift.OwnerId is MessageSenderUser
+                Info.Text = HolderOf(gift) is MessageSenderUser
                     ? Strings.Gift2ProfileInvisible4
                     : Strings.Gift2ChannelProfileInvisible3;
             }
@@ -985,10 +1509,7 @@ namespace Telegram.Views.Stars.Popups
                 var response = await _clientService.SendAsync(new GetUpgradedGiftVariants(upgraded.Gift.RegularGiftId, !upgraded.Gift.IsCrafted, upgraded.Gift.IsCrafted));
                 if (response is GiftUpgradeVariants variants)
                 {
-                    Hide();
-
                     await _navigationService.ShowPopupAsync(new GiftVariantsPopup(_clientService, _navigationService, _gift, variants));
-                    await this.ShowQueuedAsync(XamlRoot);
                 }
             }
         }
@@ -1076,8 +1597,8 @@ namespace Telegram.Views.Stars.Popups
                 return Vector3.Zero;
             }
 
-            var badge = WearIcon.TransformToVisual(UpgradedHeader).TransformPoint(new Point(WearIcon.ActualWidth / 2, WearIcon.ActualHeight / 2));
-            var photo = UpgradedAnimatedPhoto.TransformToVisual(UpgradedHeader).TransformPoint(new Point(UpgradedAnimatedPhoto.ActualWidth / 2, UpgradedAnimatedPhoto.ActualHeight / 2));
+            var badge = WearIcon.TransformToVisual(UpgradedHeader).TransformPoint(new Point((float)(WearIcon.ActualWidth / 2), (float)(WearIcon.ActualHeight / 2)));
+            var photo = UpgradedAnimatedPhoto.TransformToVisual(UpgradedHeader).TransformPoint(new Point((float)(UpgradedAnimatedPhoto.ActualWidth / 2), (float)(UpgradedAnimatedPhoto.ActualHeight / 2)));
 
             return new Vector3((float)(badge.X - photo.X), (float)(badge.Y - photo.Y), 0);
         }
@@ -1330,20 +1851,14 @@ namespace Telegram.Views.Stars.Popups
             StopRoll();
         }
 
-        private async void UpgradeCosts_Click(Hyperlink sender, HyperlinkClickEventArgs args)
+        private void UpgradeCosts_Click(Hyperlink sender, HyperlinkClickEventArgs args)
         {
             if (_preview == null)
             {
                 return;
             }
 
-            Hide();
-
-            await _navigationService.ShowPopupAsync(new GiftUpgradePricesPopup(_preview));
-            await this.ShowQueuedAsync(XamlRoot);
-
-            // Closing stopped the timer, and the price may have dropped meanwhile.
-            UpdateUpgradePrice();
+            _navigationService.ShowPopup(new GiftUpgradePricesPopup(_preview));
         }
 
         private async void InitializeValue(UpgradedGift gift)
@@ -1424,8 +1939,8 @@ namespace Telegram.Views.Stars.Popups
 
         protected override void OnDismissButtonClick()
         {
-            // The dismiss button goes back from a page to the details.
-            if (_page == GiftPage.Details)
+            // The dismiss button goes back from a page to the details, if there are any.
+            if (_page == GiftPage.Details || _gift == null)
             {
                 base.OnDismissButtonClick();
             }
@@ -1438,6 +1953,16 @@ namespace Telegram.Views.Stars.Popups
         // Pinning and the profile toggle edit the profile list, so they are offered where it is on
         // screen; everywhere else the footer's link still toggles the profile.
         private bool CanToggleSaved => _profile != null && _owned && _gift?.ReceivedGiftId.Length > 0;
+
+        /// <summary>
+        /// Whose gifts View in Profile opens; null when the popup was opened from that list already.
+        /// </summary>
+        private MessageSender ProfileOwner => _profile != null ? null : _gift?.Gift switch
+        {
+            SentGiftUpgraded upgraded => HolderOf(upgraded.Gift),
+            SentGiftRegular => _receiverId,
+            _ => null
+        };
 
         private void More_ContextRequested(object sender, RoutedEventArgs e)
         {
@@ -1452,7 +1977,7 @@ namespace Telegram.Views.Stars.Popups
 
             if (upgraded != null && _owned)
             {
-                if (upgraded.CraftProbabilityPerMille != 0)
+                if (!upgraded.IsCrafted && _gift.CraftDate > 0)
                 {
                     // TODO: Icon
                     flyout.CreateFlyoutItem(Craft, Strings.GiftCraft, Icons.Hamburger);
@@ -1469,6 +1994,16 @@ namespace Telegram.Views.Stars.Popups
                 flyout.CreateFlyoutItem(CopyLink, Strings.CopyLink, Icons.Link);
                 flyout.CreateFlyoutItem(Share, Strings.ShareFile, Icons.Share);
 
+                // Neither offer from a wallet transaction, which is about what happened to the gift.
+                if (_walletTransaction == null && !_owned && GiftOnChainHelper.CanSendOffer(_clientService, upgraded))
+                {
+                    flyout.CreateFlyoutItem(OfferToBuyOnChain, Strings.GiftOfferToBuyMenu, Icons.Coin);
+                }
+                else if (_walletTransaction == null && upgraded.CanSendPurchaseOffer)
+                {
+                    flyout.CreateFlyoutItem(OfferToBuy, Strings.GiftOfferToBuyMenu, Icons.Coin);
+                }
+
                 // A chat theme belongs to a user, so a channel's gift cannot be one.
                 if (upgraded.IsThemeAvailable && upgraded.OwnerId.IsUser(_clientService.Options.MyId))
                 {
@@ -1484,6 +2019,11 @@ namespace Telegram.Views.Stars.Popups
             if (_gift.CanBeTransferred)
             {
                 flyout.CreateFlyoutItem(Transfer, Strings.Gift2TransferOption, Icons.Replace);
+            }
+
+            if (ProfileOwner != null)
+            {
+                flyout.CreateFlyoutItem(ViewInProfile, Strings.Gift2ViewInProfile, Icons.PersonCircle);
             }
 
             if (_gift.CanBeDeleted)
@@ -1505,7 +2045,7 @@ namespace Telegram.Views.Stars.Popups
         private async void Delete()
         {
             var confirm = await MessagePopup.ShowNestedAsync(XamlRoot, Strings.Gift2DeleteText, Strings.Gift2DeleteOption, Strings.Delete, Strings.Cancel, destructive: true);
-            if (confirm != ContentDialogResult.Primary)
+            if (confirm != ModalPopupResult.Primary)
             {
                 return;
             }
@@ -1513,7 +2053,7 @@ namespace Telegram.Views.Stars.Popups
             var response = await _clientService.SendAsync(new DeleteGift(_gift.ReceivedGiftId));
             if (response is Ok)
             {
-                Hide(ContentDialogResult.Secondary);
+                Hide(ModalPopupResult.Secondary);
 
                 // The profile list drops a sold gift and a deleted one the same way.
                 _aggregator.Publish(new UpdateGiftIsSold(_gift.ReceivedGiftId));
@@ -1526,9 +2066,31 @@ namespace Telegram.Views.Stars.Popups
             }
         }
 
+        private void ViewInProfile()
+        {
+            if (ProfileOwner is MessageSender owner)
+            {
+                Hide();
+                _navigationService.NavigateToSender(owner, new NavigationState { { "open_gifts", true } });
+            }
+        }
+
         private void Craft()
         {
-            if (_gift.Gift is SentGiftUpgraded upgraded)
+            if (_gift.Gift is not SentGiftUpgraded upgraded)
+            {
+                return;
+            }
+
+            if (_gift.CraftDate > DateTime.Now.ToUnixTimeSeconds())
+            {
+                _ = MessagePopup.ShowNestedAsync(XamlRoot, string.Format(Strings.GiftCraftLaterText, Formatter.DateAt(_gift.CraftDate)), Strings.GiftCraftLaterTitle, Strings.OK);
+            }
+            else if (upgraded.Gift.GiftAddress.Length > 0)
+            {
+                _ = MessagePopup.ShowNestedAsync(XamlRoot, Strings.GiftCraftCantChooseFirst, Strings.GiftCraftCantChooseFirstTitle, Strings.OK);
+            }
+            else
             {
                 Hide();
                 _navigationService.ShowPopup(new GiftCraftPopup(_clientService, _navigationService, _gift));
@@ -1588,20 +2150,33 @@ namespace Telegram.Views.Stars.Popups
 
                 _navigationService.ShowPopup(message, Strings.Gift2ResellTimeoutTitle, Strings.OK);
             }
+            else if (upgraded.Gift.ResaleParameters != null && upgraded.Gift.UsesOnChainResale)
+            {
+                // Nothing changes here until the transaction lands, so the sheet goes rather than
+                // showing a sale that is being cancelled as still running.
+                if (await GiftOnChainHelper.DelistAsync(_clientService, _navigationService, upgraded.Gift))
+                {
+                    Hide();
+                }
+            }
             else if (upgraded.Gift.ResaleParameters != null)
             {
                 var confirm = await _navigationService.ShowPopupAsync(Strings.Gift2UnlistText, string.Format(Strings.Gift2UnlistTitle, upgraded.Gift.ToName()), Strings.Gift2ActionUnlist, Strings.Cancel);
-                if (confirm == ContentDialogResult.Primary)
+                if (confirm == ModalPopupResult.Primary)
                 {
                     var response = await _clientService.SendAsync(new SetGiftResalePrice(_gift.ReceivedGiftId, null));
                     if (response is Ok)
                     {
                         upgraded.Gift.ResaleParameters = null;
 
-                        UpdateVisibility();
+                        _aggregator.Publish(new UpdateGiftUpgraded(_gift.ReceivedGiftId, _gift.ReceivedGiftId, _gift));
+
+                        UpdateVisibility(true);
 
                         ResellButton.Glyph = Icons.TagFilled;
                         ResellButton.Content = Strings.Gift2ActionResell;
+
+                        ToastPopup.Show(XamlRoot, string.Format(Strings.Gift2ResaleDisable, upgraded.Gift.ToName()), ToastPopupIcon.Success);
                     }
                     else if (response is Error error)
                     {
@@ -1622,71 +2197,188 @@ namespace Telegram.Views.Stars.Popups
                 return;
             }
 
-            var resaleStarCount = upgraded.Gift.ResaleParameters?.StarCount ?? 0;
-            if (resaleStarCount == 0)
+            if (upgraded.Gift.UsesOnChainResale)
             {
-                resaleStarCount = await _resaleStarCount.Task;
+                ChangeOnChainPrice(upgraded.Gift);
+                return;
             }
 
-            var popup = new InputPopup(InputPopupType.Stars);
-            popup.Value = Math.Clamp(resaleStarCount, _clientService.Options.GiftResaleStarCountMin, _clientService.Options.GiftResaleStarCountMax);
-            //popup.Minimum = _clientService.Options.GiftResaleStarCountMin;
-            popup.Maximum = _clientService.Options.GiftResaleStarCountMax;
+            GiftResalePrice price;
 
-            popup.Title = Strings.ResellGiftTitle;
-            popup.Header = Strings.ResellGiftPriceTitle;
-            popup.PrimaryButtonContent = Strings.ResellGiftButton;
-            popup.PrimaryButtonStyle = BootStrapper.Current.Resources["AccentButtonStyle"] as Style;
-            popup.SecondaryButtonContent = Strings.Cancel;
-            popup.IsLightDismissEnabled = false;
-
-            popup.ValueChanged += (s, args) =>
+            if (upgraded.Gift.ResaleParameters is GiftResaleParameters listed)
             {
-                if (args.Value < _clientService.Options.GiftResaleStarCountMin)
-                {
-                    args.Footer = Locale.Declension(Strings.R.ResellGiftInfoMin, _clientService.Options.GiftResaleStarCountMin);
-                }
-                else
-                {
-                    var xtr = args.Value / 1000d;
-                    var usd = (long)(xtr * _clientService.Options.ThousandStarToUsdRate);
-                    var stars = (long)(xtr * _clientService.Options.GiftResaleStarEarningsPerMille);
-
-                    args.Footer = string.Format("{0} ~{1}", Locale.Declension(Strings.R.ResellGiftInfo, stars), Formatter.FormatAmount(usd, "USD"));
-                }
-            };
-
-            popup.Validating += (s, args) =>
+                price = listed.GramOnly
+                    ? new GiftResalePriceGram(listed.GramCentCount)
+                    : new GiftResalePriceStar(listed.StarCount);
+            }
+            else
             {
-                if (args.Value < _clientService.Options.GiftResaleStarCountMin)
-                {
-                    _navigationService.ShowToast(Locale.Declension(Strings.R.ResellGiftInfoMin, _clientService.Options.GiftResaleStarCountMin), ToastPopupIcon.Info);
-                    args.Cancel = true;
-                }
-            };
+                var floor = await _resaleStarCount.Task;
+                price = new GiftResalePriceStar(Math.Clamp(floor, _clientService.Options.GiftResaleStarCountMin, _clientService.Options.GiftResaleStarCountMax));
+            }
+
+            var popup = new GiftResalePricePopup(_clientService, price);
 
             var confirm = await popup.ShowAsync(XamlRoot);
-            if (confirm != ContentDialogResult.Primary)
+            if (confirm != ModalPopupResult.Primary)
             {
                 return;
             }
 
-            var response = await _clientService.SendAsync(new SetGiftResalePrice(_gift.ReceivedGiftId, new GiftResalePriceStar(popup.Value)));
+            var listing = upgraded.Gift.ResaleParameters == null;
+
+            var response = await _clientService.SendAsync(new SetGiftResalePrice(_gift.ReceivedGiftId, popup.Price));
             if (response is Ok)
             {
-                upgraded.Gift.ResaleParameters = new GiftResaleParameters(popup.Value, 0, false);
+                upgraded.Gift.ResaleParameters = popup.Parameters;
 
                 _aggregator.Publish(new UpdateGiftUpgraded(_gift.ReceivedGiftId, _gift.ReceivedGiftId, _gift));
 
-                UpdateVisibility();
-                ResaleStarCount.Text = upgraded.Gift.ResaleParameters.StarCount.ToString("N0");
+                UpdateResalePrice(upgraded.Gift);
+                UpdateVisibility(true);
 
                 ResellButton.Glyph = Icons.TagOffFilled;
                 ResellButton.Content = Strings.Gift2ActionUnlist;
+
+                if (listing)
+                {
+                    ToastPopup.Show(XamlRoot, string.Format(Strings.Gift2ResaleEnable, upgraded.Gift.ToName()), ToastPopupIcon.Success);
+                }
             }
             else if (response is Error error)
             {
                 ToastPopup.ShowError(XamlRoot, error);
+            }
+        }
+
+        private async void ChangeOnChainPrice(UpgradedGift gift)
+        {
+            var listed = gift.ResaleParameters;
+
+            // A Fragment sale is cancelled and started again to change its price.
+            if (listed != null && !listed.IsFixedOnChain)
+            {
+                if (await GiftOnChainHelper.ExplainChangePriceAsync(_clientService, _navigationService, gift))
+                {
+                    Hide();
+                }
+
+                return;
+            }
+
+            // The server picks the kind of a new sale; this is only what the price is asked under.
+            var fixedPrice = listed?.IsFixedOnChain ?? _clientService.Options.CanBuyOnChainFixedPriceGifts;
+
+            var popup = new GiftResalePricePopup(_clientService, listed?.GramAmount ?? 0, fixedPrice, listed != null);
+
+            var confirm = await popup.ShowAsync(XamlRoot);
+            if (confirm != ModalPopupResult.Primary)
+            {
+                return;
+            }
+
+            if (await GiftOnChainHelper.ListAsync(_clientService, _navigationService, gift, popup.GramAmount, listed != null))
+            {
+                Hide();
+            }
+        }
+
+        private void ResaleStarCountRoot_Tapped(object sender, TappedRoutedEventArgs e)
+        {
+            if (_owned)
+            {
+                ChangePrice();
+            }
+        }
+
+        private void UpdateResalePrice(UpgradedGift gift)
+        {
+            // The glyphs are drawn for Segoe UI's baseline, so they go inline rather than beside the text.
+            ResaleStarCount.Text = string.Format(Strings.GiftOnSale, GiftHelper.IsResaleInGrams(gift)
+                ? Icons.Gram14 + " " + GiftHelper.FormatResaleGrams(gift, true)
+                : Icons.Star14 + " " + gift.ResaleParameters.StarCount.ToString("N0"));
+        }
+
+        private void ShowResalePrice(bool show, bool animate)
+        {
+            var price = ElementComposition.GetElementVisual(ResaleStarCountRoot);
+            var subtitle = ElementComposition.GetElementVisual(UpgradedSubtitle);
+
+            if (!animate)
+            {
+                _resaleShown = show;
+
+                price.StopAnimation("Scale");
+                price.StopAnimation("Opacity");
+                subtitle.StopAnimation("Opacity");
+
+                price.Scale = Vector3.One;
+                price.Opacity = 1;
+                subtitle.Opacity = show ? 0 : 1;
+
+                ResaleStarCountRoot.IsHitTestVisible = show;
+                ResaleStarCountRoot.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+                return;
+            }
+            else if (show == _resaleShown)
+            {
+                return;
+            }
+
+            _resaleShown = show;
+
+            if (show && ResaleStarCountRoot.Visibility == Visibility.Collapsed)
+            {
+                price.Scale = new Vector3(0.4f, 0.4f, 1);
+                price.Opacity = 0;
+                ResaleStarCountRoot.Visibility = Visibility.Visible;
+            }
+
+            ResaleStarCountRoot.IsHitTestVisible = show;
+
+            var compositor = price.Compositor;
+            var easing = compositor.CreateCubicBezierEasingFunction(new Vector2(.23f, 1), new Vector2(.32f, 1));
+            var duration = TimeSpan.FromMilliseconds(420);
+
+            // The pill is collapsed until now, so its size is only known once it is laid out.
+            price.StartAnimation("CenterPoint", compositor.CreateExpressionAnimation("Vector3(this.Target.Size.X * 0.5, this.Target.Size.Y * 0.5, 0)"));
+
+            var scale = compositor.CreateVector3KeyFrameAnimation();
+            scale.InsertExpressionKeyFrame(0, "this.StartingValue");
+            scale.InsertKeyFrame(1, show ? Vector3.One : new Vector3(0.4f, 0.4f, 1), easing);
+            scale.Duration = duration;
+
+            var opacity = compositor.CreateScalarKeyFrameAnimation();
+            opacity.InsertExpressionKeyFrame(0, "this.StartingValue");
+            opacity.InsertKeyFrame(1, show ? 1 : 0, easing);
+            opacity.Duration = duration;
+
+            var fade = compositor.CreateScalarKeyFrameAnimation();
+            fade.InsertExpressionKeyFrame(0, "this.StartingValue");
+            fade.InsertKeyFrame(1, show ? 0 : 1, easing);
+            fade.Duration = duration;
+
+            var batch = compositor.CreateScopedBatch(CompositionBatchTypes.Animation);
+            batch.Completed += ResalePrice_Completed;
+
+            price.StartAnimation("Scale", scale);
+            price.StartAnimation("Opacity", opacity);
+            subtitle.StartAnimation("Opacity", fade);
+
+            batch.End();
+        }
+
+        private void ResalePrice_Completed(object sender, CompositionBatchCompletedEventArgs args)
+        {
+            if (sender is CompositionScopedBatch batch)
+            {
+                batch.Completed -= ResalePrice_Completed;
+            }
+
+            // A show that started while this hide was running interrupts it, and keeps the pill.
+            if (!_resaleShown)
+            {
+                ResaleStarCountRoot.Visibility = Visibility.Collapsed;
             }
         }
 
@@ -1697,30 +2389,155 @@ namespace Telegram.Views.Stars.Popups
                 return;
             }
 
-            var now = DateTime.Now.ToUnixTimeSeconds();
-            if (now < _gift.NextTransferDate)
+            // An on-chain sale holds the gift in its contract, so there is nothing to transfer.
+            if (upgraded.Gift.UsesOnChainResale && upgraded.Gift.ResaleParameters != null)
             {
-                var date = Formatter.ToLocalTime(_gift.NextTransferDate);
-                var diff = date - DateTime.Now;
-
-                string message;
-                if (diff.TotalDays >= 1)
-                {
-                    message = Formatter.DateAt(_gift.NextTransferDate);
-                    message = string.Format(Strings.Gift2TransferTimeoutDate, message);
-                }
-                else
-                {
-                    message = Locale.FormatTtl(_gift.NextTransferDate - now);
-                    message = string.Format(Strings.Gift2TransferTimeout, message);
-                }
-
-                _navigationService.ShowPopup(message, Strings.Gift2TransferTimeoutTitle, Strings.OK);
+                _navigationService.ShowPopup(Strings.GiftOnchainTransferUnlistFirst, Strings.Gift2TransferOption, Strings.OK);
+                return;
             }
-            else
+
+            if (TransferGiftPopup.CheckTransferDate(_navigationService, _gift))
             {
                 Hide();
                 _navigationService.ShowPopup(new ChooseChatsPopup(), new ChooseChatsConfigurationTransferGift(_gift));
+            }
+        }
+
+        private async void TransferCollectible()
+        {
+            if (_gift.Gift is not SentGiftUpgraded upgraded)
+            {
+                return;
+            }
+
+            var gift = upgraded.Gift;
+
+            if (gift.ResaleParameters != null)
+            {
+                var unlist = gift.UsesOnChainResale && gift.ResaleParameters.CanBeManaged;
+
+                var confirm = await MessagePopup.ShowNestedAsync(XamlRoot, Strings.GiftOnchainTransferUnlistFirst, Strings.Gift2TransferOption, unlist ? Strings.Gift2ActionUnlist : Strings.OK, unlist ? Strings.Cancel : null);
+                if (confirm != ModalPopupResult.Primary || !unlist)
+                {
+                    return;
+                }
+
+                var delisted = await GiftOnChainHelper.DelistAsync(_clientService, _navigationService, gift);
+                if (delisted)
+                {
+                    Hide();
+                }
+
+                return;
+            }
+
+            Hide();
+            _navigationService.ShowPopup(new ChooseChatsPopup(), new ChooseChatsConfigurationDepositGift(gift));
+        }
+
+        private async void ToggleCollectibleColor(UpgradedGift gift)
+        {
+            if (!_collectibleHost.IsCardColor(_collectible) && !gift.CanBeTonWalletCardBackground)
+            {
+                var response = await _clientService.SendAsync(new GetTonWalletCardBackgroundGiftCollectionNames());
+                if (response is UpgradedGiftCollectionNames { Names.Count: > 0 } collections)
+                {
+                    ToastPopup.Show(XamlRoot, FormatColorCollections(collections.Names), ToastPopupIcon.Info);
+                }
+
+                return;
+            }
+
+            // The sheet goes first, so that the card can be seen taking the colour.
+            Hide();
+            await Task.Delay(250);
+
+            _collectibleHost.ToggleColor(_collectible);
+        }
+
+        private static string FormatColorCollections(IReadOnlyList<string> names)
+        {
+            if (names.Count == 1)
+            {
+                return string.Format(Strings.WalletGiftColorOnlyOne, names[0]);
+            }
+
+            var first = new StringBuilder(names[0]);
+
+            for (int i = 1; i < names.Count - 1; i++)
+            {
+                first.Append(", ").Append(names[i]);
+            }
+
+            return string.Format(Strings.WalletGiftColorOnly, first, names[names.Count - 1]);
+        }
+
+        private async void ToggleCollectibleCard()
+        {
+            Hide();
+            await Task.Delay(250);
+
+            _collectibleHost.ToggleCard(_collectible);
+        }
+
+        private async void CollectibleDisplay_Click(object sender, RoutedEventArgs e)
+        {
+            if (_gift.Gift is not SentGiftUpgraded upgraded)
+            {
+                return;
+            }
+
+            var display = CollectibleDisplay.IsChecked == true;
+            var ownerId = display ? new MessageSenderUser(_clientService.Options.MyId) : null;
+
+            var response = await _clientService.SendAsync(new DisplayUpgradedGift(ownerId, upgraded.Gift.Name));
+            if (response is Error error)
+            {
+                CollectibleDisplay.IsChecked = !display;
+                ToastPopup.ShowError(XamlRoot, error);
+            }
+        }
+
+        private async void OfferToBuy()
+        {
+            if (_gift.Gift is not SentGiftUpgraded upgraded)
+            {
+                return;
+            }
+
+            var ownerName = _clientService.GetTitle(upgraded.Gift.OwnerId, true);
+
+            var response = await GiftOfferPopup.OfferAsync(_clientService, _navigationService, upgraded.Gift, ownerName);
+            if (response is Ok)
+            {
+                ToastPopup.Show(XamlRoot, string.Format("**{0}**\n{1}", Strings.GiftOfferSentTitle, string.Format(Strings.GiftOfferSentText, upgraded.Gift.ToName(), ownerName)), ToastPopupIcon.Forward);
+            }
+            else if (response is Error error)
+            {
+                ToastPopup.ShowError(XamlRoot, error);
+            }
+            else if (response is ErrorStarsNeeded needed)
+            {
+                Hide();
+                await _navigationService.ShowPopupAsync(new BuyPopup(), BuyStarsArgs.ForChannel(needed.StarCount, 0));
+            }
+        }
+
+        private async void OfferToBuyOnChain()
+        {
+            if (_gift.Gift is not SentGiftUpgraded upgraded)
+            {
+                return;
+            }
+
+            // A gift in a wallet nobody has linked to an account has only the name its owner gave.
+            var ownerName = upgraded.Gift.OwnerId != null
+                ? _clientService.GetTitle(upgraded.Gift.OwnerId, true)
+                : upgraded.Gift.OwnerName;
+
+            if (await GiftOnChainHelper.SendOfferAsync(_clientService, _navigationService, upgraded.Gift, ownerName))
+            {
+                Hide();
             }
         }
 
@@ -1733,40 +2550,64 @@ namespace Telegram.Views.Stars.Popups
 
             var chat = await _clientService.GetChatFromMessageSenderAsync(_sendGiftTo);
 
-            var confirm = await _navigationService.ShowPopupAsync(new TransferGiftPopup(_clientService, _gift, chat, true));
-            if (confirm == ContentDialogResult.Primary)
-            {
-                // TODO: text, isPrivate
-                var response = await _clientService.SendPaymentAsync(upgraded.Gift.ResaleParameters.StarCount, new SendResoldGift(upgraded.Gift.Name, _sendGiftTo ?? _clientService.MyId, new GiftResalePriceStar(upgraded.Gift.ResaleParameters.StarCount), string.Empty.AsFormattedText(), false));
-                if (response is GiftResaleResultOk)
-                {
-                    _aggregator.Publish(new UpdateGiftIsSold(_gift.ReceivedGiftId));
-                    Hide(ContentDialogResult.Primary);
+            var text = string.Empty.AsFormattedText();
+            var isPrivate = false;
 
-                    if (chat != null)
-                    {
-                        _navigationService.NavigateToChat(chat.Id);
-                        ToastPopup.Show(XamlRoot, string.Format("**{0}**\n{1}", Strings.BoughtResoldGiftToTitle, string.Format(Strings.BoughtResoldGiftToText, chat.Title)), new DelayedFileSource(_clientService, upgraded.Gift.Model.Sticker));
-                    }
-                    else
-                    {
-                        ToastPopup.Show(XamlRoot, string.Format("**{0}**\n{1}", Strings.BoughtResoldGiftTitle, string.Format(Strings.BoughtResoldGiftText, upgraded.Gift.ToName())), new DelayedFileSource(_clientService, upgraded.Gift.Model.Sticker));
-                    }
-                }
-                else if (response is Error error)
+            if (_sendGiftTo != null && !_sendGiftTo.IsUser(_clientService.Options.MyId))
+            {
+                var popup = new GiftMessagePopup(_clientService, upgraded.Gift, _sendGiftTo);
+
+                var confirm = await _navigationService.ShowPopupAsync(popup);
+                if (confirm != ModalPopupResult.Primary)
                 {
                     _submitted = false;
-                    ToastPopup.ShowError(XamlRoot, error);
+                    return;
                 }
-                else if (response is ErrorStarsNeeded)
-                {
-                    Hide();
-                    await _navigationService.ShowPopupAsync(new BuyPopup(), BuyStarsArgs.ForChannel(upgraded.Gift.ResaleParameters.StarCount, 0));
-                }
+
+                text = popup.Text;
+                isPrivate = popup.IsPrivate;
             }
-            else
+
+            var response = await TransferGiftPopup.BuyAsync(_clientService, _navigationService, upgraded.Gift, chat, _sendGiftTo ?? _clientService.MyId, text, isPrivate);
+            if (response is Ok)
             {
-                _submitted = false;
+                // Sent on-chain: the gift is not sold until the transaction lands, and the toasts
+                // say when it does.
+                Hide();
+                return;
+            }
+            else if (response is GiftResaleResultOk)
+            {
+                _aggregator.Publish(new UpdateGiftIsSold(_gift.ReceivedGiftId));
+                Hide(ModalPopupResult.Primary);
+
+                if (chat != null)
+                {
+                    _navigationService.NavigateToChat(chat.Id);
+                    ToastPopup.Show(XamlRoot, string.Format("**{0}**\n{1}", Strings.BoughtResoldGiftToTitle, string.Format(Strings.BoughtResoldGiftToText, chat.Title)), new DelayedFileSource(_clientService, upgraded.Gift.Model.Sticker));
+                }
+                else
+                {
+                    ToastPopup.Show(XamlRoot, string.Format("**{0}**\n{1}", Strings.BoughtResoldGiftTitle, string.Format(Strings.BoughtResoldGiftText, upgraded.Gift.ToName())), new DelayedFileSource(_clientService, upgraded.Gift.Model.Sticker));
+                }
+
+                return;
+            }
+
+            _submitted = false;
+
+            // A raised price was confirmed or declined in the loop, and the sheet has to show it either way.
+            PrimaryButtonText = GetUpgradedPrimaryButtonText(upgraded.Gift);
+            UpdateResalePrice(upgraded.Gift);
+
+            if (response is Error error)
+            {
+                ToastPopup.ShowError(XamlRoot, error);
+            }
+            else if (response is ErrorStarsNeeded)
+            {
+                Hide();
+                await _navigationService.ShowPopupAsync(new BuyPopup(), BuyStarsArgs.ForChannel(upgraded.Gift.ResaleParameters.StarCount, 0));
             }
         }
 
@@ -1794,7 +2635,7 @@ namespace Telegram.Views.Stars.Popups
                 fullInfo = await _clientService.SendAsync(new GetUserFullInfo(user.Id)) as UserFullInfo;
             }
 
-            if (fullInfo != null)
+            if (fullInfo != null && GiftPopup.CanReceiveGifts(_clientService, _navigationService, user, fullInfo))
             {
                 Hide();
                 _navigationService.ShowPopup(new GiftPopup(_clientService, _navigationService, user, fullInfo));
@@ -1805,9 +2646,9 @@ namespace Telegram.Views.Stars.Popups
         {
             Hide();
 
-            if (_gift.Gift is SentGiftUpgraded upgraded && upgraded.Gift.OwnerId != null)
+            if (_gift.Gift is SentGiftUpgraded upgraded && HolderOf(upgraded.Gift) is MessageSender holder)
             {
-                _navigationService.NavigateToSender(upgraded.Gift.OwnerId);
+                _navigationService.NavigateToSender(holder);
             }
             else
             {
@@ -1817,7 +2658,52 @@ namespace Telegram.Views.Stars.Popups
 
         private void TransferButton_Click(object sender, RoutedEventArgs e)
         {
-            Transfer();
+            if (_collectible != null)
+            {
+                TransferCollectible();
+            }
+            else if (_owned)
+            {
+                Transfer();
+            }
+            else
+            {
+                ShowActionLocked();
+            }
+        }
+
+        private async void ShowActionLocked()
+        {
+            if (_gift.Gift is not SentGiftUpgraded upgraded)
+            {
+                return;
+            }
+
+            var confirm = await MessagePopup.ShowNestedAsync(XamlRoot, Strings.Gift2CantDoText, Strings.Gift2CantDoTitle, Strings.OpenFragment, Strings.Cancel);
+            if (confirm == ModalPopupResult.Primary)
+            {
+                MessageHelper.OpenUrl(_clientService, _navigationService, "https://fragment.com/gift/" + upgraded.Gift.Name);
+            }
+        }
+
+        private void OwnerAddress_Click(object sender, RoutedEventArgs e)
+        {
+            if (_gift.Gift is SentGiftUpgraded upgraded)
+            {
+                var dataPackage = new DataPackage();
+                dataPackage.SetText(upgraded.Gift.OwnerAddress);
+                ClipboardEx.TrySetContent(dataPackage);
+
+                ToastPopup.Show(XamlRoot, Strings.WalletAddressCopied, ToastPopupIcon.Copied);
+            }
+        }
+
+        private void Blockchain_Click(object sender, TextUrlClickEventArgs e)
+        {
+            if (_gift.Gift is SentGiftUpgraded upgraded)
+            {
+                MessageHelper.OpenUrl(_clientService, _navigationService, _clientService.Options.TonBlockchainExplorerUrl + upgraded.Gift.GiftAddress);
+            }
         }
 
         private void WearButton_Click(object sender, RoutedEventArgs e)
@@ -1827,7 +2713,11 @@ namespace Telegram.Views.Stars.Popups
                 return;
             }
 
-            if (_shownWearInfo || IsWorn(upgraded.Gift))
+            if (_collectible != null)
+            {
+                ToggleCollectibleColor(upgraded.Gift);
+            }
+            else if (_shownWearInfo || IsWorn(_clientService, upgraded.Gift))
             {
                 ToggleWear();
             }
@@ -1839,73 +2729,83 @@ namespace Telegram.Views.Stars.Popups
 
         private async void ToggleWear()
         {
-            if (_gift.Gift is not SentGiftUpgraded upgraded)
+            if (_gift.Gift is SentGiftUpgraded upgraded)
             {
-                _submitted = false;
-                return;
-            }
+                var worn = IsWorn(_clientService, upgraded.Gift);
 
-            var gift = upgraded.Gift;
-            var worn = IsWorn(gift);
-
-            EmojiStatus status = null;
-
-            if (worn is false)
-            {
-                if (gift.OwnerId is MessageSenderChat senderChat)
+                var toggled = await ToggleWearAsync(_clientService, _navigationService, XamlRoot, upgraded.Gift);
+                if (toggled)
                 {
-                    if (await CanSetChatEmojiStatusAsync(senderChat.ChatId) is false)
-                    {
-                        _submitted = false;
-                        return;
-                    }
+                    UpdateWearButton(!worn);
+                    ShowPage(GiftPage.Details);
                 }
-                else if (_clientService.IsPremium is false)
-                {
-                    _submitted = false;
-                    ToastPopup.ShowFeaturePromo(_navigationService, Strings.Gift2ActionWearNeededPremium, new PremiumFeatureEmojiStatus());
-                    return;
-                }
-
-                var type = ToEmojiStatusType(gift);
-                if (type == null)
-                {
-                    _submitted = false;
-                    return;
-                }
-
-                status = new EmojiStatus(type, 0);
-            }
-
-            Function function = gift.OwnerId is MessageSenderChat ownerChat
-                ? new SetChatEmojiStatus(ownerChat.ChatId, status)
-                : new SetEmojiStatus(status);
-
-            var response = await _clientService.SendAsync(function);
-            if (response is Ok)
-            {
-                UpdateWearButton(!worn);
-                ShowPage(GiftPage.Details);
-
-                ToastPopup.Show(XamlRoot, string.Format(worn ? Strings.Gift2ActionWearOffDone : Strings.Gift2ActionWearDone, gift.ToName()), new DelayedFileSource(_clientService, gift.Model.Sticker));
-            }
-            else if (response is Error error)
-            {
-                ToastPopup.ShowError(XamlRoot, error);
             }
 
             _submitted = false;
         }
 
-        private async Task<bool> CanSetChatEmojiStatusAsync(long chatId)
+        /// <summary>
+        /// Puts the gift on as its holder's emoji status, or takes it off. False when nothing
+        /// changed.
+        /// </summary>
+        public static async Task<bool> ToggleWearAsync(IClientService clientService, INavigationService navigationService, XamlRoot xamlRoot, UpgradedGift gift)
         {
-            if (!_clientService.TryGetChat(chatId, out Chat chat))
+            var worn = IsWorn(clientService, gift);
+
+            EmojiStatus status = null;
+
+            if (worn is false)
+            {
+                if (HolderOf(gift) is MessageSenderChat senderChat)
+                {
+                    var allowed = await CanSetChatEmojiStatusAsync(clientService, navigationService, senderChat.ChatId);
+                    if (allowed is false)
+                    {
+                        return false;
+                    }
+                }
+                else if (clientService.IsPremium is false)
+                {
+                    ToastPopup.ShowFeaturePromo(navigationService, Strings.Gift2ActionWearNeededPremium, new PremiumFeatureEmojiStatus());
+                    return false;
+                }
+
+                var type = ToEmojiStatusType(gift);
+                if (type == null)
+                {
+                    return false;
+                }
+
+                status = new EmojiStatus(type, 0);
+            }
+
+            Function function = HolderOf(gift) is MessageSenderChat ownerChat
+                ? new SetChatEmojiStatus(ownerChat.ChatId, status)
+                : new SetEmojiStatus(status);
+
+            var response = await clientService.SendAsync(function);
+            if (response is Ok)
+            {
+                ToastPopup.Show(xamlRoot, string.Format(worn ? Strings.Gift2ActionWearOffDone : Strings.Gift2ActionWearDone, gift.ToName()), new DelayedFileSource(clientService, gift.Model.Sticker));
+                return true;
+            }
+            else if (response is Error error)
+            {
+                ToastPopup.ShowError(xamlRoot, error);
+            }
+
+            return false;
+        }
+
+        private static async Task<bool> CanSetChatEmojiStatusAsync(IClientService clientService, INavigationService navigationService, long chatId)
+        {
+            if (!clientService.TryGetChat(chatId, out Chat chat))
             {
                 return false;
             }
 
-            var response1 = await _clientService.SendAsync(new GetChatBoostFeatures(true));
-            var response2 = await _clientService.SendAsync(new GetChatBoostStatus(chatId));
+            var response1 = await clientService.SendAsync(new GetChatBoostFeatures(true));
+            var response2 = await clientService.SendAsync(new GetChatBoostStatus(chatId));
 
             // If the level can't be read, the server has the last word.
             if (response1 is not ChatBoostFeatures features || response2 is not ChatBoostStatus status || status.Level >= features.MinEmojiStatusBoostLevel)
@@ -1913,23 +2813,30 @@ namespace Telegram.Views.Stars.Popups
                 return true;
             }
 
-            Hide();
-
-            await _navigationService.ShowPopupAsync(new ChatBoostFeaturesPopup(_clientService, _navigationService, chat, status, null, features, ChatBoostFeature.EmojiStatus, features.MinEmojiStatusBoostLevel));
-            await this.ShowQueuedAsync(XamlRoot);
-
+            await navigationService.ShowPopupAsync(new ChatBoostFeaturesPopup(clientService, navigationService, chat, status, null, features, ChatBoostFeature.EmojiStatus, features.MinEmojiStatusBoostLevel));
             return false;
         }
 
-        private bool IsWorn(UpgradedGift gift)
+        /// <summary>
+        /// The Telegram account the gift is with: its owner, or for a gift on the blockchain the
+        /// account hosting it.
+        /// </summary>
+        private static MessageSender HolderOf(UpgradedGift gift)
+        {
+            return gift.HostId ?? gift.OwnerId;
+        }
+
+        public static bool IsWorn(IClientService clientService, UpgradedGift gift)
         {
             EmojiStatus status = null;
 
-            if (_clientService.TryGetUser(gift.OwnerId, out User user))
+            var holder = HolderOf(gift);
+
+            if (clientService.TryGetUser(holder, out User user))
             {
                 status = user.EmojiStatus;
             }
-            else if (_clientService.TryGetChat(gift.OwnerId, out Chat chat))
+            else if (clientService.TryGetChat(holder, out Chat chat))
             {
                 status = chat.EmojiStatus;
             }
@@ -1955,7 +2862,18 @@ namespace Telegram.Views.Stars.Popups
 
         private void ResellButton_Click(object sender, RoutedEventArgs e)
         {
-            Resell();
+            if (_collectible != null)
+            {
+                ToggleCollectibleCard();
+            }
+            else if (_owned)
+            {
+                Resell();
+            }
+            else
+            {
+                Share();
+            }
         }
 
         private void Publisher_Click(Hyperlink sender, HyperlinkClickEventArgs args)
@@ -1994,7 +2912,7 @@ namespace Telegram.Views.Stars.Popups
         private async void UpgradedCaptionRemove_Click(object sender, RoutedEventArgs e)
         {
             var confirm = await _navigationService.ShowPopupAsync(Strings.Gift2RemoveDescriptionText, Strings.Gift2RemoveDescriptionTitle, string.Format(Strings.Gift2RemoveDescriptionButton.ReplaceStar(Icons.Premium), _gift.DropOriginalDetailsStarCount));
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 var response = await _clientService.SendPaymentAsync(_gift.DropOriginalDetailsStarCount, new DropGiftOriginalDetails(_gift.ReceivedGiftId, _gift.DropOriginalDetailsStarCount));
                 if (response is Ok)
@@ -2010,6 +2928,11 @@ namespace Telegram.Views.Stars.Popups
                     UpgradedTableRoot.CornerRadius = new CornerRadius(4);
 
                     UpgradedCaptionRoot.Visibility = Visibility.Collapsed;
+
+                    if (_gift.Gift is SentGiftUpgraded removed)
+                    {
+                        ToastPopup.Show(XamlRoot, ClientEx.ParseMarkdown(string.Format(Strings.GiftRemovedDescription, removed.Gift.ToName())), new DelayedFileSource(_clientService, removed.Gift.Model.Sticker));
+                    }
                 }
                 else if (response is Error error)
                 {

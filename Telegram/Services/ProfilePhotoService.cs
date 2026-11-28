@@ -50,7 +50,7 @@ namespace Telegram.Services
                     var popup = new EditMediaPopup(navigation.XamlRoot, _clientService, media, ImageCropperMask.Ellipse);
 
                     var confirm = await popup.ShowAsync();
-                    if (confirm == ContentDialogResult.Primary)
+                    if (confirm == ModalPopupResult.Primary)
                     {
                         return await EditPhotoAsync(navigation, media);
                     }
@@ -81,7 +81,7 @@ namespace Telegram.Services
             var tsc = new TaskCompletionSource<object>();
 
             var confirm = await navigation.ShowPopupAsync(new CreateChatPhotoPopup(tsc));
-            if (confirm != ContentDialogResult.Primary)
+            if (confirm != ModalPopupResult.Primary)
             {
                 return null;
             }
@@ -135,7 +135,7 @@ namespace Telegram.Services
                 else if (isPersonal)
                 {
                     var confirm = await navigation.ShowPopupAsync(string.Format(Strings.SetUserPhotoAlertMessage, user.FirstName, user.FirstName), Strings.AppName, Strings.SetPhoto, Strings.Cancel);
-                    if (confirm == ContentDialogResult.Primary)
+                    if (confirm == ModalPopupResult.Primary)
                     {
                         _clientService.Send(new SetUserPersonalProfilePhoto(user.Id, inputPhoto));
                         return true;
@@ -144,7 +144,7 @@ namespace Telegram.Services
                 else
                 {
                     var confirm = await navigation.ShowPopupAsync(string.Format(Strings.SuggestPhotoAlertMessage, user.FirstName), Strings.AppName, Strings.SuggestPhotoShort, Strings.Cancel);
-                    if (confirm == ContentDialogResult.Primary)
+                    if (confirm == ModalPopupResult.Primary)
                     {
                         _clientService.Send(new SuggestUserProfilePhoto(user.Id, inputPhoto));
                         return true;

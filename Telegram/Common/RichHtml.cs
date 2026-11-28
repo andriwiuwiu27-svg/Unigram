@@ -336,12 +336,6 @@ namespace Telegram.Common
                 return;
             }
 
-            if (node.HasClass("expandable"))
-            {
-                output.Add(new PageBlockExpandableBlockQuote { Text = InlineExcept(node, "cite"), Credit = credit });
-                return;
-            }
-
             var blocks = new MutableVector<PageBlock>();
             if (hasBlocks)
             {
@@ -365,7 +359,14 @@ namespace Telegram.Common
                 blocks.Add(new PageBlockParagraph { Text = EmptyText() });
             }
 
-            output.Add(new PageBlockBlockQuote { Blocks = blocks, Credit = credit });
+            if (node.HasClass("expandable"))
+            {
+                output.Add(new PageBlockExpandableBlockQuote { Blocks = blocks, Credit = credit });
+            }
+            else
+            {
+                output.Add(new PageBlockBlockQuote { Blocks = blocks, Credit = credit });
+            }
         }
 
         private static void ParseDetails(Node node, MutableVector<PageBlock> output)

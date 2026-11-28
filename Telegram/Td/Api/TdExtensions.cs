@@ -1498,7 +1498,23 @@ namespace Telegram.Td.Api
                 return false;
             }
 
-            return x.Id == yMessage.Id && x.ChatId == yMessage.ChatId;
+            return x.Id == yMessage.Id && x.ChatId == yMessage.ChatId && IsPlaybackFile(x.Content, yMessage.Document);
+        }
+
+        // One message can stand for two tracks: a poll's media and its explanation's play under the
+        // poll's id, and an edit replaces a message's file under the same one. Other contents are
+        // only read for their file at a cost, and play one file each.
+        private static bool IsPlaybackFile(MessageContent content, File document)
+        {
+            var file = content switch
+            {
+                MessageAudio audio => audio.Audio.AudioValue,
+                MessageVoiceNote voiceNote => voiceNote.VoiceNote.Voice,
+                MessageVideoNote videoNote => videoNote.VideoNote.Video,
+                _ => null
+            };
+
+            return file == null || file.Id == document?.Id;
         }
 
         public static bool AreTheSame(this AudioWithOwner x, PlaybackItem y)
@@ -4221,6 +4237,19 @@ namespace Telegram.Td.Api
                 or ChatMemberStatusRestricted { Permissions.CanCreateTopics: true };
         }
 
+        // Only supergroups and channels post stories of their own; a private chat's are its user's.
+        public static bool CanPostStories(this Chat chat, IClientService clientService)
+        {
+            if (chat.Type is not ChatTypeSupergroup)
+            {
+                return false;
+            }
+
+            var status = clientService.GetChatMemberStatus(chat, out _);
+            return status is ChatMemberStatusCreator
+                or ChatMemberStatusAdministrator { Rights.CanPostStories: true };
+        }
+
         public static bool CanEditStories(this Chat chat, IClientService clientService)
         {
             var status = clientService.GetChatMemberStatus(chat, out bool channel);
@@ -4400,7 +4429,7 @@ namespace Telegram.Td.Api
                 if (supergroup.IsDirectMessagesGroup)
                 {
                     type = TopicListType.DirectMessages;
-                    return supergroup.IsAdministeredDirectMessagesGroup ? ForumLayout.Tabs : ForumLayout.None;
+                    return supergroup.IsAdministeredDirectMessagesGroup ? ForumLayout.Sidebar : ForumLayout.None;
                 }
             }
             else if (clientService.IsSavedMessages(chat))

@@ -101,9 +101,28 @@ namespace Telegram.ViewModels.Stories
 
         public StoryList List => _activeStories?.List;
 
+        public bool HasUnread => _activeStories is { Stories.Count: > 0 } activeStories && activeStories.Stories[^1].StoryId > activeStories.MaxReadStoryId;
+
         public bool IsMyStory { get; }
 
         public ObservableCollection<StoryViewModel> Items { get; }
+
+        /// <summary>
+        /// Whether a story is pinned to the top of the profile list this viewer was opened from; null elsewhere.
+        /// </summary>
+        public Func<StoryViewModel, bool> IsPinned { get; set; }
+
+        /// <summary>
+        /// How many stories the list this viewer was opened from holds, loaded or not; null when
+        /// it was not opened from one, and then the header shows no position.
+        /// </summary>
+        public Func<int> TotalCount { get; set; }
+
+        /// <summary>
+        /// The group a story's progress segment is drawn in, consecutive stories sharing it;
+        /// null when the whole list is one group.
+        /// </summary>
+        public Func<StoryViewModel, long> SegmentGroup { get; set; }
 
         public MessageDelegate Delegate => _messageDelegate;
 
@@ -211,6 +230,16 @@ namespace Telegram.ViewModels.Stories
         public override MessageTopic OutgoingTopicId { get; }
 
         protected override bool CanSchedule => false;
+
+        /// <summary>
+        /// Raised on the UI thread after a reply goes out.
+        /// </summary>
+        public event EventHandler MessageSent;
+
+        protected override void ContinueSendMessage(MessageSendOptions options)
+        {
+            MessageSent?.Invoke(this, EventArgs.Empty);
+        }
 
         public override void ViewSticker(Sticker sticker)
         {

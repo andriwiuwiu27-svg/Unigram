@@ -58,7 +58,7 @@ namespace Telegram.ViewModels.Wallet
         public async void ShowRecoveryPhrase()
         {
             var confirm = await ShowPopupAsync(new WalletRecoveryInfoPopup());
-            if (confirm != ContentDialogResult.Primary)
+            if (confirm != ModalPopupResult.Primary)
             {
                 return;
             }
@@ -175,7 +175,7 @@ namespace Telegram.ViewModels.Wallet
             var popup = new WalletDisableBackupPopup(ClientService, _wallet, NavigationService, lease);
 
             var confirm = await ShowPopupAsync(popup);
-            if (confirm != ContentDialogResult.Primary)
+            if (confirm != ModalPopupResult.Primary)
             {
                 return;
             }
@@ -264,12 +264,12 @@ namespace Telegram.ViewModels.Wallet
                     ? WalletPhrasePopup.ForNewPhrase(words)
                     : WalletPhrasePopup.ForDisableBackup(words);
 
-                if (await ShowPopupAsync(phrase) != ContentDialogResult.Primary)
+                if (await ShowPopupAsync(phrase) != ModalPopupResult.Primary)
                 {
                     return false;
                 }
 
-                if (await ShowPopupAsync(new WalletTestPopup(words)) == ContentDialogResult.Primary)
+                if (await ShowPopupAsync(new WalletTestPopup(words)) == ModalPopupResult.Primary)
                 {
                     return true;
                 }
@@ -330,7 +330,7 @@ namespace Telegram.ViewModels.Wallet
         public async void DeleteWallet()
         {
             var confirm = await ShowPopupAsync(Strings.WalletDeleteWalletInfo, Strings.WalletDeleteWalletTitle, Strings.WalletDeleteAnyway, Strings.Cancel, destructive: true);
-            if (confirm != ContentDialogResult.Primary)
+            if (confirm != ModalPopupResult.Primary)
             {
                 return;
             }
@@ -342,16 +342,16 @@ namespace Telegram.ViewModels.Wallet
                 Message = Strings.WalletReplaceWalletTitle,
                 PrimaryButtonText = Strings.WalletCreateNew,
                 SecondaryButtonText = Strings.WalletImportExisting,
-                ButtonsLayout = ContentPopupButtonsLayout.Vertical
+                ButtonsLayout = ModalPopupButtonsLayout.Vertical
             };
 
             var action = await ShowPopupAsync(replace);
-            if (action == ContentDialogResult.None)
+            if (action == ModalPopupResult.None)
             {
                 return;
             }
 
-            if (action == ContentDialogResult.Secondary)
+            if (action == ModalPopupResult.Secondary)
             {
                 // Replacing rather than deleting: the account keeps a wallet throughout, and which
                 // one it is changes when the imported phrase proves itself. Nothing is deleted

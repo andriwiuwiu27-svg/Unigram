@@ -11,15 +11,7 @@
                   xmlns:local="using:Telegram.Views"
                   mc:Ignorable="d">
 
-    <Page.Transitions>
-        <TransitionCollection>
-            <NavigationThemeTransition>
-                <SlideNavigationTransitionInfo Effect="FromRight" />
-            </NavigationThemeTransition>
-        </TransitionCollection>
-    </Page.Transitions>
-
-    <Page.Resources>
+    <UserControl.Resources>
         <DataTemplate x:Key="PostTemplate">
             <Grid Padding="12,6">
                 <Grid.RowDefinitions>
@@ -183,7 +175,7 @@
                                 Padding="{TemplateBinding Padding}" />
             </Border>
         </ControlTemplate>
-    </Page.Resources>
+    </UserControl.Resources>
 
     <Grid Background="{ThemeResource SettingsPageBackground}">
         <controls:TableListView x:Name="ScrollingHost"

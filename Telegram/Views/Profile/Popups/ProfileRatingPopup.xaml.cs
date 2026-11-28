@@ -23,7 +23,7 @@ using Windows.UI.Xaml.Media;
 
 namespace Telegram.Views.Profile.Popups
 {
-    public sealed partial class ProfileRatingPopup : ContentPopup
+    public sealed partial class ProfileRatingPopup : ModalPopup
     {
         private readonly int _pendingRatingDate;
 
@@ -298,7 +298,7 @@ namespace Telegram.Views.Profile.Popups
             block.Blocks.Add(paragraph);
         }
 
-        private void OnOpened(ContentDialog sender, ContentDialogOpenedEventArgs args)
+        private void OnOpened(ModalPopup sender, ModalPopupOpenedEventArgs args)
         {
             if (_ratingLevel < 0)
             {
@@ -312,7 +312,7 @@ namespace Telegram.Views.Profile.Popups
 
         private void Learn_Click(object sender, RoutedEventArgs e)
         {
-            Hide(ContentDialogResult.Primary);
+            Hide(ModalPopupResult.Primary);
         }
 
         private void Visual_SizeChanged(object sender, SizeChangedEventArgs e)

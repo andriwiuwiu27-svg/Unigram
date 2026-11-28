@@ -11,15 +11,7 @@
                   Loaded="OnLoaded"
                   Unloaded="OnUnloaded">
 
-    <Page.Transitions>
-        <TransitionCollection>
-            <NavigationThemeTransition>
-                <SuppressNavigationTransitionInfo />
-            </NavigationThemeTransition>
-        </TransitionCollection>
-    </Page.Transitions>
-
-    <Page.Resources>
+    <UserControl.Resources>
         <Style x:Key="EmptyButtonStyle"
                TargetType="Button">
             <Setter Property="Background"
@@ -248,7 +240,7 @@
             <Setter Property="ContentTemplate"
                     Value="{StaticResource ChannelItemTemplate}" />
         </Style>
-    </Page.Resources>
+    </UserControl.Resources>
 
     <Grid Background="Transparent">
         <Grid.RowDefinitions>

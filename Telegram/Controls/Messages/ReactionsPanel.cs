@@ -277,7 +277,7 @@ namespace Telegram.Controls.Messages
 
                 match = i;
 
-                if (key.AreTheSame(spare[i].Reaction?.Type))
+                if (key.AreTheSame(spare[i].IconType))
                 {
                     break;
                 }

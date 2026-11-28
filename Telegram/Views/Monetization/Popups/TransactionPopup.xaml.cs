@@ -19,7 +19,7 @@ using Windows.UI.Xaml.Media;
 
 namespace Telegram.Views.Monetization.Popups
 {
-    public sealed partial class TransactionPopup : ContentPopup
+    public sealed partial class TransactionPopup : ModalPopup
     {
         private readonly ChatRevenueTransaction _info;
 
@@ -83,7 +83,7 @@ namespace Telegram.Views.Monetization.Popups
 
         private void Learn_Click(object sender, RoutedEventArgs e)
         {
-            Hide(ContentDialogResult.Primary);
+            Hide(ModalPopupResult.Primary);
 
             if (_info?.Type is ChatRevenueTransactionTypeFragmentWithdrawal withdrawal && withdrawal.State is RevenueWithdrawalStateSucceeded succeeded)
             {

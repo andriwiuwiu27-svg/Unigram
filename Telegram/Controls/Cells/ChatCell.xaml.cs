@@ -74,10 +74,17 @@ namespace Telegram.Controls.Cells
         private bool _compact;
         private bool _draft;
 
-        // Detaching the heart does not stop its loops; StopAnimation on each line does.
+        // Detaching the heart does not stop its loops; StopAnimation on each line does. The
+        // animations are kept so a cell leaving the tree can stop them and restart them on return:
+        // a loop left running keeps the compositor ticking, and re-evaluating every expression.
         private CompositionRoundedRectangleGeometry _heart1;
         private CompositionRoundedRectangleGeometry _heart2;
         private CompositionRoundedRectangleGeometry _heart3;
+        private Vector2KeyFrameAnimation _heartSize1;
+        private Vector2KeyFrameAnimation _heartSize2;
+        private Vector2KeyFrameAnimation _heartOffset1;
+        private Vector2KeyFrameAnimation _heartOffset2;
+        private Vector2KeyFrameAnimation _heartOffset3;
 
         private MessageTicksState _ticksState;
         private long _ticksHash;
@@ -94,12 +101,47 @@ namespace Telegram.Controls.Cells
         {
             _strokeBrush?.Register();
             _selectionStrokeBrush?.Register();
+
+            StartHeart();
         }
 
         protected override void OnUnloaded()
         {
             _strokeBrush?.Unregister();
             _selectionStrokeBrush?.Unregister();
+
+            StopHeart();
+        }
+
+        private void StartHeart()
+        {
+            if (_heart1 == null)
+            {
+                return;
+            }
+
+            _heart1.StartAnimation("Size", _heartSize1);
+            _heart2.StartAnimation("Size", _heartSize2);
+            _heart3.StartAnimation("Size", _heartSize1);
+
+            _heart1.StartAnimation("Offset", _heartOffset1);
+            _heart2.StartAnimation("Offset", _heartOffset2);
+            _heart3.StartAnimation("Offset", _heartOffset3);
+        }
+
+        private void StopHeart()
+        {
+            if (_heart1 == null)
+            {
+                return;
+            }
+
+            _heart1.StopAnimation("Size");
+            _heart1.StopAnimation("Offset");
+            _heart2.StopAnimation("Size");
+            _heart2.StopAnimation("Offset");
+            _heart3.StopAnimation("Size");
+            _heart3.StopAnimation("Offset");
         }
 
         #region InitializeComponent
@@ -1238,35 +1280,35 @@ namespace Telegram.Controls.Cells
                 offset3.IterationBehavior = AnimationIterationBehavior.Forever;
                 offset3.Duration *= 8;
 
-                line1.StartAnimation("Size", size1);
-                line2.StartAnimation("Size", size2);
-                line3.StartAnimation("Size", size1);
-
-                line1.StartAnimation("Offset", offset1);
-                line2.StartAnimation("Offset", offset2);
-                line3.StartAnimation("Offset", offset3);
-
                 _heart1 = line1;
                 _heart2 = line2;
                 _heart3 = line3;
+                _heartSize1 = size1;
+                _heartSize2 = size2;
+                _heartOffset1 = offset1;
+                _heartOffset2 = offset2;
+                _heartOffset3 = offset3;
+
+                // A cell can be bound before it is in the tree; OnLoaded starts it then.
+                if (IsConnected)
+                {
+                    StartHeart();
+                }
 
                 ElementCompositionPreview.SetElementChildVisual(OnlineHeart, shape);
             }
             else
             {
-                if (_heart1 != null)
-                {
-                    _heart1.StopAnimation("Size");
-                    _heart1.StopAnimation("Offset");
-                    _heart2.StopAnimation("Size");
-                    _heart2.StopAnimation("Offset");
-                    _heart3.StopAnimation("Size");
-                    _heart3.StopAnimation("Offset");
+                StopHeart();
 
-                    _heart1 = null;
-                    _heart2 = null;
-                    _heart3 = null;
-                }
+                _heart1 = null;
+                _heart2 = null;
+                _heart3 = null;
+                _heartSize1 = null;
+                _heartSize2 = null;
+                _heartOffset1 = null;
+                _heartOffset2 = null;
+                _heartOffset3 = null;
 
                 ElementCompositionPreview.SetElementChildVisual(OnlineHeart, null);
             }
@@ -1616,13 +1658,13 @@ namespace Telegram.Controls.Cells
         private static readonly Regex _verificationCodes = new("\\b\\d{5,8}\\b", RegexOptions.Compiled);
         private static readonly Regex _gatewayCodes = new("\\b\\d{4,8}\\b", RegexOptions.Compiled);
 
-        private void UpdateBriefLabel(Chat chat, FormattedText message)
+        public static FormattedText RemoveCodes(IClientService clientService, Chat chat, FormattedText message)
         {
             // Parenthesised: && binds tighter than ||, so the null check only covered the
             // first of the two chats and Match below would have run on a null message.
-            if (message != null && (chat?.Id == _clientService.Options.TelegramServiceNotificationsChatId || chat?.Id == _clientService.Options.VerificationCodesBotChatId))
+            if (message != null && (chat?.Id == clientService.Options.TelegramServiceNotificationsChatId || chat?.Id == clientService.Options.VerificationCodesBotChatId))
             {
-                var pattern = chat?.Id == _clientService.Options.TelegramServiceNotificationsChatId
+                var pattern = chat?.Id == clientService.Options.TelegramServiceNotificationsChatId
                     ? _verificationCodes
                     : _gatewayCodes;
 
@@ -1635,6 +1677,13 @@ namespace Telegram.Controls.Cells
                     message = builder.ToFormattedText();
                 }
             }
+
+            return message;
+        }
+
+        private void UpdateBriefLabel(Chat chat, FormattedText message)
+        {
+            message = RemoveCodes(_clientService, chat, message);
 
             BriefText.SetText(_clientService, message);
             BriefText.SetQuery(string.Empty);
@@ -1783,12 +1832,17 @@ namespace Telegram.Controls.Cells
                 case MessageAudio audio:
                     return Text1("\U0001F3B5 ", audio.Caption, audio.Audio.GetTitle());
                 case MessageDocument document:
-                    if (string.IsNullOrEmpty(document.Document.FileName))
+                    var documentFallback = string.IsNullOrEmpty(document.Document.FileName)
+                        ? Strings.AttachDocument
+                        : document.Document.FileName;
+
+                    if (document.Document.Minithumbnail == null || forceEmoji)
                     {
-                        return Text1("\U0001F4CE ", document.Caption, Strings.AttachDocument);
+                        return Text1("\U0001F4CE ", document.Caption, documentFallback);
                     }
 
-                    return Text1("\U0001F4CE ", document.Caption, document.Document.FileName);
+                    thumbnail = new MinithumbnailId(document.Document.DocumentValue.Id, document.Document.Minithumbnail, false);
+                    return Text1(string.Empty, document.Caption, documentFallback);
                 case MessageInvoice invoice:
                     return Text1("\U0001F4CB ", invoice.PaidMediaCaption, invoice.ProductInfo.Title);
                 case MessageContact:
@@ -2395,7 +2449,11 @@ namespace Telegram.Controls.Cells
                     builder.EndFigure(CanvasFigureLoop.Open);
                     result = CanvasGeometry.CreatePath(builder);
                 }
-                return new CompositionPath(result);
+
+                using (result)
+                {
+                    return new CompositionPath(result);
+                }
             }
 
             var compositor = BootStrapper.Current.Compositor;
@@ -2567,14 +2625,21 @@ namespace Telegram.Controls.Cells
                 CanvasGeometry result;
                 using (var builder = new CanvasPathBuilder(null))
                 {
-                    builder.AddGeometry(CanvasGeometry.CreateEllipse(null, 13, 5, radius, radius));
+                    using (var part = CanvasGeometry.CreateEllipse(null, 13, 5, radius, radius))
+                    {
+                        builder.AddGeometry(part);
+                    }
                     builder.BeginFigure(new Vector2(12.5f, 3f));
                     builder.AddLine(new Vector2(12.5f, 5.5f));
                     builder.AddLine(new Vector2(15f, 5.5f));
                     builder.EndFigure(CanvasFigureLoop.Open);
                     result = CanvasGeometry.CreatePath(builder);
                 }
-                return new CompositionPath(result);
+
+                using (result)
+                {
+                    return new CompositionPath(result);
+                }
             }
 
             var shape11 = BootStrapper.Current.Compositor.CreateSpriteShape(BootStrapper.Current.Compositor.CreatePathGeometry(GetPending()));
@@ -2606,7 +2671,10 @@ namespace Telegram.Controls.Cells
                 CanvasGeometry result;
                 using (var builder = new CanvasPathBuilder(null))
                 {
-                    builder.AddGeometry(CanvasGeometry.CreateRoundedRectangle(null, 4 + center, center, 11 - stroke, 11 - stroke, 2, 2));
+                    using (var part = CanvasGeometry.CreateRoundedRectangle(null, 4 + center, center, 11 - stroke, 11 - stroke, 2, 2))
+                    {
+                        builder.AddGeometry(part);
+                    }
                     builder.BeginFigure(new Vector2(9.5f, 3f));
                     builder.AddLine(new Vector2(9.5f, 5.5f + center));
                     builder.EndFigure(CanvasFigureLoop.Open);
@@ -2615,7 +2683,11 @@ namespace Telegram.Controls.Cells
                     builder.EndFigure(CanvasFigureLoop.Open);
                     result = CanvasGeometry.CreatePath(builder);
                 }
-                return new CompositionPath(result);
+
+                using (result)
+                {
+                    return new CompositionPath(result);
+                }
             }
 
             var shape11 = BootStrapper.Current.Compositor.CreateSpriteShape(BootStrapper.Current.Compositor.CreatePathGeometry(GetFailed()));
@@ -2663,7 +2735,11 @@ namespace Telegram.Controls.Cells
                     builder.EndFigure(CanvasFigureLoop.Open);
                     result = CanvasGeometry.CreatePath(builder);
                 }
-                return new CompositionPath(result);
+
+                using (result)
+                {
+                    return new CompositionPath(result);
+                }
             }
 
             var geometry = GetLine();

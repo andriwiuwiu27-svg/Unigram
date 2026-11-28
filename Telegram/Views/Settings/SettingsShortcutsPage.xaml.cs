@@ -30,6 +30,7 @@ namespace Telegram.Views.Settings
         public SettingsShortcutsPage()
         {
             InitializeComponent();
+            Transition = PageTransition.Entrance;
             Title = Strings.ShortcutsTitle;
 
             _renew = new DispatcherTimer

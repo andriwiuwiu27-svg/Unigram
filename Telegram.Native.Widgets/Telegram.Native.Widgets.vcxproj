@@ -1,8 +1,9 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <!--
-  Message widgets: widget-sandbox's desktop core (QuickJS, the trusted validator, WidgetHost) with
-  twidget's TwidgetCore and its litehtml fork behind the Renderer seam, painted by Direct2D onto a
-  composition surface. Everything third party is compiled straight from the submodules, unmodified.
+  Message widgets: widget-sandbox's desktop core (the Nova engine, the trusted validator, WidgetHost)
+  with twidget's TwidgetCore and its litehtml fork behind the Renderer seam, painted by Direct2D onto a
+  composition surface. Everything third party is compiled straight from the submodules, unmodified;
+  Nova is the static library cargo builds from Libraries\nova-safe.
 -->
 <Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <!-- Which app this component is built for: see Telegram.Native.vcxproj. -->
@@ -28,14 +29,19 @@
     <AppContainerApplication Condition="'$(TelegramWinUI)' != 'true'">true</AppContainerApplication>
     <ApplicationType Condition="'$(TelegramWinUI)' != 'true'">Windows Store</ApplicationType>
     <ApplicationTypeRevision Condition="'$(TelegramWinUI)' != 'true'">10.0</ApplicationTypeRevision>
-    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <!-- The SDK the apps target, not "10.0", the newest installed: a winmd from a newer SDK is
+         rejected by the app's reference (MSB3851), and the DLL is then never copied. -->
+    <WindowsTargetPlatformVersion>10.0.26100.0</WindowsTargetPlatformVersion>
     <WindowsTargetPlatformMinVersion>10.0.18362.0</WindowsTargetPlatformMinVersion>
     <TwSandbox>$(MSBuildThisFileDirectory)..\Libraries\widget-sandbox\</TwSandbox>
-    <TwQuickJS>$(TwSandbox)packages\ios\Sources\CQuickJS\</TwQuickJS>
     <TwDesktop>$(TwSandbox)packages\desktop\</TwDesktop>
     <TwCore>$(MSBuildThisFileDirectory)..\Libraries\twidget\core\</TwCore>
     <TwLitehtml>$(MSBuildThisFileDirectory)..\Libraries\twidget\litehtml\</TwLitehtml>
     <TwPlatforms>$(MSBuildThisFileDirectory)..\Libraries\twidget\platforms\</TwPlatforms>
+    <TwNova>$(MSBuildThisFileDirectory)..\Libraries\nova-safe\</TwNova>
+    <TwNovaTarget Condition="'$(Platform)' == 'ARM64'">aarch64-pc-windows-msvc</TwNovaTarget>
+    <TwNovaTarget Condition="'$(Platform)' != 'ARM64'">x86_64-pc-windows-msvc</TwNovaTarget>
+    <TwNovaLibrary>$(TwNova)target\$(TwNovaTarget)\release\nova_embed_ffi.lib</TwNovaLibrary>
   </PropertyGroup>
   <PropertyGroup Condition="'$(TelegramWinUI)' == 'true'">
     <IntDir>$(Platform)\$(Configuration)\WinUI\</IntDir>
@@ -90,16 +96,17 @@
       <WarningLevel>Level3</WarningLevel>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(GeneratedFilesDir);$(IntDir)generated;$(TwDesktop)sandbox\include;$(TwQuickJS)include;$(TwQuickJS)quickjs;$(TwCore)src;$(TwCore)include;$(TwPlatforms)windows;$(TwLitehtml)include;$(TwLitehtml)include\litehtml;$(TwLitehtml)src;$(TwLitehtml)gumbo-include;$(TwDesktop)renderer\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>_WINRT_DLL;QUICKJS_NG_BUILD;_CRT_SECURE_NO_WARNINGS;NOMINMAX;TW_LITEHTML_TWIDGET;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(GeneratedFilesDir);$(IntDir)generated;$(TwDesktop)sandbox\include;$(TwNova)nova_embed_ffi\include;$(TwCore)src;$(TwCore)include;$(TwPlatforms)windows;$(TwLitehtml)include;$(TwLitehtml)include\litehtml;$(TwLitehtml)src;$(TwLitehtml)gumbo-include;$(TwDesktop)renderer\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>_WINRT_DLL;_CRT_SECURE_NO_WARNINGS;NOMINMAX;TW_LITEHTML_TWIDGET;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalUsingDirectories>$(WindowsSDK_WindowsMetadata);$(AdditionalUsingDirectories)</AdditionalUsingDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
+    <!-- After Nova, the libraries rustc's "print native-static-libs" lists for nova_embed_ffi. -->
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateWindowsMetadata>false</GenerateWindowsMetadata>
-      <AdditionalDependencies>d2d1.lib;d3d11.lib;dxgi.lib;dwrite.lib;windowscodecs.lib;dxguid.lib;bcrypt.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>d2d1.lib;d3d11.lib;dxgi.lib;dwrite.lib;windowscodecs.lib;dxguid.lib;bcrypt.lib;$(TwNovaLibrary);kernel32.lib;ntdll.lib;userenv.lib;ws2_32.lib;dbghelp.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <ModuleDefinitionFile>Telegram.Native.Widgets.def</ModuleDefinitionFile>
     </Link>
   </ItemDefinitionGroup>
@@ -117,8 +124,6 @@
       <PreprocessorDefinitions>WINUI3;UIComposition=Microsoft.UI.Composition;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </Midl>
   </ItemDefinitionGroup>
-  <!-- An -O0 quickjs-ng spends ~10 KB of C stack per JS call and is several times slower
-       (packages/desktop/CMakeLists.txt), so the third-party code below is optimised in Debug too. -->
   <ItemDefinitionGroup Condition="'$(Configuration)'=='Debug'">
     <ClCompile>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
@@ -126,6 +131,7 @@
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="AppPartition.h" />
     <ClInclude Include="GraphicsDevice.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="SurfaceRenderer.h" />
@@ -159,19 +165,9 @@
     <None Include="ua_stylesheet.ps1" />
   </ItemGroup>
   <ItemGroup>
-    <TwQuickJSSource Include="$(TwQuickJS)quickjs\quickjs.c;$(TwQuickJS)quickjs\dtoa.c;$(TwQuickJS)quickjs\libregexp.c;$(TwQuickJS)quickjs\libunicode.c;$(TwQuickJS)shim\qjs_shim.c" />
     <TwGumboSource Include="$(TwLitehtml)src\gumbo\*.c" />
     <TwLitehtmlSource Include="$(TwLitehtml)src\*.cpp" />
     <TwCoreSource Include="$(TwDesktop)sandbox\src\*.cpp;$(TwCore)src\*.cpp;$(TwPlatforms)windows\d2d_backend.cpp" />
-    <ClCompile Include="@(TwQuickJSSource)">
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-      <SDLCheck>false</SDLCheck>
-      <CompileAs>CompileAsC</CompileAs>
-      <WarningLevel>TurnOffAllWarnings</WarningLevel>
-      <Optimization>MaxSpeed</Optimization>
-      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
-      <ObjectFileName>$(IntDir)quickjs\</ObjectFileName>
-    </ClCompile>
     <ClCompile Include="@(TwGumboSource)">
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <SDLCheck>false</SDLCheck>
@@ -199,6 +195,7 @@
       <Optimization>MaxSpeed</Optimization>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <ObjectFileName>$(IntDir)core\</ObjectFileName>
+      <ForcedIncludeFiles Condition="'%(Filename)' == 'engine_platform'">$(MSBuildThisFileDirectory)AppPartition.h</ForcedIncludeFiles>
     </ClCompile>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
@@ -225,6 +222,17 @@
     <Error Condition="'$(TelegramWinUI)' == 'true' And !Exists('..\packages\Microsoft.WindowsAppSDK.WinUI.2.3.9\build\native\Microsoft.WindowsAppSDK.WinUI.props')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Microsoft.WindowsAppSDK.WinUI.2.3.9\build\native\Microsoft.WindowsAppSDK.WinUI.props'))" />
     <Error Condition="'$(TelegramWinUI)' == 'true' And !Exists('..\packages\Microsoft.WindowsAppSDK.WinUI.2.3.9\build\native\Microsoft.WindowsAppSDK.WinUI.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Microsoft.WindowsAppSDK.WinUI.2.3.9\build\native\Microsoft.WindowsAppSDK.WinUI.targets'))" />
     <Error Condition="'$(TelegramWinUI)' == 'true' And !Exists('..\packages\Microsoft.Web.WebView2.1.0.4129.50\build\native\Microsoft.Web.WebView2.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Microsoft.Web.WebView2.1.0.4129.50\build\native\Microsoft.Web.WebView2.targets'))" />
+  </Target>
+  <!-- Always a release Nova, in Debug too, as widget-sandbox links it: a debug one recurses far less deep in a
+       JSThread's stack. cargo itself decides whether anything changed. -->
+  <Target Name="TwNovaCargo" BeforeTargets="Link">
+    <Exec Command="where /q rustup &amp;&amp; where /q cargo" IgnoreExitCode="true" StandardOutputImportance="low">
+      <Output TaskParameter="ExitCode" PropertyName="TwRustFound" />
+    </Exec>
+    <Error Condition="'$(TwRustFound)' != '0'" Text="Message widgets build the Nova engine with Rust: install rustup from https://rustup.rs, with cargo on PATH." />
+    <!-- rustup installs the toolchain nova-safe's rust-toolchain.toml pins on first use, but no target beyond the host's. -->
+    <Exec Command="rustup target add $(TwNovaTarget)" WorkingDirectory="$(TwNova)" StandardOutputImportance="low" />
+    <Exec Command="cargo rustc --release --locked --package nova_embed_ffi --lib --crate-type staticlib --target $(TwNovaTarget) --target-dir &quot;$(TwNova)target&quot;" WorkingDirectory="$(TwNova)" IgnoreStandardErrorWarningFormat="true" />
   </Target>
   <!-- The profile's UA layer for TwidgetCore's master CSS, read from widget-sandbox as twidget's CMake reads it. -->
   <Target Name="TwUaStylesheet" BeforeTargets="ClCompile" Inputs="$(TwSandbox)packages\core\profile.json;$(MSBuildThisFileDirectory)ua_stylesheet.ps1" Outputs="$(IntDir)generated\tw_ua_stylesheet.h">

@@ -128,9 +128,6 @@ namespace Telegram.Common.Recording
 
                     _recorder = new OpusRecorder(mode == ChatRecordMode.Video);
 
-                    _recorder.m_mediaCapture = new MediaCapture();
-                    _recorder.m_mediaCapture.Failed += OnFailed;
-
                     if (mode == ChatRecordMode.Video)
                     {
                         var cameraDevice = await _recorder.FindCameraDeviceByPanelAsync(Windows.Devices.Enumeration.Panel.Front);
@@ -155,7 +152,7 @@ namespace Telegram.Common.Recording
                         }
                     }
 
-                    await _recorder.m_mediaCapture.InitializeAsync(_recorder.settings);
+                    await InitializeCaptureAsync(_recorder);
                     RecordingStarted?.Invoke(this, EventArgs.Empty);
 
                     Logger.Debug("Devices initialized, starting");
@@ -224,6 +221,83 @@ namespace Telegram.Common.Recording
             // to start again.
             Cancel();
             RecordingFailed?.Invoke(this, EventArgs.Empty);
+        }
+
+        private async Task InitializeCaptureAsync(OpusRecorder recorder)
+        {
+            if (recorder.settings.SharingMode == MediaCaptureSharingMode.ExclusiveControl)
+            {
+                var capture = new MediaCapture();
+                capture.Failed += OnFailed;
+
+                try
+                {
+                    await capture.InitializeAsync(recorder.settings);
+
+                    // A format the camera was left in, rather than one this capture set, can fail
+                    // LowLagMediaRecording.StartAsync with MF_E_INVALIDMEDIATYPE, as MJPG left by
+                    // another app does. Setting it again records, but the preview of a camera whose
+                    // preview and record are one MJPG stream then stays blank, so the uncompressed
+                    // format of the same size and rate is taken where there is one.
+                    var controller = capture.VideoDeviceController;
+                    if (controller.GetMediaStreamProperties(MediaStreamType.VideoRecord) is VideoEncodingProperties current)
+                    {
+                        var format = FindUncompressedFormat(controller, current) ?? current;
+                        await controller.SetMediaStreamPropertiesAsync(MediaStreamType.VideoRecord, format);
+
+                        Logger.Info($"Camera found at {current.Subtype} {current.Width}x{current.Height}, recording from {format.Subtype} {format.Width}x{format.Height}@{GetFrameRate(format)}");
+                    }
+
+                    recorder.m_mediaCapture = capture;
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    // Usually another app using the camera. Shared, it records unless the format
+                    // it was left in is one of those.
+                    Logger.Info("The camera couldn't be taken exclusively, sharing it: " + ex.Message);
+
+                    capture.Failed -= OnFailed;
+                    capture.Dispose();
+
+                    recorder.settings.SharingMode = MediaCaptureSharingMode.SharedReadOnly;
+                }
+            }
+
+            recorder.m_mediaCapture = new MediaCapture();
+            recorder.m_mediaCapture.Failed += OnFailed;
+
+            await recorder.m_mediaCapture.InitializeAsync(recorder.settings);
+        }
+
+        private static VideoEncodingProperties FindUncompressedFormat(VideoDeviceController controller, VideoEncodingProperties current)
+        {
+            var rate = GetFrameRate(current);
+            VideoEncodingProperties match = null;
+
+            foreach (var item in controller.GetAvailableMediaStreamProperties(MediaStreamType.VideoRecord))
+            {
+                if (item is not VideoEncodingProperties format || format.Width != current.Width || format.Height != current.Height || GetFrameRate(format) < rate)
+                {
+                    continue;
+                }
+
+                if (string.Equals(format.Subtype, MediaEncodingSubtypes.Nv12, StringComparison.OrdinalIgnoreCase))
+                {
+                    return format;
+                }
+                else if (string.Equals(format.Subtype, MediaEncodingSubtypes.Yuy2, StringComparison.OrdinalIgnoreCase))
+                {
+                    match ??= format;
+                }
+            }
+
+            return match;
+        }
+
+        private static double GetFrameRate(VideoEncodingProperties format)
+        {
+            return format.FrameRate.Denominator == 0 ? 0 : format.FrameRate.Numerator / (double)format.FrameRate.Denominator;
         }
 
         private static async Task<FileItem> CreateFileAsync(ChatRecordMode mode, bool streaming)
@@ -747,7 +821,7 @@ namespace Telegram.Common.Recording
                 settings.MediaCategory = MediaCategory.Media;
                 settings.AudioProcessing = m_isVideo ? AudioProcessing.Default : AppSettings.Diagnostics.ForceRawAudio ? AudioProcessing.Raw : AudioProcessing.Default;
                 settings.MemoryPreference = MediaCaptureMemoryPreference.Cpu;
-                settings.SharingMode = MediaCaptureSharingMode.SharedReadOnly;
+                settings.SharingMode = m_isVideo ? MediaCaptureSharingMode.ExclusiveControl : MediaCaptureSharingMode.SharedReadOnly;
                 settings.StreamingCaptureMode = m_isVideo ? StreamingCaptureMode.AudioAndVideo : StreamingCaptureMode.Audio;
             }
 
@@ -810,8 +884,8 @@ namespace Telegram.Common.Recording
                     return;
                 }
 
-                // A read, so it is allowed even though the sharing mode forbids changing the
-                // camera's own format.
+                // A read, so it is allowed when the camera is only shared and its format can't be
+                // changed.
                 if (m_mediaCapture.VideoDeviceController.GetMediaStreamProperties(MediaStreamType.VideoRecord) is not VideoEncodingProperties source)
                 {
                     return;

@@ -8,6 +8,7 @@
 using System.Linq;
 using System.Threading.Tasks;
 using Telegram.Collections;
+using Telegram.Controls;
 using Telegram.Services;
 using Telegram.Td.Api;
 using Telegram.ViewModels.Gallery;
@@ -152,7 +153,7 @@ namespace Telegram.ViewModels.Chats
         public override async void Delete()
         {
             var confirm = await ShowPopupAsync(Strings.AreYouSureDeletePhoto, Strings.AppName, Strings.OK, Strings.Cancel);
-            if (confirm == ContentDialogResult.Primary && _selectedItem is GalleryChatPhoto chatPhoto)
+            if (confirm == ModalPopupResult.Primary && _selectedItem is GalleryChatPhoto chatPhoto)
             {
                 Function function;
                 if (chatPhoto.MessageId == 0)

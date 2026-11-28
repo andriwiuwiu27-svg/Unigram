@@ -8,6 +8,7 @@
 using System;
 using System.Threading.Tasks;
 using Telegram.Common;
+using Telegram.Controls;
 using Telegram.Converters;
 using Telegram.Navigation.Services;
 using Telegram.Services;
@@ -189,7 +190,7 @@ namespace Telegram.ViewModels.Business
             var popup = new ChooseAwayPopup(Strings.BusinessAwayScheduleCustomStartTitle, DateTime.Now, CustomStart ?? DateTime.Now);
 
             var confirm = await ShowPopupAsync(popup);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 CustomStart = popup.Value;
             }
@@ -200,7 +201,7 @@ namespace Telegram.ViewModels.Business
             var popup = new ChooseAwayPopup(Strings.BusinessAwayScheduleCustomEndTitle, CustomStart ?? DateTime.Now, CustomEnd ?? (CustomStart ?? DateTime.Now).AddDays(1));
 
             var confirm = await ShowPopupAsync(popup);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 CustomEnd = popup.Value;
             }

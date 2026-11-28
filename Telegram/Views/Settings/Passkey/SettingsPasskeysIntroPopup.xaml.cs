@@ -9,14 +9,14 @@ using Telegram.Controls;
 
 namespace Telegram.Views.Settings
 {
-    public sealed partial class SettingsPasskeysIntroPopup : ContentPopup
+    public sealed partial class SettingsPasskeysIntroPopup : ModalPopup
     {
         public SettingsPasskeysIntroPopup()
         {
             InitializeComponent();
 
             PrimaryButtonText = Strings.PasskeyFeatureButton;
-            ButtonsLayout = ContentPopupButtonsLayout.Vertical;
+            ButtonsLayout = ModalPopupButtonsLayout.Vertical;
         }
     }
 }

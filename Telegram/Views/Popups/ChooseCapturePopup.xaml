@@ -1,17 +1,17 @@
-﻿<controls:ContentPopup x:Class="Telegram.Views.Popups.ChooseCapturePopup"
-                       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-                       xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-                       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-                       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-                       xmlns:common="using:Telegram.Common"
-                       xmlns:controls="using:Telegram.Controls"
-                       xmlns:cells="using:Telegram.Controls.Cells"
-                       mc:Ignorable="d"
-                       ContentMaxWidth="568"
-                       ContentMaxHeight="420"
-                       HorizontalContentAlignment="Stretch"
-                       Padding="0"
-                       RequestedTheme="Dark">
+﻿<controls:ModalPopup x:Class="Telegram.Views.Popups.ChooseCapturePopup"
+                     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+                     xmlns:common="using:Telegram.Common"
+                     xmlns:controls="using:Telegram.Controls"
+                     xmlns:cells="using:Telegram.Controls.Cells"
+                     mc:Ignorable="d"
+                     ContentMaxWidth="568"
+                     ContentMaxHeight="420"
+                     HorizontalContentAlignment="Stretch"
+                     Padding="0"
+                     RequestedTheme="Dark">
 
     <Grid>
         <Grid.RowDefinitions>
@@ -88,4 +88,4 @@
                     Grid.Column="2" />
         </Grid>
     </Grid>
-</controls:ContentPopup>
+</controls:ModalPopup>

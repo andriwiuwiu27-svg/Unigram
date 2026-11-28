@@ -24,7 +24,7 @@ namespace Telegram.Views.Settings.Password
         Recovery
     }
 
-    public sealed partial class SettingsPasswordEmailCodePopup : ContentPopup
+    public sealed partial class SettingsPasswordEmailCodePopup : ModalPopup
     {
         private readonly IClientService _clientService;
         private EmailAddressAuthenticationCodeInfo _codeInfo;
@@ -85,7 +85,7 @@ namespace Telegram.Views.Settings.Password
         private async void Abort()
         {
             var confirm = await MessagePopup.ShowNestedAsync(XamlRoot, Strings.CancelEmailQuestion, Strings.CancelEmailQuestionTitle, Strings.Abort, Strings.Cancel, destructive: true);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 var response = await _clientService.SendAsync(new CancelRecoveryEmailAddressVerification());
                 if (response is PasswordState passwordState)
@@ -104,7 +104,7 @@ namespace Telegram.Views.Settings.Password
 
         public PasswordState PasswordState { get; private set; }
 
-        private async void OnPrimaryButtonClick(ContentDialog sender, ContentDialogButtonClickEventArgs args)
+        private async void OnPrimaryButtonClick(ModalPopup sender, ModalPopupButtonClickEventArgs args)
         {
             try
             {
@@ -163,7 +163,7 @@ namespace Telegram.Views.Settings.Password
         {
             if (Field.Text.Length == _codeInfo.Length && _codeInfo.Length > 0)
             {
-                Hide(ContentDialogResult.Primary);
+                Hide(ModalPopupResult.Primary);
             }
         }
 
@@ -173,7 +173,7 @@ namespace Telegram.Views.Settings.Password
             else if (e.Key is >= Windows.System.VirtualKey.NumberPad0 and <= Windows.System.VirtualKey.NumberPad9) { }
             else if (e.Key == Windows.System.VirtualKey.Enter)
             {
-                Hide(ContentDialogResult.Primary);
+                Hide(ModalPopupResult.Primary);
                 e.Handled = true;
             }
             else
@@ -187,7 +187,7 @@ namespace Telegram.Views.Settings.Password
             if (_recovery)
             {
                 var confirm = await MessagePopup.ShowNestedAsync(XamlRoot, Strings.RestoreEmailTroubleText2, Strings.ResendCode, Strings.Reset, Strings.Cancel);
-                if (confirm == ContentDialogResult.Primary)
+                if (confirm == ModalPopupResult.Primary)
                 {
                     var response = await _clientService.SendAsync(new ResetPassword());
                     if (response is ResetPasswordResult)

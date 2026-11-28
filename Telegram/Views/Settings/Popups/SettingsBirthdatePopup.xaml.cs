@@ -28,7 +28,7 @@ namespace Telegram.Views.Settings.Popups
             Title = string.Format(Strings.UserSuggestBirthdayTitle, user.FirstName);
             PrimaryButtonText = Strings.UserSuggestBirthdayButton;
             SecondaryButtonText = string.Empty;
-            ButtonsLayout = ContentPopupButtonsLayout.Vertical;
+            ButtonsLayout = ModalPopupButtonsLayout.Vertical;
 
             IsDismissButtonVisible = true;
         }
@@ -105,7 +105,7 @@ namespace Telegram.Views.Settings.Popups
                 PrimaryButtonText = Strings.DateOfBirthAddToProfile;
                 SecondaryButtonText = string.Empty;
 
-                ButtonsLayout = ContentPopupButtonsLayout.Vertical;
+                ButtonsLayout = ModalPopupButtonsLayout.Vertical;
 
                 IsDismissButtonVisible = true;
             }
@@ -118,7 +118,7 @@ namespace Telegram.Views.Settings.Popups
                 HideYear.Visibility = Visibility.Collapsed;
             }
 
-            DefaultButton = ContentDialogButton.Primary;
+            DefaultButton = ModalPopupButton.Primary;
         }
 
         private void DayHost_Loaded(object sender, RoutedEventArgs e)
@@ -405,7 +405,7 @@ namespace Telegram.Views.Settings.Popups
         private void PrivacyInfo_Click(object sender, TextUrlClickEventArgs e)
         {
             ShowPrivacySettings = true;
-            Hide(ContentDialogResult.Secondary);
+            Hide(ModalPopupResult.Secondary);
         }
 
         private void HideYear_Click(object sender, RoutedEventArgs e)

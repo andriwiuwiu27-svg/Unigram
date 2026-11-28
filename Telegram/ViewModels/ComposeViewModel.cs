@@ -225,7 +225,76 @@ namespace Telegram.ViewModels
             ClientService.Send(new AddSavedAnimation(new InputFileId(animation.AnimationValue.Id)));
         }
 
+        public void CaptionAnimation(Animation animation)
+        {
+            OpenAnimation(animation, false);
+        }
+
+        public void EditAnimation(Animation animation)
+        {
+            OpenAnimation(animation, true);
+        }
+
+        private async void OpenAnimation(Animation animation, bool edit)
+        {
+            var composer = PeekComposer();
+            HideStickers();
+
+            var restricted = await VerifyRightsAsync(x => x.CanSendOtherMessages, Strings.GlobalAttachGifRestricted, Strings.AttachGifRestrictedForever, Strings.AttachGifRestricted);
+            if (restricted)
+            {
+                return;
+            }
+
+            var storage = await CreateRemoteMediaAsync(animation.AnimationValue, true);
+            if (storage != null)
+            {
+                SendFilesAsync(StorageMediaSource.FromMedia(new[] { storage }), null, true, composer, edit);
+            }
+        }
+
         #endregion
+
+        /// <summary>
+        /// Downloads a file already on Telegram and types it for the send popup, remembering where
+        /// it came from so that it can go out again without an upload if it is left unchanged.
+        /// </summary>
+        protected async Task<StorageMedia> CreateRemoteMediaAsync(File file, bool animation)
+        {
+            if (file == null)
+            {
+                return null;
+            }
+
+            if (!file.Local.IsDownloadingCompleted)
+            {
+                file = await ClientService.DownloadFileAsync(file, 32);
+            }
+
+            var cached = await ClientService.GetFileAsync(file);
+
+            var storage = await StorageMedia.CreateAsync(cached);
+            if (storage == null)
+            {
+                return null;
+            }
+
+            if (animation)
+            {
+                // A .gif types as a photo, and its id would not go out as one: it is uploaded instead.
+                if (storage is not StorageVideo video)
+                {
+                    return storage;
+                }
+
+                // Muted is what sends a video as an animation.
+                video.IsMuted = true;
+                video.IsOriginalAnimation = true;
+            }
+
+            storage.OriginalFile = file;
+            return storage;
+        }
 
         public async Task<bool> VerifyRightsAsync(Func<ChatPermissions, bool> permission, string global, string forever, string temporary)
         {
@@ -427,7 +496,7 @@ namespace Telegram.ViewModels
             var popup = new SendAudiosPopup(ClientService, NavigationService);
 
             var confirm = await ShowPopupAsync(popup);
-            if (confirm != ContentDialogResult.Primary)
+            if (confirm != ModalPopupResult.Primary)
             {
                 return;
             }
@@ -520,14 +589,16 @@ namespace Telegram.ViewModels
             }
         }
 
-        private async void SendFilesAsync(StorageMediaSource source, FormattedText caption, bool media)
+        /// <param name="composer">What to send with in place of the composer, read by the caller before its first await.</param>
+        /// <param name="edit">Whether the editor opens on the first item along with the popup.</param>
+        protected async void SendFilesAsync(StorageMediaSource source, FormattedText caption, bool media, ComposerSnapshot composer = null, bool edit = false)
         {
             if (Chat is not Chat chat)
             {
                 return;
             }
 
-            var composer = PeekComposer();
+            composer ??= PeekComposer();
 
             var permissions = ClientService.GetPermissions(chat, out bool restricted);
 
@@ -593,6 +664,7 @@ namespace Telegram.ViewModels
 
             var popup = new SendFilesPopup(this, source, Validating, media, permissions, chat.Type is ChatTypePrivate && !self, CanSchedule, self, false);
             popup.Caption = caption;
+            popup.EditOnOpen = edit;
 
             if (ClientService.TryGetSupergroupFull(chat, out SupergroupFullInfo fullInfo))
             {
@@ -600,7 +672,7 @@ namespace Telegram.ViewModels
             }
 
             var confirm = await popup.OpenAsync(XamlRoot);
-            if (confirm != ContentDialogResult.Primary)
+            if (confirm != ModalPopupResult.Primary)
             {
                 if (formattedText != null)
                 {
@@ -906,7 +978,7 @@ namespace Telegram.ViewModels
         //    {
         //        var dialog = new SupergroupEditRestrictedUntilView(DateTime.Now.ToTimestamp());
         //        var confirm = await ShowPopupAsync(dialog);
-        //        if (confirm != ContentDialogResult.Primary)
+        //        if (confirm != ModalPopupResult.Primary)
         //        {
         //            return null;
         //        }
@@ -1048,7 +1120,7 @@ namespace Telegram.ViewModels
             var popup = new SendLocationPopup(Session);
 
             var confirm = await ShowPopupAsync(popup);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 var plan = await PrepareSendAsync(composer, 1, SchedulingState.Auto, null, false, 0);
                 if (plan == null)
@@ -1076,7 +1148,7 @@ namespace Telegram.ViewModels
             var popup = new CreatePollPopup(ClientService, NavigationService, title, forceQuiz, forceRegular, channel);
 
             var confirm = await ShowPopupAsync(popup);
-            if (confirm != ContentDialogResult.Primary)
+            if (confirm != ModalPopupResult.Primary)
             {
                 SetFormattedText(title);
                 return;
@@ -1102,7 +1174,7 @@ namespace Telegram.ViewModels
                 var popup = new CreateChecklistPopup(ClientService, title);
 
                 var confirm = await ShowPopupAsync(popup);
-                if (confirm != ContentDialogResult.Primary)
+                if (confirm != ModalPopupResult.Primary)
                 {
                     SetFormattedText(title);
                     return;

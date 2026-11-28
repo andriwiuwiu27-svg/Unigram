@@ -28,8 +28,8 @@ namespace Telegram.Controls
         private bool _closing;
         private bool _watching;
 
-        private TaskCompletionSource<ContentDialogResult> _callback;
-        private ContentDialogResult _result;
+        private TaskCompletionSource<ModalPopupResult> _callback;
+        private ModalPopupResult _result;
 
         protected Border Container;
         protected Border BackgroundElement;
@@ -126,7 +126,7 @@ namespace Telegram.Controls
             window.UpdateTitleBar();
         }
 
-        public async Task<ContentDialogResult> ShowAsync()
+        public async Task<ModalPopupResult> ShowAsync()
         {
             _instances.GetOrAdd(XamlRoot, this);
             Margin = new Thickness();
@@ -138,8 +138,8 @@ namespace Telegram.Controls
 
             var previous = _callback;
 
-            _result = ContentDialogResult.None;
-            _callback = new TaskCompletionSource<ContentDialogResult>();
+            _result = ModalPopupResult.None;
+            _callback = new TaskCompletionSource<ModalPopupResult>();
 
             if (_popupHost == null)
             {
@@ -261,7 +261,7 @@ namespace Telegram.Controls
         protected virtual void OnBackRequestedOverride(object sender, BackRequestedRoutedEventArgs e)
         {
             e.Handled = true;
-            Hide(ContentDialogResult.None);
+            Hide(ModalPopupResult.None);
         }
 
         protected void Prepare()
@@ -270,7 +270,7 @@ namespace Telegram.Controls
             Closing?.Invoke(this, EventArgs.Empty);
         }
 
-        public static void TryHide(XamlRoot xamlRoot, ContentDialogResult result)
+        public static void TryHide(XamlRoot xamlRoot, ModalPopupResult result)
         {
             if (xamlRoot != null && _instances.TryGetValue(xamlRoot, out OverlayWindow window))
             {
@@ -278,7 +278,7 @@ namespace Telegram.Controls
             }
         }
 
-        public void TryHide(ContentDialogResult result)
+        public void TryHide(ModalPopupResult result)
         {
             var e = new BackRequestedRoutedEventArgs();
             OnBackRequestedOverride(this, e);
@@ -293,10 +293,10 @@ namespace Telegram.Controls
 
         public void Hide()
         {
-            Hide(ContentDialogResult.None);
+            Hide(ModalPopupResult.None);
         }
 
-        public void Hide(ContentDialogResult result)
+        public void Hide(ModalPopupResult result)
         {
             if (_popupHost == null || !_popupHost.IsOpen)
             {

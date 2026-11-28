@@ -8,6 +8,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Telegram.Controls;
 using Telegram.Navigation.Services;
 using Telegram.Td.Api;
 using Windows.ApplicationModel.ExtendedExecution;
@@ -214,7 +215,7 @@ namespace Telegram.Services
                 var message = Strings.PermissionNoLocationPosition;
 
                 var confirm = await navigation.ShowPopupAsync(message, Strings.AppName, Strings.PermissionOpenSettings, Strings.OK);
-                if (confirm == ContentDialogResult.Primary)
+                if (confirm == ModalPopupResult.Primary)
                 {
                     await Launcher.LaunchUriAsync(new Uri("ms-settings:appsfeatures-app"));
                 }

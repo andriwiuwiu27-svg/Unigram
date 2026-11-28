@@ -33,7 +33,8 @@ namespace Telegram.ViewModels.Supergroups
         ChatTheme,
         CustomBackground,
         DisableSponsoredMessages,
-        AutoTranslate
+        AutoTranslate,
+        Stories
     }
 
     public partial class SupergroupProfileColorViewModel : ViewModelBase
@@ -374,12 +375,12 @@ namespace Telegram.ViewModels.Supergroups
         private async void ConfirmClose(NavigatingEventArgs args)
         {
             var confirm = await ShowPopupAsync(Strings.ChannelColorUnsavedMessage, Strings.ChannelColorUnsaved, Strings.ChatThemeSaveDialogDiscard, Strings.ChatThemeSaveDialogApply, destructive: true);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 _confirmed = true;
                 NavigationService.GoBack(args);
             }
-            else if (confirm == ContentDialogResult.Secondary)
+            else if (confirm == ModalPopupResult.Secondary)
             {
                 Continue(args);
             }
@@ -414,7 +415,20 @@ namespace Telegram.ViewModels.Supergroups
             var required = UpdateRequiredLevel(out var feature);
             if (required > status.Level)
             {
-                await ShowPopupAsync(new ChatBoostFeaturesPopup(ClientService, NavigationService, chat, status, null, _features, feature, required));
+                // Missing when the request in OnNavigatedToAsync failed or has not answered yet.
+                var features = _features;
+                if (features == null)
+                {
+                    var responseFeatures = await ClientService.SendAsync(new GetChatBoostFeatures(chat.Type is ChatTypeSupergroup { IsChannel: true }));
+                    if (responseFeatures is not ChatBoostFeatures loaded)
+                    {
+                        return;
+                    }
+
+                    features = loaded;
+                }
+
+                await ShowPopupAsync(new ChatBoostFeaturesPopup(ClientService, NavigationService, chat, status, null, features, feature, required));
                 return;
             }
 

@@ -106,7 +106,7 @@ namespace Telegram.ViewModels.Settings
             if (_passcodeService.IsEnabled)
             {
                 var confirm = await ShowPopupAsync(Strings.DisablePasscodeConfirmMessage, Strings.DisablePasscode, Strings.DisablePasscodeTurnOff, Strings.Cancel, destructive: true);
-                if (confirm != ContentDialogResult.Primary)
+                if (confirm != ModalPopupResult.Primary)
                 {
                     return false;
                 }
@@ -130,7 +130,7 @@ namespace Telegram.ViewModels.Settings
                 popup.IsSimple = _passcodeService.IsSimple;
 
                 var confirm = await ShowPopupAsync(popup);
-                if (confirm == ContentDialogResult.Primary)
+                if (confirm == ModalPopupResult.Primary)
                 {
                     var passcode = popup.Passcode;
                     var simple = popup.IsSimple;
@@ -160,7 +160,7 @@ namespace Telegram.ViewModels.Settings
             dialog.IsSimple = _passcodeService.IsSimple;
 
             var confirm = await ShowPopupAsync(dialog);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 var passcode = dialog.Passcode;
                 var simple = dialog.IsSimple;

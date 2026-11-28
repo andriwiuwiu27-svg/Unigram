@@ -16,7 +16,7 @@ namespace Telegram.Views.Wallet.Popups
             InitializeComponent();
 
             PrimaryButtonText = Strings.WalletGotIt;
-            ButtonsLayout = ContentPopupButtonsLayout.Vertical;
+            ButtonsLayout = ModalPopupButtonsLayout.Vertical;
         }
 
         private void Footer_Click(object sender, TextUrlClickEventArgs e)

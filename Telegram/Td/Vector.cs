@@ -516,6 +516,71 @@ namespace Telegram
         #endregion
     }
 
+    /// <summary>
+    /// Collects a vector of a length not known in advance, for the parsers.
+    /// </summary>
+    /// <remarks>
+    /// The first element waits in a field and the array is only allocated once a second one
+    /// arrives, so a one-element vector costs exactly the array it keeps. A mutable struct: keep
+    /// it in a local, never copy it.
+    /// </remarks>
+    internal struct VectorBuilder<T>
+    {
+        private T _first;
+        private T[] _items;
+        private int _count;
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Add(T item)
+        {
+            if (_items != null)
+            {
+                if (_count == _items.Length)
+                {
+                    Array.Resize(ref _items, _count * 2);
+                }
+
+                _items[_count] = item;
+            }
+            else if (_count == 0)
+            {
+                _first = item;
+            }
+            else
+            {
+                _items = new T[4];
+                _items[0] = _first;
+                _items[1] = item;
+            }
+
+            _count++;
+        }
+
+        public Vector<T> ToVector()
+        {
+            if (_count == 0)
+            {
+                return Vector<T>.Empty;
+            }
+            else if (_count == 1)
+            {
+                return new T[] { _first };
+            }
+
+            // Trimmed rather than handed over with slack: the parsed object goes into the
+            // ClientService cache and keeps whatever it holds for the session, so up to 2x wasted
+            // is worth one copy here.
+            if (_count != _items.Length)
+            {
+                Array.Resize(ref _items, _count);
+            }
+
+            // The conversion wraps without copying, which is only safe because nothing else
+            // holds this array.
+            return _items;
+        }
+    }
+
     public static class Vector
     {
         /// <summary>

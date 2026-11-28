@@ -642,14 +642,21 @@ namespace Telegram.Controls.Messages
                 CanvasGeometry result;
                 using (var builder = new CanvasPathBuilder(null))
                 {
-                    builder.AddGeometry(CanvasGeometry.CreateEllipse(null, 13, 5, radius, radius));
+                    using (var part = CanvasGeometry.CreateEllipse(null, 13, 5, radius, radius))
+                    {
+                        builder.AddGeometry(part);
+                    }
                     builder.BeginFigure(new Vector2(12.5f, 3f));
                     builder.AddLine(new Vector2(12.5f, 5.5f));
                     builder.AddLine(new Vector2(15f, 5.5f));
                     builder.EndFigure(CanvasFigureLoop.Open);
                     result = CanvasGeometry.CreatePath(builder);
                 }
-                return new CompositionPath(result);
+
+                using (result)
+                {
+                    return new CompositionPath(result);
+                }
             }
 
             var shape11 = BootStrapper.Current.Compositor.CreateSpriteShape(BootStrapper.Current.Compositor.CreatePathGeometry(GetPending()));
@@ -681,7 +688,10 @@ namespace Telegram.Controls.Messages
                 CanvasGeometry result;
                 using (var builder = new CanvasPathBuilder(null))
                 {
-                    builder.AddGeometry(CanvasGeometry.CreateRoundedRectangle(null, 4 + center, center, 11 - stroke, 11 - stroke, 2, 2));
+                    using (var part = CanvasGeometry.CreateRoundedRectangle(null, 4 + center, center, 11 - stroke, 11 - stroke, 2, 2))
+                    {
+                        builder.AddGeometry(part);
+                    }
                     builder.BeginFigure(new Vector2(9.5f, 3f));
                     builder.AddLine(new Vector2(9.5f, 5.5f + center));
                     builder.EndFigure(CanvasFigureLoop.Open);
@@ -690,7 +700,11 @@ namespace Telegram.Controls.Messages
                     builder.EndFigure(CanvasFigureLoop.Open);
                     result = CanvasGeometry.CreatePath(builder);
                 }
-                return new CompositionPath(result);
+
+                using (result)
+                {
+                    return new CompositionPath(result);
+                }
             }
 
             var shape11 = BootStrapper.Current.Compositor.CreateSpriteShape(BootStrapper.Current.Compositor.CreatePathGeometry(GetFailed()));
@@ -738,7 +752,11 @@ namespace Telegram.Controls.Messages
                     builder.EndFigure(CanvasFigureLoop.Open);
                     result = CanvasGeometry.CreatePath(builder);
                 }
-                return new CompositionPath(result);
+
+                using (result)
+                {
+                    return new CompositionPath(result);
+                }
             }
 
             var geometry = GetLine();

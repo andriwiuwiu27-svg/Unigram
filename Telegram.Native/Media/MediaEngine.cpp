@@ -3362,8 +3362,9 @@ namespace winrt::Telegram::Native::Media::implementation
             return;
         }
 
-        // Seeking at the end plays again, which scrubbing an ended video relies on.
-        if (m_state.load() == MediaEngineState::Ended)
+        // Seeking at the end plays again, which scrubbing an ended video relies on. Not when a seek
+        // made while paused reached the end, or scrubbing a paused video past its end resumes it.
+        if (m_state.load() == MediaEngineState::Ended && !m_endedPaused.load())
         {
             m_paused = false;
         }
@@ -3542,6 +3543,8 @@ namespace winrt::Telegram::Native::Media::implementation
         {
             m_position = position;
             m_host->PositionChanged(position);
+
+            m_endedPaused = m_paused.load();
 
             if (m_state.exchange(MediaEngineState::Ended) != MediaEngineState::Ended)
             {

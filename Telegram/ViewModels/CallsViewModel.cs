@@ -132,13 +132,13 @@ namespace Telegram.ViewModels
                 Message = Strings.DeleteSelectedCallsText,
                 PrimaryButtonText = Strings.Delete,
                 SecondaryButtonText = Strings.Cancel,
-                DefaultButton = ContentDialogButton.None,
+                DefaultButton = ModalPopupButton.None,
                 PrimaryButtonStyle = BootStrapper.Current.Resources["DangerButtonStyle"] as Style,
                 CheckBoxLabel = Strings.DeleteCallsForEveryone
             };
 
             var confirm = await popup.ShowAsync(XamlRoot);
-            if (confirm != ContentDialogResult.Primary)
+            if (confirm != ModalPopupResult.Primary)
             {
                 return;
             }

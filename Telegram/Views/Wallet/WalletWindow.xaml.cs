@@ -25,6 +25,7 @@ using Telegram.ViewModels.Wallet;
 using Telegram.Views.Grams;
 using Telegram.Views.Host;
 using Telegram.Views.Popups;
+using Telegram.Views.Stars.Popups;
 using Telegram.Views.Wallet.Popups;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Foundation;
@@ -53,7 +54,7 @@ namespace Telegram.Views.Wallet
     /// a popup opens over the wallet and a page navigation lands in the main window, which is what
     /// the mini apps do.
     /// </remarks>
-    public sealed partial class WalletWindow : WindowContent, IWalletDelegate
+    public sealed partial class WalletWindow : WindowContent, IWalletDelegate, IWalletCollectibleHost
     {
         private readonly IClientService _clientService;
         private readonly IWalletService _wallet;
@@ -231,10 +232,33 @@ namespace Telegram.Views.Wallet
                 return;
             }
 
+            // A transaction that moved or traded a gift opens the gift, as the transaction carries
+            // it, with the transaction in place of its details.
+            var gift = GiftOf(transaction.Type);
+            if (gift != null)
+            {
+                await _navigationService.ShowPopupAsync(ReceivedGiftPopup.FromWalletTransaction(_clientService, _navigationService, gift, transaction));
+                return;
+            }
+
             var popup = new WalletTransactionPopup(_clientService, _wallet, _navigationService, transaction);
 
             // The popup opens the send flow itself, having the transfer and its peer in hand.
             await _navigationService.ShowPopupAsync(popup);
+        }
+
+        private static UpgradedGift GiftOf(TonWalletTransactionType type)
+        {
+            if (type is TonWalletTransactionTypeTelegramGiftTransfer transfer)
+            {
+                return transfer.Nft?.Gift;
+            }
+            else if (WalletHelper.GiftMarketActivity.TryGet(type, out var activity))
+            {
+                return activity.Nft?.Gift;
+            }
+
+            return null;
         }
 
         /// <summary>
@@ -448,7 +472,7 @@ namespace Telegram.Views.Wallet
             var popup = new WalletCurrencyPopup(_clientService);
 
             var confirm = await _navigationService.ShowPopupAsync(popup);
-            if (confirm == ContentDialogResult.Primary && popup.SelectedItem != null)
+            if (confirm == ModalPopupResult.Primary && popup.SelectedItem != null)
             {
                 await _wallet.SetCurrencyAsync(popup.SelectedItem);
             }
@@ -507,54 +531,11 @@ namespace Telegram.Views.Wallet
             // Somewhere to send to, typed. The other way in is the Send pill on a transaction,
             // which already knows who it is sending to; this is the one for everybody else, until
             // there is a picker.
-            var popup = new InputPopup
+            var recipient = await WalletHelper.AskRecipientAsync(_navigationService, _wallet, Strings.WalletSendGrams);
+            if (recipient != null)
             {
-                Title = Strings.WalletSendGrams,
-                PlaceholderText = Strings.WalletAddressOrName,
-                PrimaryButtonText = Strings.Next,
-                SecondaryButtonText = Strings.Cancel,
-                MinLength = 1
-            };
-
-            var confirm = await _navigationService.ShowPopupAsync(popup);
-            if (confirm != ContentDialogResult.Primary)
-            {
-                return;
+                await SendAsync(0, recipient.Address, recipient.Domain);
             }
-
-            var recipient = popup.Text.Trim();
-            var domain = string.Empty;
-
-            if (recipient.EndsWith(".ton", StringComparison.OrdinalIgnoreCase))
-            {
-                domain = recipient;
-
-                try
-                {
-                    recipient = await _wallet.ResolveDnsAsync(recipient);
-                }
-                catch (Exception ex)
-                {
-                    // An unknown name is one of the ways this fails, so it is said the same way.
-                    Logger.Error("wallet name could not be resolved: " + ex.Message);
-                    recipient = null;
-                }
-
-                if (string.IsNullOrEmpty(recipient))
-                {
-                    _navigationService.ShowToast(string.Format(Strings.WalletSearchNoResults, domain), ToastPopupIcon.Error);
-                    return;
-                }
-            }
-            else if (!WalletHelper.IsValidAddress(recipient))
-            {
-                _navigationService.ShowToast(Strings.WalletInvalidAddress, ToastPopupIcon.Error);
-                return;
-            }
-
-            // The name is kept, not just what it resolved to: it is what the user typed and what
-            // the history should say the transfer went to.
-            await SendAsync(0, recipient, domain);
         }
 
         private void Navigation_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -834,9 +815,47 @@ namespace Telegram.Views.Wallet
         private void Collectibles_ItemClick(object sender, ItemClickEventArgs e)
         {
             // By name: the NFT's own copy of the gift leaves out the owner.
-            if (e.ClickedItem is TonNft { Gift: UpgradedGift gift })
+            if (e.ClickedItem is TonNft { Gift: UpgradedGift gift } collectible)
             {
-                MessageHelper.NavigateToUpgradedGift(_clientService, _navigationService, gift.Name);
+                MessageHelper.NavigateToUpgradedGift(_clientService, _navigationService, gift.Name, collectible, this);
+            }
+            else if (e.ClickedItem is TonNft other)
+            {
+                _navigationService.ShowPopup(new WalletCollectiblePopup(_clientService, _navigationService, other));
+            }
+        }
+
+        public bool IsOnCard(TonNft collectible)
+        {
+            return Card.Stickers.Contains(collectible.Address);
+        }
+
+        public bool IsCardColor(TonNft collectible)
+        {
+            return collectible.Address == _backgroundAddress;
+        }
+
+        public void ToggleCard(TonNft collectible)
+        {
+            if (Card.Stickers.Contains(collectible.Address))
+            {
+                RemoveStickerFromCard(collectible);
+            }
+            else
+            {
+                AddToCard(collectible);
+            }
+        }
+
+        public void ToggleColor(TonNft collectible)
+        {
+            if (IsCardColor(collectible))
+            {
+                RemoveColor();
+            }
+            else
+            {
+                ApplyColor(collectible);
             }
         }
 

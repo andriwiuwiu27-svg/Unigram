@@ -5,8 +5,13 @@
 // file LICENSE or copy at https://www.gnu.org/licenses/gpl-3.0.txt)
 //
 
+// The shim BannedSymbols.WinUI.txt sends every other caller to.
+#pragma warning disable RS0030
+
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Windows.Foundation;
 using Windows.Storage;
 
 namespace Telegram.Storage
@@ -37,6 +42,63 @@ namespace Telegram.Storage
             };
         }
 
+        /// <summary>
+        /// The operation's files, copied on the thread that completed it. The projection fetches
+        /// the result in the completion callback, which for the file picker runs on an STA thread
+        /// of its own, and its list is not agile: CsWinRT 3 does not marshal it, so read on the UI
+        /// thread after an await, every call fails with RPC_E_WRONG_THREAD. The files in it are agile.
+        /// </summary>
+        public static Task<IReadOnlyList<FileItem>> ToFileItemsAsync(this IAsyncOperation<IReadOnlyList<StorageFile>> operation)
+        {
+            return new ListConversion<StorageFile, FileItem>(operation, ToFileItems).Task;
+        }
+
+        /// <inheritdoc cref="ToFileItemsAsync"/>
+        public static Task<IReadOnlyList<IFileSystemItem>> ToFileSystemItemsAsync(this IAsyncOperation<IReadOnlyList<IStorageItem>> operation)
+        {
+            return new ListConversion<IStorageItem, IFileSystemItem>(operation, ToFileSystemItems).Task;
+        }
+
+        private sealed class ListConversion<TSource, TResult>
+        {
+            private readonly TaskCompletionSource<IReadOnlyList<TResult>> _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            private readonly Func<IReadOnlyList<TSource>, IReadOnlyList<TResult>> _convert;
+
+            public ListConversion(IAsyncOperation<IReadOnlyList<TSource>> operation, Func<IReadOnlyList<TSource>, IReadOnlyList<TResult>> convert)
+            {
+                _convert = convert;
+
+                // Assigned after completion, the handler runs at once on this thread.
+                operation.Completed = OnCompleted;
+            }
+
+            public Task<IReadOnlyList<TResult>> Task => _completion.Task;
+
+            private void OnCompleted(IAsyncOperation<IReadOnlyList<TSource>> operation, AsyncStatus status)
+            {
+                try
+                {
+                    switch (status)
+                    {
+                        case AsyncStatus.Completed:
+                            _completion.TrySetResult(_convert(operation.GetResults()));
+                            break;
+                        case AsyncStatus.Error:
+                            _completion.TrySetException(operation.ErrorCode);
+                            break;
+                        default:
+                            _completion.TrySetCanceled();
+                            break;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _completion.TrySetException(ex);
+                }
+            }
+        }
+
+        // Only on the thread the list was fetched on: see ToFileItemsAsync.
         public static IReadOnlyList<FileItem> ToFileItems(this IReadOnlyList<StorageFile> files)
         {
             var items = new FileItem[files.Count];

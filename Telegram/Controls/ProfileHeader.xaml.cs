@@ -217,20 +217,7 @@ namespace Telegram.Controls
 
             if (HeaderTheme != ElementTheme.Default)
             {
-                if (show)
-                {
-                    Identity.ClearValue(ForegroundProperty);
-                    BotVerified.ClearValue(AnimatedImage.ReplacementColorProperty);
-                    Rating.ClearValue(ProfileRating.FillProperty);
-                    Rating.ClearValue(ProfileRating.StrokeProperty);
-                }
-                else
-                {
-                    Identity.Foreground = new SolidColorBrush(Colors.White);
-                    BotVerified.ReplacementColor = new SolidColorBrush(Colors.White);
-                    Rating.Fill = new SolidColorBrush(Colors.White);
-                    Rating.Stroke = new SolidColorBrush(Color.FromArgb(0x33, 0x00, 0x00, 0x00));
-                }
+                UpdateTitleForeground(!show);
 
                 TitleRoot.RequestedTheme = show ? ActualTheme : HeaderTheme;
                 SubtitleRoot.RequestedTheme = show ? ActualTheme : HeaderTheme;
@@ -245,6 +232,31 @@ namespace Telegram.Controls
 
             headerBackground.StartAnimation("Opacity", opacityOut);
             headerGlow.StartAnimation("Opacity", opacityOut);
+        }
+
+        private SolidColorBrush _titleForeground;
+        private SolidColorBrush _ratingStroke;
+
+        // White over a coloured header, the theme's own once the background has faded out.
+        private void UpdateTitleForeground(bool white)
+        {
+            if (white)
+            {
+                _titleForeground ??= new SolidColorBrush(Colors.White);
+                _ratingStroke ??= new SolidColorBrush(Color.FromArgb(0x33, 0x00, 0x00, 0x00));
+
+                Identity.Foreground = _titleForeground;
+                BotVerified.ReplacementColor = _titleForeground;
+                Rating.Fill = _titleForeground;
+                Rating.Stroke = _ratingStroke;
+            }
+            else
+            {
+                Identity.ClearValue(ForegroundProperty);
+                BotVerified.ClearValue(AnimatedImage.ReplacementColorProperty);
+                Rating.ClearValue(ProfileRating.FillProperty);
+                Rating.ClearValue(ProfileRating.StrokeProperty);
+            }
         }
 
         public void InitializeScrolling(CompositionPropertySet properties)
@@ -386,10 +398,13 @@ namespace Telegram.Controls
         {
             _actualTheme = ViewModel.NavigationService.Window.ActualTheme;
 
-            if (chat.ProfileAccentColorId != -1 || chat.EmojiStatus?.Type is EmojiStatusTypeUpgradedGift)
+            var upgradedGift = chat.EmojiStatus?.Type as EmojiStatusTypeUpgradedGift;
+            var patternId = upgradedGift?.SymbolCustomEmojiId ?? chat.ProfileBackgroundCustomEmojiId;
+
+            if (chat.ProfileAccentColorId != -1 || upgradedGift != null)
             {
                 ProfileColors colors;
-                if (chat.EmojiStatus?.Type is EmojiStatusTypeUpgradedGift upgradedGift)
+                if (upgradedGift != null)
                 {
                     colors = new ProfileColors(new ProfileAccentColors(Array.Empty<int>(), new[] { upgradedGift.BackdropColors.EdgeColor, upgradedGift.BackdropColors.CenterColor }, Array.Empty<int>()));
                 }
@@ -402,10 +417,7 @@ namespace Telegram.Controls
                     return;
                 }
 
-                Identity.Foreground = new SolidColorBrush(Colors.White);
-                BotVerified.ReplacementColor = new SolidColorBrush(Colors.White);
-                Rating.Fill = new SolidColorBrush(Colors.White);
-                Rating.Stroke = new SolidColorBrush(Color.FromArgb(0x33, 0x00, 0x00, 0x00));
+                UpdateTitleForeground(true);
 
                 HeaderRoot.RequestedTheme = ElementTheme.Dark;
 
@@ -433,39 +445,58 @@ namespace Telegram.Controls
                     HeaderBackground.Background = new SolidColorBrush(colors.BackgroundColors[0]);
                 }
 
-                UpdateProfileBackgroundCustomEmoji(colors);
+                UpdateProfileBackgroundCustomEmoji(colors, patternId != 0);
                 UpdateIcons(chat, true);
             }
             else
             {
-                Identity.ClearValue(ForegroundProperty);
-                BotVerified.ClearValue(AnimatedImage.ReplacementColorProperty);
-                Rating.ClearValue(ProfileRating.FillProperty);
-                Rating.ClearValue(ProfileRating.StrokeProperty);
+                UpdateTitleForeground(false);
 
                 HeaderBackground.ClearValue(Panel.BackgroundProperty);
                 HeaderRoot.RequestedTheme = ElementTheme.Default;
 
-                UpdateProfileBackgroundCustomEmoji(null);
+                UpdateProfileBackgroundCustomEmoji(null, patternId != 0);
                 UpdateIcons(chat, false);
             }
 
-            if (chat.EmojiStatus?.Type is EmojiStatusTypeUpgradedGift emojiStatusTypeUpgradedGift)
-            {
-                Pattern.Source = new CustomEmojiFileSource(ViewModel.ClientService, emojiStatusTypeUpgradedGift.SymbolCustomEmojiId);
-            }
-            else if (chat.ProfileBackgroundCustomEmojiId != 0)
-            {
-                Pattern.Source = new CustomEmojiFileSource(ViewModel.ClientService, chat.ProfileBackgroundCustomEmojiId);
-            }
-            else
-            {
-                Pattern.Source = null;
-            }
+            Pattern.Source = patternId != 0
+                ? new CustomEmojiFileSource(ViewModel.ClientService, patternId)
+                : null;
         }
 
-        private void UpdateProfileBackgroundCustomEmoji(ProfileColors colors)
+        // One per UI thread: each window's thread has its own compositor.
+        [ThreadStatic]
+        private static CompositionEffectFactory _glowFactory;
+
+        private void UpdateProfileBackgroundCustomEmoji(ProfileColors colors, bool pattern)
         {
+            if (!_glowBackground)
+            {
+                _glowBackground = true;
+
+                var radial2 = new RadialGradientBrush();
+                radial2.Center = new Point(0.5f, 0.3f);
+                radial2.RadiusX = 0.4;
+                radial2.RadiusY = 0.6;
+                radial2.GradientStops.Add(new GradientStop { Color = Color.FromArgb(50, 255, 255, 255) });
+                radial2.GradientStops.Add(new GradientStop { Color = Color.FromArgb(0, 255, 255, 255), Offset = 1 });
+
+                HeaderGlow.Background = radial2;
+            }
+
+            // The glow is masked by the pattern, so with no pattern there is nothing to draw, and a
+            // visual surface left behind would still be rendered on every frame.
+            if (!pattern)
+            {
+                if (_glowVisual)
+                {
+                    _glowVisual = false;
+                    ElementCompositionPreview.SetElementChildVisual(HeaderGlow, null);
+                }
+
+                return;
+            }
+
             var compositor = BootStrapper.Current.Compositor;
 
             // Create a VisualSurface positioned at the same location as this control and feed that
@@ -510,15 +541,19 @@ namespace Telegram.Controls
             radial.ColorStops.Add(compositor.CreateColorGradientStop(0, Color.FromArgb(200, 0, 0, 0)));
             radial.ColorStops.Add(compositor.CreateColorGradientStop(1, Color.FromArgb(0, 0, 0, 0)));
 
-            var blend = new BlendEffect
+            if (_glowFactory?.Compositor != compositor)
             {
-                Background = new CompositionEffectSourceParameter("Background"),
-                Foreground = new CompositionEffectSourceParameter("Foreground"),
-                Mode = BlendEffectMode.SoftLight
-            };
+                var blend = new BlendEffect
+                {
+                    Background = new CompositionEffectSourceParameter("Background"),
+                    Foreground = new CompositionEffectSourceParameter("Foreground"),
+                    Mode = BlendEffectMode.SoftLight
+                };
 
-            var borderEffectFactory = BootStrapper.Current.Compositor.CreateEffectFactory(blend);
-            var borderEffectBrush = borderEffectFactory.CreateBrush();
+                _glowFactory = compositor.CreateEffectFactory(blend);
+            }
+
+            var borderEffectBrush = _glowFactory.CreateBrush();
             borderEffectBrush.SetSourceParameter("Foreground", brush);
             borderEffectBrush.SetSourceParameter("Background", radial); // compositor.CreateColorBrush(Color.FromArgb(80, 0x00, 0x00, 0x00)));
 
@@ -532,17 +567,11 @@ namespace Telegram.Controls
             visual.Brush = maskBrush;
 
             ElementCompositionPreview.SetElementChildVisual(HeaderGlow, visual);
-
-            var radial2 = new RadialGradientBrush();
-            //radial.CenterPoint = new Vector2(0.5f, 0.0f);
-            radial2.Center = new Point(0.5f, 0.3f);
-            radial2.RadiusX = 0.4;
-            radial2.RadiusY = 0.6;
-            radial2.GradientStops.Add(new GradientStop { Color = Color.FromArgb(50, 255, 255, 255) });
-            radial2.GradientStops.Add(new GradientStop { Color = Color.FromArgb(0, 255, 255, 255), Offset = 1 });
-
-            HeaderGlow.Background = radial2;
+            _glowVisual = true;
         }
+
+        private bool _glowBackground;
+        private bool _glowVisual;
 
         private ElementTheme _actualTheme = ElementTheme.Default;
         private bool _filledIcons = true;
@@ -609,9 +638,15 @@ namespace Telegram.Controls
             UpdateChatActiveStories(chat);
 
             UpdateChatNotificationSettings(chat);
+            UpdateChatActionBar(chat);
 
             if (AppSettings.Diagnostics.ShowIds)
             {
+                if (ChatId == null)
+                {
+                    FindName(nameof(ChatId));
+                }
+
                 ChatId.Visibility = Visibility.Visible;
 
                 if (chat.Type is ChatTypePrivate privata)
@@ -625,7 +660,19 @@ namespace Telegram.Controls
             }
             else
             {
-                ChatId.Visibility = Visibility.Collapsed;
+                ChatId?.Visibility = Visibility.Collapsed;
+            }
+
+            // Both are shown by a binding on the view model's value, which is only ever set before
+            // the profile is first updated.
+            if (DeleteReaction == null && ViewModel.DeleteReactions != null)
+            {
+                FindName(nameof(DeleteReaction));
+            }
+
+            if (BanAndReport == null && ViewModel.ReportReactions != null)
+            {
+                FindName(nameof(BanAndReport));
             }
         }
 
@@ -633,7 +680,7 @@ namespace Telegram.Controls
         {
             if (chat.Id == ViewModel.LinkedChatId)
             {
-                PersonalChannel.UpdateChatTitle(chat);
+                PersonalChannel?.UpdateChatTitle(chat);
             }
             else if (ViewModel.ForumTopic != null)
             {
@@ -657,27 +704,42 @@ namespace Telegram.Controls
         {
             if (chat.Id == ViewModel.LinkedChatId)
             {
-                PersonalChannel.UpdateChatPhoto(chat);
+                PersonalChannel?.UpdateChatPhoto(chat);
             }
             else if (ViewModel.ForumTopic != null)
             {
                 if (ViewModel.ForumTopic.Info.Icon.CustomEmojiId != 0)
                 {
+                    if (Icon == null)
+                    {
+                        FindName(nameof(Icon));
+                    }
+
                     Icon.Source = new CustomEmojiFileSource(ViewModel.ClientService, ViewModel.ForumTopic.Info.Icon.CustomEmojiId);
-                    TopicIconRoot.Visibility = Visibility.Collapsed;
-                    TopicIconGeneral.Visibility = Visibility.Collapsed;
+                    TopicIconRoot?.Visibility = Visibility.Collapsed;
+                    TopicIconGeneral?.Visibility = Visibility.Collapsed;
                 }
                 else if (ViewModel.ForumTopic.Info.IsGeneral)
                 {
-                    Icon.Source = null;
-                    TopicIconRoot.Visibility = Visibility.Collapsed;
+                    if (TopicIconGeneral == null)
+                    {
+                        FindName(nameof(TopicIconGeneral));
+                    }
+
+                    Icon?.Source = null;
+                    TopicIconRoot?.Visibility = Visibility.Collapsed;
                     TopicIconGeneral.Visibility = Visibility.Visible;
                 }
                 else
                 {
-                    Icon.Source = null;
+                    if (TopicIconRoot == null)
+                    {
+                        FindName(nameof(TopicIconRoot));
+                    }
+
+                    Icon?.Source = null;
                     TopicIconRoot.Visibility = Visibility.Visible;
-                    TopicIconGeneral.Visibility = Visibility.Collapsed;
+                    TopicIconGeneral?.Visibility = Visibility.Collapsed;
 
                     var brush = ForumTopicCell.GetIconGradient(ViewModel.ForumTopic.Info.Icon);
 
@@ -688,7 +750,7 @@ namespace Telegram.Controls
             }
             else
             {
-                Icon.Source = null;
+                Icon?.Source = null;
 
                 if (chat.Id == ViewModel.ClientService.Options.MyId && !ViewModel.IsSavedMessages && ViewModel.ClientService.TryGetUser(chat, out User user))
                 {
@@ -707,7 +769,7 @@ namespace Telegram.Controls
         {
             if (chat.Id == ViewModel.LinkedChatId)
             {
-                PersonalChannel.UpdateChatLastMessage(chat, updateChatLists: false);
+                PersonalChannel?.UpdateChatLastMessage(chat, updateChatLists: false);
             }
         }
 
@@ -721,6 +783,9 @@ namespace Telegram.Controls
             {
                 Identity.SetStatus(ViewModel.ClientService, chat, BotVerified);
             }
+
+            // The gift worn as the status leaves the cover.
+            GiftsCover.TransitionFraction = _verticalOffset / (32 + 140 + 96);
         }
 
         public void UpdateChatActiveStories(Chat chat)
@@ -744,17 +809,51 @@ namespace Telegram.Controls
                 : (_filledIcons ? Icons.AlertFilled : Icons.Alert);
         }
 
+        public void UpdateChatActionBar(Chat chat)
+        {
+            if (chat.ActionBar is ChatActionBarBotInvite botInvite && ViewModel.ClientService.TryGetUser(botInvite.InviterUserId, out User inviter))
+            {
+                var text = FormatUserLink(Strings.ProfileBotInvitedBy, inviter);
+
+                if (ViewModel.ClientService.TryGetUser(botInvite.OwnerUserId, out User owner))
+                {
+                    text = FormattedText.Concat(text, "\n", FormatUserLink(Strings.ProfileBotCurrentOwner, owner));
+                }
+
+                if (BotInvite == null)
+                {
+                    FindName(nameof(BotInvite));
+                }
+
+                BotInviteLabel.SetText(ViewModel.ClientService, text);
+                BotInvite.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                BotInvite?.Visibility = Visibility.Collapsed;
+            }
+        }
+
+        private static FormattedText FormatUserLink(string format, User user)
+        {
+            // The markup is parsed before the name goes in, so markdown in a name stays literal,
+            // and a run the translation wraps around the placeholder grows to cover the name.
+            var builder = new FormattedTextBuilder(ClientEx.ParseMarkdown(format));
+            builder.Substitute("{0}", user.FullName(), new TextEntityTypeMentionName(user.Id));
+
+            return builder.ToFormattedText();
+        }
+
         public void UpdateUserFullInfo(Chat chat, User user, UserFullInfo fullInfo, bool secret, bool accessToken)
         {
             UpdateUserStatus(chat, user);
-
-            UserPhone.Content = PhoneNumber.Format(user.PhoneNumber);
-            UserPhone.Visibility = string.IsNullOrEmpty(user.PhoneNumber) ? Visibility.Collapsed : Visibility.Visible;
+            UpdateUserPhone(user.PhoneNumber);
 
             if (user.HasActiveUsername(out string username))
             {
                 Username.Content = username;
                 Username.Visibility = Visibility.Visible;
+                UsernameQrCode.Visibility = Visibility.Visible;
             }
             else
             {
@@ -767,19 +866,7 @@ namespace Telegram.Controls
 
             if (secret is false)
             {
-                MiscPanel.Visibility = Visibility.Collapsed;
-                SecretLifetime.Visibility = Visibility.Collapsed;
-                SecretHashKey.Visibility = Visibility.Collapsed;
-            }
-
-            if (user.PhoneNumber.Length > 0)
-            {
-                var info = Client.Execute(new GetPhoneNumberInfoSync("en", user.PhoneNumber)) as PhoneNumberInfo;
-                if (info != null)
-                {
-                    AnonymousNumber.Visibility = info.IsAnonymous ? Visibility.Visible : Visibility.Collapsed;
-                    AnonymousNumberSeparator.Visibility = info.IsAnonymous ? Visibility.Visible : Visibility.Collapsed;
-                }
+                MiscPanel?.Visibility = Visibility.Collapsed;
             }
 
             OpenChat.Content = Strings.VoipGroupOpenChat;
@@ -795,46 +882,77 @@ namespace Telegram.Controls
                     Search.Visibility = Visibility.Visible;
                     Grid.SetColumn(Search, 2);
                     Grid.SetColumn(Edit, 1);
-
-                    Statistics.Visibility = Visibility.Visible;
                 }
                 else
                 {
                     Edit.Visibility = Visibility.Collapsed;
-                    Statistics.Visibility = Visibility.Collapsed;
                 }
 
-                AffiliateProgram.Visibility = Visibility.Collapsed;
+                ShowStatistics(userTypeBot.CanBeEdited);
+                AffiliateProgram?.Visibility = Visibility.Collapsed;
 
                 if (userTypeBot.HasMainWebApp)
                 {
+                    if (BotMainApp == null)
+                    {
+                        FindName(nameof(BotMainApp));
+                    }
+
                     BotMainApp.Visibility = Visibility.Visible;
                     InfoPanel.Footer = Strings.ProfileBotOpenAppInfo;
                 }
                 else
                 {
-                    BotMainApp.Visibility = Visibility.Collapsed;
+                    BotMainApp?.Visibility = Visibility.Collapsed;
                     InfoPanel.Footer = string.Empty;
+                }
+
+                if (userTypeBot.CanBeEdited || userTypeBot.CanJoinGroups)
+                {
+                    if (BotActionsRoot == null)
+                    {
+                        FindName(nameof(BotActionsRoot));
+                    }
+
+                    InviteToBot.Visibility = userTypeBot.CanBeEdited
+                        ? Visibility.Visible
+                        : Visibility.Collapsed;
+                    AddToGroup.Visibility = userTypeBot.CanJoinGroups
+                        ? Visibility.Visible
+                        : Visibility.Collapsed;
+
+                    BotActionsRoot.Footer = userTypeBot.CanJoinGroups
+                        ? Strings.BotAddToGroupOrChannelInfo
+                        : string.Empty;
+                    BotActionsRoot.Visibility = Visibility.Visible;
+                }
+                else
+                {
+                    BotActionsRoot?.Visibility = Visibility.Collapsed;
                 }
             }
             else
             {
                 Edit.Visibility = Visibility.Collapsed;
-                BotMainApp.Visibility = Visibility.Collapsed;
-                Statistics.Visibility = Visibility.Collapsed;
-                AffiliateProgram.Visibility = Visibility.Collapsed;
+                BotMainApp?.Visibility = Visibility.Collapsed;
+                ShowStatistics(false);
+                AffiliateProgram?.Visibility = Visibility.Collapsed;
+                BotActionsRoot?.Visibility = Visibility.Collapsed;
             }
 
             // Unused:
-            Location.Visibility = Visibility.Collapsed;
+            Location?.Visibility = Visibility.Collapsed;
 
             VideoChat.Visibility = Visibility.Collapsed;
             Join.Visibility = Visibility.Collapsed;
             Leave.Visibility = Visibility.Collapsed;
 
-            Admins.Visibility = Visibility.Collapsed;
-            Members.Visibility = Visibility.Collapsed;
-            ChannelSettings.Visibility = Visibility.Collapsed;
+            if (AdminPanel != null)
+            {
+                Admins.Visibility = Visibility.Collapsed;
+                Members.Visibility = Visibility.Collapsed;
+                ChannelSettings.Visibility = Visibility.Collapsed;
+            }
 
             if (fullInfo == null)
             {
@@ -843,12 +961,17 @@ namespace Telegram.Controls
 
             if (fullInfo.UsesUnofficialApp)
             {
+                if (UnofficialRoot == null)
+                {
+                    FindName(nameof(UnofficialRoot));
+                }
+
                 UnofficialRoot.Visibility = Visibility.Visible;
                 UnofficialText.Text = string.Format(Strings.ProfileUnofficialSecurityRisk, user.FullName(true));
             }
             else
             {
-                UnofficialRoot.Visibility = Visibility.Collapsed;
+                UnofficialRoot?.Visibility = Visibility.Collapsed;
             }
 
             if (fullInfo.Rating != null)
@@ -863,13 +986,18 @@ namespace Telegram.Controls
 
             if (fullInfo.Note != null)
             {
+                if (UserNote == null)
+                {
+                    FindName(nameof(UserNote));
+                    UserNote.Description = string.Format("{0} ({1})", Strings.ProfileNotes, Strings.ProfileNotesInfo);
+                }
+
                 UserNote.Visibility = Visibility.Visible;
-                UserNote.Description = string.Format("{0} ({1})", Strings.ProfileNotes, Strings.ProfileNotesInfo);
                 UserNoteLabel.SetText(ViewModel.ClientService, fullInfo.Note);
             }
             else
             {
-                UserNote.Visibility = Visibility.Collapsed;
+                UserNote?.Visibility = Visibility.Collapsed;
             }
 
             var footerVisible = false;
@@ -877,6 +1005,11 @@ namespace Telegram.Controls
 
             if (fullInfo.TonWalletCard != null)
             {
+                if (UserBalanceRoot == null)
+                {
+                    FindName(nameof(UserBalanceRoot));
+                }
+
                 footerVisible = true;
                 balanceVisible = true;
                 UserBalanceRoot.Visibility = Visibility.Visible;
@@ -885,11 +1018,16 @@ namespace Telegram.Controls
             }
             else
             {
-                UserBalanceRoot.Visibility = Visibility.Collapsed;
+                UserBalanceRoot?.Visibility = Visibility.Collapsed;
             }
 
             if (fullInfo.FirstProfileAudio != null)
             {
+                if (UserFirstAudioRoot == null)
+                {
+                    FindName(nameof(UserFirstAudioRoot));
+                }
+
                 footerVisible = true;
                 UserFirstAudioRoot.Visibility = Visibility.Visible;
 
@@ -925,39 +1063,31 @@ namespace Telegram.Controls
             }
             else
             {
-                UserFirstAudioRoot.Visibility = Visibility.Collapsed;
+                UserFirstAudioRoot?.Visibility = Visibility.Collapsed;
             }
 
             FooterRoot.Visibility = footerVisible
                 ? Visibility.Visible
                 : Visibility.Collapsed;
 
-            var animation = fullInfo.PersonalPhoto != null
+            UpdateAnimatedPhoto(fullInfo.PersonalPhoto != null
                 ? fullInfo.PersonalPhoto.SmallAnimation ?? fullInfo.PersonalPhoto.Animation
-                : fullInfo.Photo?.SmallAnimation ?? fullInfo.Photo?.Animation;
-            if (animation != null)
-            {
-                AnimatedPhoto.Source = new DelayedFileSource(ViewModel.ClientService, animation.File)
-                {
-                    SeekToSeconds = animation.MainFrameTimestamp
-                };
-            }
-            else
-            {
-                AnimatedPhoto.Source = null;
-            }
+                : fullInfo.Photo?.SmallAnimation ?? fullInfo.Photo?.Animation);
 
             if (user.Type is UserTypeBot && fullInfo.BotInfo != null)
             {
                 GetEntities(fullInfo.BotInfo.ShortDescription);
                 Description.Visibility = string.IsNullOrEmpty(fullInfo.BotInfo.ShortDescription) ? Visibility.Collapsed : Visibility.Visible;
 
-                Statistics.Visibility = fullInfo.BotInfo.CanGetRevenueStatistics
-                    ? Visibility.Visible
-                    : Visibility.Collapsed;
+                ShowStatistics(fullInfo.BotInfo.CanGetRevenueStatistics);
 
                 if (fullInfo.BotInfo.AffiliateProgram != null)
                 {
+                    if (AffiliateProgramRoot == null)
+                    {
+                        FindName(nameof(AffiliateProgramRoot));
+                    }
+
                     AffiliateProgram.Visibility = Visibility.Visible;
                     AffiliateProgram.Badge = fullInfo.BotInfo.AffiliateProgram.Parameters.CommissionPercent();
                     AffiliateProgramRoot.Footer = user.Type is UserTypeBot { CanBeEdited: true }
@@ -966,7 +1096,7 @@ namespace Telegram.Controls
                 }
                 else
                 {
-                    AffiliateProgram.Visibility = Visibility.Collapsed;
+                    AffiliateProgram?.Visibility = Visibility.Collapsed;
                 }
             }
             else
@@ -974,8 +1104,8 @@ namespace Telegram.Controls
                 ReplaceEntities(fullInfo.Bio);
                 Description.Visibility = string.IsNullOrEmpty(fullInfo.Bio.Text) ? Visibility.Collapsed : Visibility.Visible;
 
-                Statistics.Visibility = Visibility.Collapsed;
-                AffiliateProgram.Visibility = Visibility.Collapsed;
+                ShowStatistics(false);
+                AffiliateProgram?.Visibility = Visibility.Collapsed;
             }
 
             if (user.Type is UserTypeBot { CanBeEdited: true })
@@ -1004,6 +1134,11 @@ namespace Telegram.Controls
             var businessLocation = businessInfo?.Location;
             if (businessLocation != null)
             {
+                if (Location == null)
+                {
+                    FindName(nameof(Location));
+                }
+
                 Location.Visibility = Visibility.Visible;
                 Location.Content = businessLocation.Address;
 
@@ -1046,43 +1181,135 @@ namespace Telegram.Controls
                 UserBirthday.Visibility = Visibility.Collapsed;
             }
 
-            if (ViewModel.ClientService.TryGetChat(fullInfo.PersonalChatId, out Chat personalChat))
+            UpdatePersonalChannel(ViewModel.ClientService.TryGetChat(fullInfo.PersonalChatId, out Chat personalChat) ? personalChat : null);
+
+            var openingHours = businessInfo?.OpeningHours;
+            if (openingHours != null)
             {
+                if (BusinessHours == null)
+                {
+                    FindName(nameof(BusinessHours));
+                }
+
+                BusinessHours.Visibility = Visibility.Visible;
+                BusinessHours.UpdateHours(ViewModel.ClientService, openingHours);
+            }
+            else
+            {
+                BusinessHours?.Visibility = Visibility.Collapsed;
+            }
+
+            UpdateBotVerification(fullInfo.BotVerification);
+        }
+
+        private void UpdateUserPhone(string phoneNumber)
+        {
+            // The parsed number only changes with the number itself, and asking TDLib for it is a
+            // synchronous call on every update of the user.
+            if (_phoneNumber == phoneNumber)
+            {
+                return;
+            }
+
+            _phoneNumber = phoneNumber;
+
+            UserPhone.Content = PhoneNumber.Format(phoneNumber);
+            UserPhone.Visibility = string.IsNullOrEmpty(phoneNumber) ? Visibility.Collapsed : Visibility.Visible;
+
+            if (phoneNumber.Length > 0)
+            {
+                var info = Client.Execute(new GetPhoneNumberInfoSync("en", phoneNumber)) as PhoneNumberInfo;
+                if (info != null)
+                {
+                    AnonymousNumber.Visibility = info.IsAnonymous ? Visibility.Visible : Visibility.Collapsed;
+                    AnonymousNumberSeparator.Visibility = info.IsAnonymous ? Visibility.Visible : Visibility.Collapsed;
+                }
+            }
+        }
+
+        private string _phoneNumber;
+
+        private void UpdateAnimatedPhoto(AnimatedChatPhoto animation)
+        {
+            if (animation != null)
+            {
+                if (AnimatedPhoto == null)
+                {
+                    FindName(nameof(AnimatedPhoto));
+                }
+
+                AnimatedPhoto.Source = new DelayedFileSource(ViewModel.ClientService, animation.File)
+                {
+                    SeekToSeconds = animation.MainFrameTimestamp
+                };
+            }
+            else
+            {
+                AnimatedPhoto?.Source = null;
+            }
+        }
+
+        // Statistics is the only row of the panel a bot shows, and the first one a channel does.
+        private void ShowStatistics(bool show)
+        {
+            if (show)
+            {
+                if (AdminPanel == null)
+                {
+                    FindName(nameof(AdminPanel));
+                }
+
+                Statistics.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                Statistics?.Visibility = Visibility.Collapsed;
+            }
+        }
+
+        private void UpdatePersonalChannel(Chat personalChat)
+        {
+            if (personalChat != null)
+            {
+                if (PersonalChannelRoot == null)
+                {
+                    FindName(nameof(PersonalChannelRoot));
+                }
+
                 PersonalChannelRoot.Visibility = Visibility.Visible;
                 PersonalChannelFooter.Text = Locale.Declension(Strings.R.Subscribers, ViewModel.ClientService.GetMembersCount(personalChat));
                 PersonalChannel.UpdateChat(ViewModel.ClientService, personalChat, new ChatListFolder(int.MaxValue));
             }
             else
             {
-                PersonalChannelRoot.Visibility = Visibility.Collapsed;
+                PersonalChannelRoot?.Visibility = Visibility.Collapsed;
             }
+        }
 
-            var openingHours = businessInfo?.OpeningHours;
-            if (openingHours != null)
+        private void UpdateBotVerification(BotVerification verification)
+        {
+            if (verification != null && ViewModel.ClientService.TryGetUser(verification.BotUserId, out User verifierBotUser))
             {
-                BusinessHours.Visibility = Visibility.Visible;
-                BusinessHours.UpdateHours(ViewModel.ClientService, openingHours);
-            }
-            else
-            {
-                BusinessHours.Visibility = Visibility.Collapsed;
-            }
+                if (BotVerifiedRoot == null)
+                {
+                    FindName(nameof(BotVerifiedRoot));
+                }
 
-            if (fullInfo.BotVerification != null && ViewModel.ClientService.TryGetUser(fullInfo.BotVerification.BotUserId, out User verifierBotUser))
-            {
-                var emoji = new CustomEmojiFileSource(ViewModel.ClientService, fullInfo.BotVerification.IconCustomEmojiId);
-                var text = fullInfo.BotVerification.CustomDescription.Text.Length > 0
-                    ? fullInfo.BotVerification.CustomDescription
+                // The constructor starts the icon's download.
+                _ = new CustomEmojiFileSource(ViewModel.ClientService, verification.IconCustomEmojiId);
+
+                var text = verification.CustomDescription.Text.Length > 0
+                    ? verification.CustomDescription
                     : string.Format(Strings.BotVerifierRepresentatives, verifierBotUser.FirstName).AsFormattedText();
 
-                BotVerifiedText.SetText(ViewModel.ClientService, ClientEx.Format("{0} {1}", ClientEx.CustomEmoji(fullInfo.BotVerification.IconCustomEmojiId), text));
+                BotVerifiedText.SetText(ViewModel.ClientService, ClientEx.Format("{0} {1}", ClientEx.CustomEmoji(verification.IconCustomEmojiId), text));
                 BotVerifiedText.SetQuery(string.Empty);
 
                 BotVerifiedRoot.Visibility = Visibility.Visible;
             }
             else
             {
-                BotVerifiedRoot.Visibility = Visibility.Collapsed;
+                BotVerifiedRoot?.Visibility = Visibility.Collapsed;
             }
         }
 
@@ -1098,9 +1325,19 @@ namespace Telegram.Controls
                 _ => false
             };
 
-            SubtitleWhen.Visibility = when
-                ? Visibility.Visible
-                : Visibility.Collapsed;
+            if (when)
+            {
+                if (SubtitleWhen == null)
+                {
+                    FindName(nameof(SubtitleWhen));
+                }
+
+                SubtitleWhen.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                SubtitleWhen?.Visibility = Visibility.Collapsed;
+            }
         }
 
 
@@ -1109,6 +1346,11 @@ namespace Telegram.Controls
         {
             if (secretChat.State is SecretChatStateReady)
             {
+                if (MiscPanel == null)
+                {
+                    FindName(nameof(MiscPanel));
+                }
+
                 SecretLifetime.Badge = chat.MessageAutoDeleteTime > 0 ? Locale.FormatTtl(chat.MessageAutoDeleteTime) : Strings.ShortMessageLifetimeForever;
                 //SecretIdenticon.Source = Direct2D.GetIdenticon(secretChat.KeyHash, 24);
 
@@ -1118,9 +1360,7 @@ namespace Telegram.Controls
             }
             else
             {
-                MiscPanel.Visibility = Visibility.Collapsed;
-                SecretLifetime.Visibility = Visibility.Collapsed;
-                SecretHashKey.Visibility = Visibility.Collapsed;
+                MiscPanel?.Visibility = Visibility.Collapsed;
             }
         }
 
@@ -1129,30 +1369,32 @@ namespace Telegram.Controls
         public void UpdateBasicGroupFullInfo(Chat chat, BasicGroup group, BasicGroupFullInfo fullInfo)
         {
             Subtitle.Text = Locale.Declension(Strings.R.Members, group.MemberCount);
-            SubtitleWhen.Visibility = Visibility.Collapsed;
+            SubtitleWhen?.Visibility = Visibility.Collapsed;
 
             RatingRoot.Visibility = Visibility.Collapsed;
 
             Description.Description = Strings.DescriptionPlaceholder;
 
             UserPhone.Visibility = Visibility.Collapsed;
-            Location.Visibility = Visibility.Collapsed;
+            _phoneNumber = null;
+            Location?.Visibility = Visibility.Collapsed;
             Username.Visibility = Visibility.Collapsed;
 
             Description.Visibility = Visibility.Collapsed;
 
             //UserCommonChats.Visibility = Visibility.Collapsed;
-            MiscPanel.Visibility = Visibility.Collapsed;
+            MiscPanel?.Visibility = Visibility.Collapsed;
 
-            SecretLifetime.Visibility = Visibility.Collapsed;
-            SecretHashKey.Visibility = Visibility.Collapsed;
+            if (AdminPanel != null)
+            {
+                Admins.Visibility = Visibility.Collapsed;
+                Members.Visibility = Visibility.Collapsed;
+                Statistics.Visibility = Visibility.Collapsed;
+                ChannelSettings.Visibility = Visibility.Collapsed;
+            }
 
-            Admins.Visibility = Visibility.Collapsed;
-            Members.Visibility = Visibility.Collapsed;
-            Statistics.Visibility = Visibility.Collapsed;
-            AffiliateProgram.Visibility = Visibility.Collapsed;
-            ChannelSettings.Visibility = Visibility.Collapsed;
-            UnofficialRoot.Visibility = Visibility.Collapsed;
+            AffiliateProgram?.Visibility = Visibility.Collapsed;
+            UnofficialRoot?.Visibility = Visibility.Collapsed;
 
             if (chat.Permissions.CanChangeInfo || group.Status is ChatMemberStatusCreator || group.Status is ChatMemberStatusAdministrator)
             {
@@ -1186,41 +1428,32 @@ namespace Telegram.Controls
             Call.Visibility = Visibility.Collapsed;
             VideoCall.Visibility = Visibility.Collapsed;
 
-            BotMainApp.Visibility = Visibility.Collapsed;
+            BotMainApp?.Visibility = Visibility.Collapsed;
+            BotActionsRoot?.Visibility = Visibility.Collapsed;
 
             AnonymousNumber.Visibility = Visibility.Collapsed;
             AnonymousNumberSeparator.Visibility = Visibility.Collapsed;
 
-            PersonalChannelRoot.Visibility = Visibility.Collapsed;
+            PersonalChannelRoot?.Visibility = Visibility.Collapsed;
             UserBirthday.Visibility = Visibility.Collapsed;
 
-            BusinessHours.Visibility = Visibility.Collapsed;
+            BusinessHours?.Visibility = Visibility.Collapsed;
 
             if (fullInfo == null)
             {
                 return;
             }
 
-            var animation = fullInfo.Photo?.SmallAnimation ?? fullInfo.Photo?.Animation;
-            if (animation != null)
-            {
-                AnimatedPhoto.Source = new DelayedFileSource(ViewModel.ClientService, animation.File)
-                {
-                    SeekToSeconds = animation.MainFrameTimestamp
-                };
-            }
-            else
-            {
-                AnimatedPhoto.Source = null;
-            }
-
+            UpdateAnimatedPhoto(fullInfo.Photo?.SmallAnimation ?? fullInfo.Photo?.Animation);
             GetEntities(fullInfo.Description);
 
-            Description.Visibility = string.IsNullOrEmpty(fullInfo.Description)
-                ? Visibility.Collapsed
-                : Visibility.Visible;
+            var description = !string.IsNullOrEmpty(fullInfo.Description);
 
-            InfoPanel.Visibility = Description.Visibility == Visibility.Visible || ChatId.Visibility == Visibility.Visible
+            Description.Visibility = description
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+
+            InfoPanel.Visibility = description || ChatId?.Visibility == Visibility.Visible
                 ? Visibility.Visible
                 : Visibility.Collapsed;
         }
@@ -1232,21 +1465,20 @@ namespace Telegram.Controls
             if (ViewModel.ForumTopic != null)
             {
                 Subtitle.Text = string.Format(Strings.TopicProfileStatus, chat.Title);
-                SubtitleWhen.Visibility = Visibility.Collapsed;
             }
             else if (fullInfo != null)
             {
                 Subtitle.Text = Locale.Declension(group.IsChannel ? Strings.R.Subscribers : Strings.R.Members, fullInfo.MemberCount);
-                SubtitleWhen.Visibility = Visibility.Collapsed;
             }
             else
             {
                 Subtitle.Text = Locale.Declension(group.IsChannel ? Strings.R.Subscribers : Strings.R.Members, group.MemberCount);
-                SubtitleWhen.Visibility = Visibility.Collapsed;
             }
 
+            SubtitleWhen?.Visibility = Visibility.Collapsed;
+
             RatingRoot.Visibility = Visibility.Collapsed;
-            UnofficialRoot.Visibility = Visibility.Collapsed;
+            UnofficialRoot?.Visibility = Visibility.Collapsed;
 
             Description.Description = Strings.DescriptionPlaceholder;
 
@@ -1261,16 +1493,12 @@ namespace Telegram.Controls
                             Username.Content = link.Link;
                             Username.Visibility = Visibility.Visible;
 
-                            if (link.IsPublic)
-                            {
-                                ActiveUsernames.Inlines.Clear();
-                                ActiveUsernames.Inlines.Add(new Run { Text = Strings.InviteLink });
-                            }
-                            else
-                            {
-                                ActiveUsernames.Inlines.Clear();
-                                ActiveUsernames.Inlines.Add(new Run { Text = Strings.InviteLinkPrivate });
-                            }
+                            // The code encodes the forum's username, which a private forum does not have.
+                            UsernameQrCode.Visibility = link.IsPublic
+                                ? Visibility.Visible
+                                : Visibility.Collapsed;
+
+                            SetUsernamesText(link.IsPublic ? Strings.InviteLink : Strings.InviteLinkPrivate);
                         });
                     }
                 });
@@ -1281,6 +1509,7 @@ namespace Telegram.Controls
                 {
                     Username.Content = username;
                     Username.Visibility = Visibility.Visible;
+                    UsernameQrCode.Visibility = Visibility.Visible;
                 }
                 else
                 {
@@ -1290,7 +1519,19 @@ namespace Telegram.Controls
                 UpdateUsernames(group.Usernames);
             }
 
-            Location.Visibility = group.HasLocation ? Visibility.Visible : Visibility.Collapsed;
+            if (group.HasLocation)
+            {
+                if (Location == null)
+                {
+                    FindName(nameof(Location));
+                }
+
+                Location.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                Location?.Visibility = Visibility.Collapsed;
+            }
 
             if (chat.VideoChat.GroupCallId != 0 || group.CanManageVideoChats())
             {
@@ -1335,46 +1576,53 @@ namespace Telegram.Controls
                 : Strings.VoipGroupOpenGroup;
 
             // Unused:
-            BotMainApp.Visibility = Visibility.Collapsed;
-            MiscPanel.Visibility = Visibility.Collapsed;
+            BotMainApp?.Visibility = Visibility.Collapsed;
+            BotActionsRoot?.Visibility = Visibility.Collapsed;
+            MiscPanel?.Visibility = Visibility.Collapsed;
             UserPhone.Visibility = Visibility.Collapsed;
+            _phoneNumber = null;
             //UserCommonChats.Visibility = Visibility.Collapsed;
-            SecretLifetime.Visibility = Visibility.Collapsed;
-            SecretHashKey.Visibility = Visibility.Collapsed;
 
             AnonymousNumber.Visibility = Visibility.Collapsed;
             AnonymousNumberSeparator.Visibility = Visibility.Collapsed;
 
             UserBirthday.Visibility = Visibility.Collapsed;
 
-            BusinessHours.Visibility = Visibility.Collapsed;
+            BusinessHours?.Visibility = Visibility.Collapsed;
 
             if (fullInfo == null || ViewModel.ForumTopic != null)
             {
                 return;
             }
 
-            var animation = fullInfo.Photo?.SmallAnimation ?? fullInfo.Photo?.Animation;
-            if (animation != null)
-            {
-                AnimatedPhoto.Source = new DelayedFileSource(ViewModel.ClientService, animation.File)
-                {
-                    SeekToSeconds = animation.MainFrameTimestamp
-                };
-            }
-            else
-            {
-                AnimatedPhoto.Source = null;
-            }
+            UpdateAnimatedPhoto(fullInfo.Photo?.SmallAnimation ?? fullInfo.Photo?.Animation);
 
             GetEntities(fullInfo.Description);
             Description.Visibility = string.IsNullOrEmpty(fullInfo.Description) ? Visibility.Collapsed : Visibility.Visible;
 
-            Location.Visibility = fullInfo.Location != null ? Visibility.Visible : Visibility.Collapsed;
-            Location.Content = fullInfo.Location?.Address;
+            if (fullInfo.Location != null)
+            {
+                if (Location == null)
+                {
+                    FindName(nameof(Location));
+                }
+
+                Location.Visibility = Visibility.Visible;
+                Location.Content = fullInfo.Location.Address;
+            }
+            else if (Location != null)
+            {
+                Location.Visibility = Visibility.Collapsed;
+                Location.Content = null;
+            }
 
             if (group.IsChannel && group.Status is ChatMemberStatusCreator or ChatMemberStatusAdministrator)
             {
+                if (AdminPanel == null)
+                {
+                    FindName(nameof(AdminPanel));
+                }
+
                 Admins.Visibility = Visibility.Visible;
                 Members.Visibility = Visibility.Visible;
                 ChannelSettings.Visibility = Visibility.Visible;
@@ -1382,51 +1630,30 @@ namespace Telegram.Controls
                 Admins.Badge = fullInfo.AdministratorCount.ToString("N0");
                 Members.Badge = fullInfo.MemberCount.ToString("N0");
             }
-            else
+            else if (AdminPanel != null)
             {
                 Admins.Visibility = Visibility.Collapsed;
                 Members.Visibility = Visibility.Collapsed;
                 ChannelSettings.Visibility = Visibility.Collapsed;
             }
 
-            Statistics.Visibility = fullInfo.CanGetRevenueStatistics || fullInfo.CanGetStarRevenueStatistics
-                ? Visibility.Visible
-                : Visibility.Collapsed;
-            AffiliateProgram.Visibility = Visibility.Collapsed;
+            ShowStatistics(fullInfo.CanGetRevenueStatistics || fullInfo.CanGetStarRevenueStatistics);
+            AffiliateProgram?.Visibility = Visibility.Collapsed;
 
-            if (group.IsChannel is false && ViewModel.ClientService.TryGetChat(fullInfo.LinkedChatId, out Chat linkedChat) && linkedChat.LastMessage != null)
-            {
-                PersonalChannelRoot.Visibility = Visibility.Visible;
-                PersonalChannelFooter.Text = Locale.Declension(Strings.R.Subscribers, ViewModel.ClientService.GetMembersCount(linkedChat));
-                PersonalChannel.UpdateChat(ViewModel.ClientService, linkedChat, new ChatListFolder(int.MaxValue));
-            }
-            else
-            {
-                PersonalChannelRoot.Visibility = Visibility.Collapsed;
-            }
-
-            if (fullInfo.BotVerification != null && ViewModel.ClientService.TryGetUser(fullInfo.BotVerification.BotUserId, out User verifierBotUser))
-            {
-                var emoji = new CustomEmojiFileSource(ViewModel.ClientService, fullInfo.BotVerification.IconCustomEmojiId);
-                var text = fullInfo.BotVerification.CustomDescription.Text.Length > 0
-                    ? fullInfo.BotVerification.CustomDescription
-                    : string.Format(Strings.BotVerifierRepresentatives, verifierBotUser.FirstName).AsFormattedText();
-
-                BotVerifiedText.SetText(ViewModel.ClientService, ClientEx.Format("{0} {1}", ClientEx.CustomEmoji(fullInfo.BotVerification.IconCustomEmojiId), text));
-                BotVerifiedText.SetQuery(string.Empty);
-                BotVerifiedRoot.Visibility = Visibility.Visible;
-            }
-            else
-            {
-                BotVerifiedRoot.Visibility = Visibility.Collapsed;
-            }
+            UpdatePersonalChannel(group.IsChannel is false && ViewModel.ClientService.TryGetChat(fullInfo.LinkedChatId, out Chat linkedChat) && linkedChat.LastMessage != null ? linkedChat : null);
+            UpdateBotVerification(fullInfo.BotVerification);
         }
+
+        // 0 when the text is unknown, 1 when it is the plain label, 2 when it lists other usernames.
+        private int _usernamesState;
 
         private void UpdateUsernames(Usernames usernames)
         {
             if (usernames?.ActiveUsernames.Count > 1)
             {
-                ActiveUsernames.Inlines.Clear();
+                ClearUsernames();
+                _usernamesState = 2;
+
                 ActiveUsernames.Inlines.Add(new Run { Text = string.Format(Strings.UsernameAlso, string.Empty) });
 
                 for (int i = 1; i < usernames.ActiveUsernames.Count; i++)
@@ -1436,20 +1663,50 @@ namespace Telegram.Controls
                         ActiveUsernames.Inlines.Add(new Run { Text = ", " });
                     }
 
-                    var username = usernames.ActiveUsernames[i];
-
                     var hyperlink = new Hyperlink();
-                    hyperlink.Inlines.Add(new Run { Text = $"@{username}" });
+                    hyperlink.Inlines.Add(new Run { Text = $"@{usernames.ActiveUsernames[i]}" });
                     hyperlink.UnderlineStyle = UnderlineStyle.None;
-                    hyperlink.Click += (s, args) => Username_Click(username);
+                    hyperlink.Click += Username_Click;
 
                     ActiveUsernames.Inlines.Add(hyperlink);
                 }
             }
-            else
+            else if (_usernamesState != 1)
             {
-                ActiveUsernames.Inlines.Clear();
-                ActiveUsernames.Inlines.Add(new Run { Text = Strings.Username });
+                SetUsernamesText(Strings.Username);
+                _usernamesState = 1;
+            }
+        }
+
+        private void SetUsernamesText(string text)
+        {
+            ClearUsernames();
+            _usernamesState = 0;
+
+            ActiveUsernames.Inlines.Add(new Run { Text = text });
+        }
+
+        private void ClearUsernames()
+        {
+            if (_usernamesState == 2)
+            {
+                foreach (var inline in ActiveUsernames.Inlines)
+                {
+                    if (inline is Hyperlink hyperlink)
+                    {
+                        hyperlink.Click -= Username_Click;
+                    }
+                }
+            }
+
+            ActiveUsernames.Inlines.Clear();
+        }
+
+        private void Username_Click(Hyperlink sender, HyperlinkClickEventArgs args)
+        {
+            if (sender.Inlines.Count > 0 && sender.Inlines[0] is Run run && run.Text.Length > 1)
+            {
+                ViewModel.OpenUsernameInfo(run.Text.Substring(1));
             }
         }
 
@@ -1484,7 +1741,7 @@ namespace Telegram.Controls
             async void Remove()
             {
                 var confirm = await ViewModel.ShowPopupAsync(Strings.ProfileNotesRemoveText, Strings.ProfileNotesRemoveTitle, Strings.Delete, Strings.Cancel, destructive: true);
-                if (confirm == ContentDialogResult.Primary && ViewModel.ClientService.TryGetUser(ViewModel.Chat, out User user))
+                if (confirm == ModalPopupResult.Primary && ViewModel.ClientService.TryGetUser(ViewModel.Chat, out User user))
                 {
                     ViewModel.ClientService.Send(new SetUserNote(user.Id, string.Empty.AsFormattedText()));
                 }
@@ -1572,13 +1829,8 @@ namespace Telegram.Controls
                     }
                     else
                     {
-                        if (user.Type is UserTypeBot bot)
+                        if (user.Type is UserTypeBot)
                         {
-                            if (bot.CanJoinGroups)
-                            {
-                                flyout.CreateFlyoutItem(ViewModel.Invite, Strings.BotInvite, Icons.PersonAdd);
-                            }
-
                             flyout.CreateFlyoutItem(() => { }, Strings.BotShare, Icons.Share);
                             flyout.CreateFlyoutItem(ViewModel.PrivacyPolicy, Strings.BotPrivacyPolicy, Icons.ShieldCheckmark);
                         }
@@ -1659,6 +1911,11 @@ namespace Telegram.Controls
                 if (fullInfo != null && fullInfo.CanGetStatistics)
                 {
                     flyout.CreateFlyoutItem(ViewModel.OpenStatistics, Strings.Statistics, Icons.DataUsage);
+                }
+
+                if (chat.CanPostStories(ViewModel.ClientService))
+                {
+                    flyout.CreateFlyoutItem(ViewModel.AddStory, Strings.AddStory, Icons.StoriesAdd);
                 }
 
                 if (supergroup.CanEditStories())
@@ -1792,11 +2049,6 @@ namespace Telegram.Controls
         }
 
         #endregion
-
-        private void Username_Click(string username)
-        {
-            ViewModel.OpenUsernameInfo(username);
-        }
 
         private void Notifications_Click(object sender, RoutedEventArgs e)
         {
@@ -2112,7 +2364,7 @@ namespace Telegram.Controls
                 && fullInfo.TonWalletCard != null)
             {
                 var confirm = await ViewModel.ShowPopupAsync(new WalletBalancePopup(clientService, user, fullInfo.TonWalletCard, UserBalanceRoot));
-                if (confirm == ContentDialogResult.Primary)
+                if (confirm == ModalPopupResult.Primary)
                 {
                     ViewModel.SendMoney();
                 }

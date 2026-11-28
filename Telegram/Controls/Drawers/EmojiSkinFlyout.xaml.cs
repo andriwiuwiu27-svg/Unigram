@@ -11,20 +11,21 @@ using Telegram.Td.Api;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Automation;
 using Windows.UI.Xaml.Controls;
+using Windows.UI.Xaml.Controls.Primitives;
 
 namespace Telegram.Controls.Drawers
 {
     public sealed partial class EmojiSkinFlyout : Grid
     {
         private readonly EmojiDrawer _drawer;
-        private readonly Flyout _flyout;
+        private readonly FlyoutBase _flyout;
         private readonly EmojiSkinData _emoji;
         private readonly (string, string) _outlines;
 
         private EmojiSkinTone _tone1;
         private EmojiSkinTone _tone2;
 
-        public EmojiSkinFlyout(EmojiDrawer drawer, Flyout flyout, EmojiSkinData emoji)
+        public EmojiSkinFlyout(EmojiDrawer drawer, FlyoutBase flyout, EmojiSkinData emoji)
         {
             InitializeComponent();
 

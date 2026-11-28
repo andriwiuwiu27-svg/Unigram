@@ -19,8 +19,10 @@ using Windows.UI.Xaml.Input;
 
 namespace Telegram.Controls
 {
-    public sealed partial class PlaybackMasterHeader : UserControlEx
+    public sealed partial class PlaybackMasterHeader : UserControlEx, ISlidePanelChild
     {
+        private readonly SlidePanel.SlideState _slide;
+
         private IClientService _clientService;
         private INavigationService _navigationService;
 
@@ -43,6 +45,8 @@ namespace Telegram.Controls
             _visual2 = ElementComposition.GetElementVisual(Label2);
 
             _visual = _visual1;
+
+            _slide = new SlidePanel.SlideState(this, false, 32);
         }
 
         private bool _collapsed;
@@ -303,6 +307,58 @@ namespace Telegram.Controls
         private void Buttons_SizeChanged(object sender, SizeChangedEventArgs e)
         {
             ViewButton.Padding = new Thickness(LeftButtons.ActualWidth + 4, 0, RightButtons.ActualWidth + 4, 0);
+        }
+
+        public SlidePanel.SlideState SlideState => _slide;
+
+        private bool _isFirst;
+        public bool IsFirst
+        {
+            get => _isFirst;
+            set
+            {
+                if (_isFirst != value)
+                {
+                    UpdateAttach(_isFirst = value, _isLast);
+                }
+            }
+        }
+
+        private bool _isLast;
+        public bool IsLast
+        {
+            get => _isLast;
+            set
+            {
+                if (_isLast != value)
+                {
+                    UpdateAttach(_isFirst, _isLast = value);
+                }
+            }
+        }
+
+        private double _cardRadius;
+        public double CardRadius
+        {
+            get => _cardRadius;
+            set
+            {
+                if (_cardRadius != value)
+                {
+                    _cardRadius = value;
+                    UpdateAttach(_isFirst, _isLast);
+                }
+            }
+        }
+
+        private void UpdateAttach(bool first, bool last)
+        {
+            var radiusTop = first ? _cardRadius : 0;
+            var radiusBottom = last ? _cardRadius : 0;
+
+            // Clips the view button's pointer-over fill and the progress bar to the card.
+            RootGrid.CornerRadius = new CornerRadius(radiusTop, radiusTop, radiusBottom, radiusBottom);
+            Divider.Opacity = last ? 0 : 1;
         }
     }
 }

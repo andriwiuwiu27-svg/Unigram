@@ -287,6 +287,11 @@ namespace Telegram.Views.Popups
 
         public long PaidMessageStarCount { get; private set; }
 
+        /// <summary>
+        /// Opens the editor on the first item once the popup is on screen.
+        /// </summary>
+        public bool EditOnOpen { get; set; }
+
         public SendFilesPopup(ComposeViewModel viewModel, StorageMediaSource source, Func<StorageMedia, bool> validating, bool media, ChatPermissions permissions, bool ttlAllowed, bool schedule, bool savedMessages, bool editing)
         {
             InitializeComponent();
@@ -371,6 +376,8 @@ namespace Telegram.Views.Popups
 
             MoreButton.Margin = new Thickness(0, -62, editing ? 40 : 80, 0);
 
+            Opened += OnOpened;
+
             UpdateView();
             UpdatePanel();
         }
@@ -426,12 +433,12 @@ namespace Telegram.Views.Popups
                 return;
             }
 
-            SetResult(ContentDialogResult.Primary);
+            SetResult(ModalPopupResult.Primary);
         }
 
         private void OnSecondaryButtonClick(ModalPopup sender, ModalPopupButtonClickEventArgs args)
         {
-            SetResult(ContentDialogResult.Secondary);
+            SetResult(ModalPopupResult.Secondary);
         }
 
         private void Autocomplete_ItemClick(object sender, ItemClickEventArgs e)
@@ -690,7 +697,7 @@ namespace Telegram.Views.Popups
                 return;
             }
 
-            if (storage is StorageVideo video)
+            if (storage is StorageVideo { IsOriginalAnimation: false } video)
             {
                 mute.IsChecked = video.IsMuted;
                 mute.Visibility = Visibility.Visible;
@@ -755,7 +762,7 @@ namespace Telegram.Views.Popups
             }
 
             Caption = CaptionInput.GetFormattedText();
-            Hide(ContentDialogResult.Primary);
+            Hide(ModalPopupResult.Primary);
         }
 
         private void CaptionInput_Submitted(object sender, EventArgs e)
@@ -1316,14 +1323,8 @@ namespace Telegram.Views.Popups
 
             if (StarCount > 0)
             {
-                var text = Locale.Declension(Strings.R.UnlockPaidContent, StarCount);
-                var index = text.IndexOf("\u2B50\uFE0F");
-
-                var TextPart1 = root.FindName("TextPart1") as Run;
-                var TextPart2 = root.FindName("TextPart2") as Run;
-
-                TextPart1.Text = text.Substring(0, index);
-                TextPart2.Text = text.Substring(index + 2);
+                var UnlockText = root.FindName("UnlockText") as TextBlock;
+                UnlockText.Text = Locale.Declension(Strings.R.UnlockPaidContent, StarCount).ReplaceStar(Icons.PremiumStar);
 
                 PaidMediaButton.Visibility = Visibility.Visible;
             }
@@ -1454,44 +1455,43 @@ namespace Telegram.Views.Popups
             }
         }
 
-        private async void Crop_Click(object sender, RoutedEventArgs e)
+        private void Crop_Click(object sender, RoutedEventArgs e)
         {
             var button = sender as ToggleButton;
             if (button.Tag is StorageMedia media)
             {
-                var parent = button.GetParent<AspectView>();
-                if (parent != null)
-                {
-                    ConnectedAnimationServiceEx.PrepareToAnimate("EditMediaPopup", parent);
-                }
-
-                var popup = new EditMediaPopup(XamlRoot, ViewModel.ClientService, media);
-
-                var confirm = await popup.ShowAsync();
-                if (confirm == ContentDialogResult.Primary)
-                {
-                    _thumbnails.Invalidate(media);
-
-                    UpdateView();
-                    UpdatePanel();
-                }
+                Edit(media, button.GetParent<AspectView>());
             }
         }
 
-        private async void Album_ItemClick(object sender, StorageMedia args)
+        private void Album_ItemClick(object sender, StorageMedia args)
         {
-            var parent = sender as UIElement;
-            if (parent != null)
+            Edit(args, sender as UIElement);
+        }
+
+        private void OnOpened(ModalPopup sender, ModalPopupOpenedEventArgs args)
+        {
+            Opened -= OnOpened;
+
+            if (EditOnOpen && Items.Count > 0)
             {
-                ConnectedAnimationServiceEx.PrepareToAnimate("EditMediaPopup", parent);
+                Edit(Items[0], null);
+            }
+        }
+
+        private async void Edit(StorageMedia media, UIElement source)
+        {
+            if (source != null)
+            {
+                ConnectedAnimationServiceEx.PrepareToAnimate("EditMediaPopup", source);
             }
 
-            var popup = new EditMediaPopup(XamlRoot, ViewModel.ClientService, args);
+            var popup = new EditMediaPopup(XamlRoot, ViewModel.ClientService, media);
 
             var confirm = await popup.ShowAsync();
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
-                _thumbnails.Invalidate(args);
+                _thumbnails.Invalidate(media);
 
                 UpdateView();
                 UpdatePanel();
@@ -1543,19 +1543,19 @@ namespace Telegram.Views.Popups
         private void SendWithoutGrouping()
         {
             IsAlbum = false;
-            Hide(ContentDialogResult.Primary);
+            Hide(ModalPopupResult.Primary);
         }
 
         private void SendWithoutSound()
         {
             Silent = true;
-            Hide(ContentDialogResult.Primary);
+            Hide(ModalPopupResult.Primary);
         }
 
         private void SendScheduled()
         {
             Schedule = SchedulingState.Schedule;
-            Hide(ContentDialogResult.Primary);
+            Hide(ModalPopupResult.Primary);
         }
 
         private void OnLoaded(object sender, RoutedEventArgs e)
@@ -1778,7 +1778,7 @@ namespace Telegram.Views.Popups
             //};
 
             var confirm = await popup.ShowAsync(XamlRoot);
-            if (confirm != ContentDialogResult.Primary)
+            if (confirm != ModalPopupResult.Primary)
             {
                 return;
             }
@@ -2218,7 +2218,10 @@ namespace Telegram.Views.Popups
                         var preview = new BitmapImage();
                         ThumbnailController.SetDecodeSize(preview, 300, 0, xamlRoot);
 
-                        using var stream = await media.File.OpenReadAsync();
+                        // This runs synchronously inside XAML's layout tick. A brokered file's first
+                        // call blocks on cross-process COM, whose modal loop pumps pointer input, and
+                        // WinUI halts the app on input that arrives while the tick holds its guard.
+                        using var stream = await Task.Run(async () => await media.File.OpenReadAsync());
                         await preview.SetSourceAsync(stream);
 
                         source = preview;

@@ -132,15 +132,16 @@
                            FontFamily="{ThemeResource EmojiThemeFontFamilyWithMonospace}"
                            FontSize="12"
                            Grid.Row="2" />
+                <!-- Centred as a whole, so the shadow's host is the size of the text. -->
                 <Grid Opacity="0.3"
+                      HorizontalAlignment="Center"
                       Margin="0,4"
                       Grid.Row="3">
                     <Border x:Name="AddressShadow" />
                     <TextBlock x:Name="Address"
                                Foreground="#000000"
                                FontFamily="{ThemeResource EmojiThemeFontFamilyWithMonospace}"
-                               FontSize="10"
-                               HorizontalAlignment="Center" />
+                               FontSize="10" />
                 </Grid>
             </Grid>
 

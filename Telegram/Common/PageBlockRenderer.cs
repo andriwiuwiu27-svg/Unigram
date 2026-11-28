@@ -156,7 +156,7 @@ namespace Telegram.Common
                 PageBlockThinking thinking => ProcessThinking(clientService, thinking),
                 // All
                 PageBlockFooter or PageBlockParagraph or PageBlockSectionHeading => ProcessText(clientService, block, false, true),
-                PageBlockBlockQuote blockquote => ProcessBlockquote(clientService, blockquote),
+                PageBlockBlockQuote blockquote => ProcessBlockquote(clientService, blockquote, blockquote.Blocks),
                 PageBlockDivider divider => ProcessDivider(clientService, divider),
                 PageBlockPhoto photo => ProcessPhoto(clientService, photo, parent),
                 PageBlockList list => ProcessList(clientService, list),
@@ -165,7 +165,7 @@ namespace Telegram.Common
                 PageBlockSlideshow slideshow => ProcessSlideshow(clientService, slideshow),
                 PageBlockCollage collage => ProcessCollage(clientService, collage),
                 PageBlockPullQuote pullquote => ProcessPullquote(clientService, pullquote),
-                PageBlockExpandableBlockQuote expandable => ProcessExpandableBlockquote(clientService, expandable),
+                PageBlockExpandableBlockQuote expandable => ProcessBlockquote(clientService, expandable, expandable.Blocks, true),
                 PageBlockDocument document => ProcessDocument(clientService, document),
                 PageBlockButtonRow buttonRow => ProcessButtonRow(clientService, buttonRow),
                 PageBlockAnchor anchor => ProcessAnchor(clientService, anchor),
@@ -862,9 +862,8 @@ namespace Telegram.Common
                 PageBlockParagraph paragraph => paragraph.Text,
                 PageBlockPreformatted preformatted => preformatted.Text,
                 PageBlockBlockQuote blockquote => blockquote.Credit,
+                PageBlockExpandableBlockQuote expandable => expandable.Credit,
                 PageBlockPullQuote pullquote => caption ? pullquote.Credit : pullquote.Text,
-                // Holds rich text directly, like the pull quote — not blocks like PageBlockBlockQuote.
-                PageBlockExpandableBlockQuote expandable => caption ? expandable.Credit : expandable.Text,
                 PageBlockDetails details => details.Header,
                 PageBlockTable table => table.Caption,
                 PageBlockRelatedArticles relatedArticles => relatedArticles.Header,
@@ -911,19 +910,10 @@ namespace Telegram.Common
                     ApplyStyle(element, InfoCaptionStyle, InfoCaptionDirectStyle);
                     break;
                 case PageBlockBlockQuote:
+                case PageBlockExpandableBlockQuote:
                     ApplyStyle(element, PullquoteCreditStyle, PullquoteCreditDirectStyle);
                     textBlock.FontWeight = FontWeights.SemiBold;
                     element.Margin = new Thickness(0, 0, 0, 0);
-                    break;
-                case PageBlockExpandableBlockQuote:
-                    // Only the credit is styled: the body is the quote's own text and
-                    // reads like body copy, exactly as in a plain block quote.
-                    if (caption)
-                    {
-                        ApplyStyle(element, PullquoteCreditStyle, PullquoteCreditDirectStyle);
-                        textBlock.FontWeight = FontWeights.SemiBold;
-                        element.Margin = new Thickness(0, 0, 0, 0);
-                    }
                     break;
                 case PageBlockPullQuote:
                     textBlock.TextAlignment = TextAlignment.Center;
@@ -1239,11 +1229,13 @@ namespace Telegram.Common
             return panel;
         }
 
-        private FrameworkElement ProcessBlockquote(IClientService clientService, PageBlockBlockQuote block)
+        private FrameworkElement ProcessBlockquote(IClientService clientService, PageBlock block, Vector<PageBlock> blocks, bool expandable = false)
         {
-            var content = new StackPanel(); //{ Style = _context.Resources["BlockBlockquoteStyle"] as Style };
+            Panel content = expandable
+                ? new TrimmableBlockPanel { MaxLines = 3 }
+                : new StackPanel();
 
-            foreach (var item in block.Blocks)
+            foreach (var item in blocks)
             {
                 var child = ProcessBlock(clientService, item, block);
                 if (child != null)
@@ -1252,65 +1244,13 @@ namespace Telegram.Common
                 }
             }
 
-            UpdateSpacing(content, block.Blocks, false);
+            UpdateSpacing(content, blocks, false);
 
             var caption = ProcessText(clientService, block, true, false);
             if (caption != null)
             {
                 ApplyStyle(caption, PullquoteCreditStyle, PullquoteCreditDirectStyle);
                 content.Children.Add(caption);
-            }
-
-            return new BlockQuote
-            {
-                Glyph = Icons.QuoteBlockFilled16,
-                Content = content,
-                Padding = new Thickness(8, 4, 24, 6)
-            };
-        }
-
-        // Unlike PageBlockBlockQuote this holds rich text directly, so the body comes
-        // from ProcessText rather than from nested blocks. That's also what makes the
-        // collapse affordance possible here: BlockQuote.IsExpandable only drives a
-        // FormattedTextBlock, which is exactly what ProcessText returns — so the quote
-        // starts clamped and the chevron expands it. With a credit the content becomes
-        // a panel instead, and the control (correctly) reports itself non-expandable.
-        // TODO: support expandable + caption?
-        private FrameworkElement ProcessExpandableBlockquote(IClientService clientService, PageBlockExpandableBlockQuote block)
-        {
-            var text = ProcessText(clientService, block, false, false);
-            var caption = ProcessText(clientService, block, true, false);
-
-            if (text == null && caption == null)
-            {
-                return null;
-            }
-
-            FrameworkElement content;
-            var expandable = false;
-
-            if (caption == null && text is ITrimmableText trimmable)
-            {
-                trimmable.MaxLines = 3;
-                content = text;
-                expandable = true;
-            }
-            else
-            {
-                var panel = new StackPanel();
-
-                if (text != null)
-                {
-                    panel.Children.Add(text);
-                }
-
-                if (caption != null)
-                {
-                    ApplyStyle(caption, PullquoteCreditStyle, PullquoteCreditDirectStyle);
-                    panel.Children.Add(caption);
-                }
-
-                content = panel;
             }
 
             return new BlockQuote

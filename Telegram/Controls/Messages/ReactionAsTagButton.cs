@@ -28,6 +28,8 @@ namespace Telegram.Controls.Messages
 
         protected override void OnLoaded()
         {
+            base.OnLoaded();
+
             if (_tag != null)
             {
                 _tag.PropertyChanged += OnPropertyChanged;
@@ -179,7 +181,7 @@ namespace Telegram.Controls.Messages
             popup.SecondaryButtonText = Strings.Cancel;
 
             var confirm = await popup.ShowQueuedAsync(XamlRoot);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 _message.ClientService.Send(new SetSavedMessagesTagLabel(chosen.Type, popup.Text));
             }

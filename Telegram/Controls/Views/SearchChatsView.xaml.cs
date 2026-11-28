@@ -14,6 +14,7 @@ using Telegram.Common;
 using Telegram.Controls.Cells;
 using Telegram.Controls.Media;
 using Telegram.Navigation;
+using Telegram.Navigation.Services;
 using Telegram.Td.Api;
 using Telegram.ViewModels;
 using Telegram.Views;
@@ -48,9 +49,13 @@ namespace Telegram.Controls.Views
         private SearchChatsViewModel _viewModel;
         public SearchChatsViewModel ViewModel => _viewModel ??= DataContext as SearchChatsViewModel;
 
+        private readonly ThemeShadowEx _chatFoldersShadow;
+
         public SearchChatsView()
         {
             InitializeComponent();
+
+            _chatFoldersShadow = new ThemeShadowEx(ChatFoldersShadow, Constants.BubbleElevation);
         }
 
         public Thickness PaddingImpl
@@ -126,7 +131,7 @@ namespace Telegram.Controls.Views
         public bool AreTabsVisible
         {
             get => ChatFolders.Visibility == Visibility.Visible;
-            set => ChatFolders.Visibility = value
+            set => ChatFolders.Visibility = ChatFoldersShadow.Visibility = value
                 ? Visibility.Visible
                 : Visibility.Collapsed;
         }
@@ -451,14 +456,11 @@ namespace Telegram.Controls.Views
         {
             if (ChatFolders.SelectedItem is SearchChatsTabItem page /*&& page.Type != MediaFrame.Content?.GetType()*/)
             {
-                NavigationTransitionInfo transition = _prevSelectedIndex == -1
-                ? new SuppressNavigationTransitionInfo()
-                : new SlideNavigationTransitionInfo
-                {
-                    Effect = _prevSelectedIndex < ChatFolders.SelectedIndex
-                        ? SlideNavigationTransitionEffect.FromRight
-                        : SlideNavigationTransitionEffect.FromLeft
-                };
+                var transition = _prevSelectedIndex == -1
+                    ? PageTransition.None
+                    : _prevSelectedIndex < ChatFolders.SelectedIndex
+                    ? PageTransition.Forward
+                    : PageTransition.Backward;
 
                 _prevSelectedIndex = ChatFolders.SelectedIndex;
                 MediaFrame.Navigate(page.Type, null, transition);
@@ -570,7 +572,7 @@ namespace Telegram.Controls.Views
         private long _itemsSourceToken;
         private long _selectionModeToken;
 
-        private void OnNavigating(object sender, NavigatingCancelEventArgs e)
+        private void OnNavigating(object sender, NavigatingEventArgs e)
         {
             if (MediaFrame.Content is ProfileTabPage tabPage)
             {
@@ -579,7 +581,7 @@ namespace Telegram.Controls.Views
             }
         }
 
-        private void OnNavigated(object sender, NavigationEventArgs e)
+        private void OnNavigated(object sender, NavigatedEventArgs e)
         {
             if (e.Content is not ProfileTabPage tabPage)
             {

@@ -368,6 +368,20 @@ namespace Telegram.Controls.RichEditor
                     {
                         InsertAfter(block, new RichParagraphBlock(RichBlockKind.Paragraph, quote.Credit));
                     }
+                    else
+                    {
+                        // The empty credit leaves the document, and the reindex skips it: an end
+                        // left on it keeps its old index, past the last leaf if the quote was last.
+                        if (ReferenceEquals(_anchor.Leaf, quote.Credit))
+                        {
+                            _anchor = new RichPosition(leaf, leaf.Length);
+                        }
+
+                        if (ReferenceEquals(_focus.Leaf, quote.Credit))
+                        {
+                            _focus = new RichPosition(leaf, leaf.Length);
+                        }
+                    }
                 }
             }
 

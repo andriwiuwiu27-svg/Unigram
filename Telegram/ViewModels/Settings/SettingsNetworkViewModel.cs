@@ -134,7 +134,7 @@ namespace Telegram.ViewModels.Settings
         public async void Reset()
         {
             var confirm = await ShowPopupAsync(Strings.ResetStatisticsAlert, Strings.ResetStatisticsAlertTitle, Strings.Reset, Strings.Cancel, destructive: true);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 await ClientService.SendAsync(new ResetNetworkStatistics());
                 await OnNavigatedToAsync(null, NavigationMode.Refresh, null);

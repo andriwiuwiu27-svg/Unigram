@@ -139,7 +139,7 @@ namespace Telegram.Views.Popups
             UpdateCanEdit(message);
 
             PrimaryButtonText = Strings.StarRatingButtonUnderstood;
-            ButtonsLayout = ContentPopupButtonsLayout.Vertical;
+            ButtonsLayout = ModalPopupButtonsLayout.Vertical;
         }
 
         private void UpdateCanEdit(MessageViewModel message)

@@ -241,6 +241,9 @@
     <Compile Include="Controls\PlaybackMasterHeader.xaml.cs">
       <DependentUpon>PlaybackMasterHeader.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Controls\PollMediaButton.xaml.cs">
+      <DependentUpon>PollMediaButton.xaml</DependentUpon>
+    </Compile>
     <Compile Include="Controls\TrimToolbar.xaml.cs">
       <DependentUpon>TrimToolbar.xaml</DependentUpon>
     </Compile>
@@ -270,6 +273,9 @@
     <Compile Include="Common\TdThroughput.cs" />
     <Compile Include="Common\TextSelectionCoordinator.cs" />
     <Compile Include="Common\ThemeShadowEx.cs" />
+    <Compile Include="Common\GlyphShadow.cs" />
+    <Compile Include="Common\OutlineMask.cs" />
+    <Compile Include="Common\TextShadow.cs" />
     <Compile Include="Common\NormalizingStringBuilder.cs" />
     <Compile Include="Common\VideoPreloader.cs" />
     <Compile Include="Common\VisualUtilities.Skeleton.cs" />
@@ -280,6 +286,9 @@
     <Compile Include="Composition\CompositionVisualColorSource.cs" />
     <Compile Include="Composition\WeakInteractionTrackerOwner.cs" />
     <Compile Include="Controls\ButtonEx.cs" />
+    <Compile Include="Controls\Calls\CallTitleBarIndicator.xaml.cs">
+      <DependentUpon>CallTitleBarIndicator.xaml</DependentUpon>
+    </Compile>
     <Compile Include="Controls\Calls\MediaStateBadge.xaml.cs">
       <DependentUpon>MediaStateBadge.xaml</DependentUpon>
     </Compile>
@@ -459,6 +468,7 @@
     <Compile Include="Controls\ISelectableControl.cs" />
     <Compile Include="Controls\ITextPresenter.cs" />
     <Compile Include="Controls\ITrimmableText.cs" />
+    <Compile Include="Controls\TrimmableBlockPanel.cs" />
     <Compile Include="Common\TextSelectionManager.cs" />
     <Compile Include="Controls\Messages\MessageSummary.xaml.cs">
       <DependentUpon>MessageSummary.xaml</DependentUpon>
@@ -496,6 +506,9 @@
     </Compile>
     <Compile Include="Controls\Messages\Service\MessageUpgradedGiftContent.xaml.cs">
       <DependentUpon>MessageUpgradedGiftContent.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Controls\Messages\Service\MessageUpgradedGiftOnChainPurchaseOfferContent.xaml.cs">
+      <DependentUpon>MessageUpgradedGiftOnChainPurchaseOfferContent.xaml</DependentUpon>
     </Compile>
     <Compile Include="Controls\Messages\Service\MessageUpgradedGiftPurchaseOfferContent.xaml.cs">
       <DependentUpon>MessageUpgradedGiftPurchaseOfferContent.xaml</DependentUpon>
@@ -562,6 +575,7 @@
     <Compile Include="Services\Calls\VoipGroupCallEventArgs.cs" />
     <Compile Include="Services\ProxyService.cs" />
     <Compile Include="Services\Updates\UpdateNavigationBar.cs" />
+    <Compile Include="Services\Updates\UpdateWindowTitleDetails.cs" />
     <Compile Include="Services\WebProxyCarrierService.cs" />
     <Compile Include="Services\Settings\ToolTipSettings.cs" />
     <Compile Include="Services\StoreUpdateService.cs" />
@@ -666,8 +680,11 @@
     <Compile Include="Controls\Stories\Widgets\StoryWeatherWidget.xaml.cs">
       <DependentUpon>StoryWeatherWidget.xaml</DependentUpon>
     </Compile>
-    <Compile Include="Controls\SuggestedActionSetBirthdateCard.xaml.cs">
-      <DependentUpon>SuggestedActionSetBirthdateCard.xaml</DependentUpon>
+    <Compile Include="Controls\ChatListHintCard.xaml.cs">
+      <DependentUpon>ChatListHintCard.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Controls\SettingsSuggestionCard.xaml.cs">
+      <DependentUpon>SettingsSuggestionCard.xaml</DependentUpon>
     </Compile>
     <Compile Include="Controls\TabbedPageHeader.xaml.cs">
       <DependentUpon>TabbedPageHeader.xaml</DependentUpon>
@@ -676,7 +693,7 @@
     <Compile Include="Composition\CompositionLevelVisual.cs" />
     <Compile Include="Composition\CompositionVoiceBlobVisual.cs" />
     <Compile Include="Composition\CompositionBlobVisual.cs" />
-    <Compile Include="Composition\CompositionCurveVisual.cs" />
+    <Compile Include="Composition\CompositionLensVisual.cs" />
     <Compile Include="Composition\CompositionVSync.cs" />
     <Compile Include="Composition\CompositionDustVisual.cs" />
     <Compile Include="Composition\CompositionDustParticles.cs" />
@@ -787,6 +804,7 @@
     <Compile Include="Controls\Stories\StoryChannelInteractionBar.xaml.cs">
       <DependentUpon>StoryChannelInteractionBar.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Controls\Stories\StoryReactionButton.cs" />
     <Compile Include="Controls\Stories\StoryInteractionBar.xaml.cs">
       <DependentUpon>StoryInteractionBar.xaml</DependentUpon>
     </Compile>
@@ -815,6 +833,7 @@
     <Compile Include="Td\Api\UpdateChatAffiliatePrograms.cs" />
     <Compile Include="Td\Api\UpdateChatSwitchInlineQuery.cs" />
     <Compile Include="Td\Api\UpdateFailedStories.cs" />
+    <Compile Include="Td\Api\UpdateStoryChanged.cs" />
     <Compile Include="Td\Api\UpdateFileGenerationProgress.cs" />
     <Compile Include="Td\Api\UpdateGiftUpgraded.cs" />
     <Compile Include="Td\Api\UpdateGiftIsSold.cs" />
@@ -827,6 +846,7 @@
     <Compile Include="Td\Api\UpdateTextRecognition.cs" />
     <Compile Include="Td\Client.cs" />
     <Compile Include="Td\ClientJson.cs" />
+    <Compile Include="Td\MockClient.cs" />
     <Compile Include="Td\PtrClientJson.cs" />
     <Compile Include="Td\TdJsonReader.cs" />
     <Compile Include="Td\Vector.cs" />
@@ -905,6 +925,7 @@
     <Compile Include="Common\ApiInfo.cs" />
     <Compile Include="Common\AppIdentity.cs" />
     <Compile Include="Common\AppPaths.cs" />
+    <Compile Include="Common\ScreenshotDriver.cs" />
     <Compile Include="Common\AutocompleteEntityFinder.cs" />
     <Compile Include="Common\Automation.cs" />
     <Compile Include="Controls\MenuFlyoutSlider.cs" />
@@ -1070,17 +1091,18 @@
     </Compile>
     <Compile Include="Controls\Chats\ChatSearchTextBox.cs" />
     <Compile Include="Controls\Chats\ChatSendButton.cs" />
+    <Compile Include="Controls\Chats\ChatStartButton.cs" />
     <Compile Include="Controls\Chats\ChatStickerButton.cs" />
     <Compile Include="Controls\Chats\ChatTextBox.cs" />
     <Compile Include="Controls\Chats\CaptionController.cs" />
     <Compile Include="Controls\Chats\ComposerController.cs" />
+    <Compile Include="Controls\Chats\ComposerRewriteTransition.cs" />
     <Compile Include="Controls\Chats\ChatThemeDrawer.xaml.cs">
       <DependentUpon>ChatThemeDrawer.xaml</DependentUpon>
     </Compile>
     <Compile Include="Controls\ColorPicker.cs" />
     <Compile Include="Controls\ColorTextBox.cs" />
     <Compile Include="Controls\ConfettiView.cs" />
-    <Compile Include="Controls\ContentPopup.cs" />
     <Compile Include="Controls\CountryBox.xaml.cs">
       <DependentUpon>CountryBox.xaml</DependentUpon>
     </Compile>
@@ -1128,9 +1150,7 @@
     <Compile Include="Controls\VersionLabel.cs" />
     <Compile Include="Controls\WebViewer.cs" />
     <Compile Include="Controls\ZoomViewer.cs" />
-    <Compile Include="Controls\GroupCallActiveHeader.xaml.cs">
-      <DependentUpon>GroupCallActiveHeader.xaml</DependentUpon>
-    </Compile>
+    <Compile Include="Controls\HeaderGrid.cs" />
     <Compile Include="Controls\HeaderedControl.cs" />
     <Compile Include="Controls\IdentityIcon.cs" />
     <Compile Include="Controls\CropRotationWheel.cs" />
@@ -1230,6 +1250,7 @@
       <DependentUpon>InvoiceFooter.xaml</DependentUpon>
     </Compile>
     <Compile Include="Controls\Messages\ReactionButton.cs" />
+    <Compile Include="Controls\Messages\ReactionButtonBase.cs" />
     <Compile Include="Controls\Messages\ReactionsPanel.cs" />
     <Compile Include="Controls\MoreButton.cs" />
     <Compile Include="Controls\MultipleListView.cs" />
@@ -1253,6 +1274,9 @@
     <Compile Include="Controls\PlaybackSlider.cs" />
     <Compile Include="Controls\Messages\Content\PollOptionContent.xaml.cs">
       <DependentUpon>PollOptionContent.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Controls\Messages\Content\PollAddContent.xaml.cs">
+      <DependentUpon>PollAddContent.xaml</DependentUpon>
     </Compile>
     <Compile Include="Controls\PrefixTextBox.cs" />
     <Compile Include="Controls\PremiumLock.cs" />
@@ -1291,12 +1315,13 @@
     <Compile Include="Controls\WrapPanel.cs" />
     <Compile Include="Entities\StorageAudio.cs" />
     <Compile Include="Navigation\InputListener.Uwp.cs" />
-    <Compile Include="Navigation\Services\FrameFacade.cs" />
     <Compile Include="Navigation\Services\INavigable.cs" />
     <Compile Include="Navigation\Services\NavigatedEventArgs.cs" />
     <Compile Include="Navigation\Services\NavigatingEventArgs.cs" />
     <Compile Include="Navigation\Services\NavigationService.cs" />
+    <Compile Include="Navigation\NavigationFrame.cs" />
     <Compile Include="Navigation\NavigationHost.cs" />
+    <Compile Include="Navigation\NavigationPage.cs" />
     <Compile Include="Selectors\ChatStatisticsOverviewTemplateSelector.cs" />
     <Compile Include="Selectors\InviteLinkTemplateSelector.cs" />
     <Compile Include="Selectors\PremiumFeatureTemplateSelector.cs" />
@@ -1891,6 +1916,21 @@
     <Compile Include="Views\Stars\Popups\GiftUpgradePricesPopup.xaml.cs">
       <DependentUpon>GiftUpgradePricesPopup.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Views\Stars\Popups\GiftResalePricePopup.xaml.cs">
+      <DependentUpon>GiftResalePricePopup.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\Stars\Popups\GiftOnChainConfirmPopup.xaml.cs">
+      <DependentUpon>GiftOnChainConfirmPopup.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\Stars\Popups\GiftMessagePopup.xaml.cs">
+      <DependentUpon>GiftMessagePopup.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\Stars\Popups\GiftOfferConfirmPopup.xaml.cs">
+      <DependentUpon>GiftOfferConfirmPopup.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\Stars\Popups\GiftOfferPopup.xaml.cs">
+      <DependentUpon>GiftOfferPopup.xaml</DependentUpon>
+    </Compile>
     <Compile Include="Views\Stars\StarsPage.xaml.cs">
       <DependentUpon>StarsPage.xaml</DependentUpon>
     </Compile>
@@ -1926,6 +1966,9 @@
     <Compile Include="Views\Wallet\Popups\WalletAboutPopup.xaml.cs">
       <DependentUpon>WalletAboutPopup.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Views\Wallet\Popups\WalletFirstGramsPopup.xaml.cs">
+      <DependentUpon>WalletFirstGramsPopup.xaml</DependentUpon>
+    </Compile>
     <Compile Include="Views\Wallet\Popups\WalletBalancePopup.xaml.cs">
       <DependentUpon>WalletBalancePopup.xaml</DependentUpon>
     </Compile>
@@ -1954,9 +1997,13 @@
     <Compile Include="Views\Wallet\Popups\WalletBackupPopup.xaml.cs">
       <DependentUpon>WalletBackupPopup.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Views\Wallet\Popups\WalletCollectiblePopup.xaml.cs">
+      <DependentUpon>WalletCollectiblePopup.xaml</DependentUpon>
+    </Compile>
     <Compile Include="Views\Wallet\Popups\WalletConnectedAppsPopup.xaml.cs">
       <DependentUpon>WalletConnectedAppsPopup.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Views\Wallet\IWalletCollectibleHost.cs" />
     <Compile Include="Views\Wallet\IWalletTransferSite.cs" />
     <Compile Include="Views\Wallet\WalletPendingRow.cs" />
     <Compile Include="Views\Wallet\WalletSparks.cs" />
@@ -1981,6 +2028,7 @@
     <Compile Include="Td\Api\ErrorType.cs" />
     <Compile Include="Entities\StorageDocument.cs" />
     <Compile Include="Entities\StorageMedia.cs" />
+    <Compile Include="Entities\PollMediaDraft.cs" />
     <Compile Include="Entities\ImageGeneration.cs" />
     <Compile Include="Entities\StoragePhoto.cs" />
     <Compile Include="Entities\StorageVideo.cs" />
@@ -2162,6 +2210,9 @@
       <DependentUpon>ChatView.xaml</DependentUpon>
     </Compile>
     <Compile Include="Views\ChatView.Drawers.cs">
+      <DependentUpon>ChatView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\ChatView.ChecksHint.cs">
       <DependentUpon>ChatView.xaml</DependentUpon>
     </Compile>
     <Compile Include="Views\ChatView.xaml.cs">
@@ -2441,6 +2492,9 @@
     <Compile Include="Views\Supergroups\Popups\SupergroupTopicPopup.xaml.cs">
       <DependentUpon>SupergroupTopicPopup.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Views\Supergroups\Popups\SupergroupBroadcastGroupPopup.xaml.cs">
+      <DependentUpon>SupergroupBroadcastGroupPopup.xaml</DependentUpon>
+    </Compile>
     <Compile Include="Views\Supergroups\Popups\SupergroupChooseMemberPopup.xaml.cs">
       <DependentUpon>SupergroupChooseMemberPopup.xaml</DependentUpon>
     </Compile>
@@ -2558,6 +2612,7 @@
     <Compile Include="Common\MessageHelper.cs" />
     <Compile Include="Common\WalletCardSheen.cs" />
     <Compile Include="Common\GiftHelper.cs" />
+    <Compile Include="Common\GiftOnChainHelper.cs" />
     <Compile Include="Common\PaidMessageHelper.cs" />
     <Compile Include="Common\WalletHelper.cs" />
     <Compile Include="Controls\GlyphButton.cs" />
@@ -2582,8 +2637,13 @@
     <Compile Include="ViewModels\DialogViewModel.Pending.cs" />
     <Compile Include="ViewModels\DialogViewModel.Inline.cs" />
     <Compile Include="ViewModels\DialogViewModel.Messages.cs" />
+    <Compile Include="ViewModels\DialogViewModel.Footer.cs" />
+    <Compile Include="ViewModels\DialogViewModel.Suggestions.cs" />
     <Compile Include="ViewModels\MainViewModel.cs" />
+    <Compile Include="ViewModels\MainViewModel.ChatListHint.cs" />
+    <Compile Include="ViewModels\MainViewModel.Suggestions.cs" />
     <Compile Include="ViewModels\SettingsViewModel.cs" />
+    <Compile Include="ViewModels\SettingsViewModel.Suggestion.cs" />
     <Compile Include="ViewModels\Settings\SettingsSessionsViewModel.cs" />
     <Compile Include="ViewModels\Settings\SettingsStorageViewModel.cs" />
     <Compile Include="ViewModels\Settings\SettingsUsernameViewModel.cs" />
@@ -2833,6 +2893,9 @@
     <Content Include="Assets\Animations\WalletTest.tgs" />
     <Content Include="Assets\Animations\WalletAbout.tgs" />
     <Content Include="Assets\Animations\Gram.tgs" />
+    <Content Include="Assets\Animations\BroadcastGroup.tgs" />
+    <Content Include="Assets\Animations\ChecksRead.tgs" />
+    <Content Include="Assets\Animations\ChecksSent.tgs" />
     <Content Include="Assets\Animations\GramCard.tgs" />
     <Content Include="Assets\Models\Diamond\anchors.bin" />
     <Content Include="Assets\Models\Diamond\camera.bin" />
@@ -2848,6 +2911,8 @@
     <Content Include="Assets\Models\Icon\coin_logo.binobj" />
     <Content Include="Assets\Models\Icon\coin_outer.binobj" />
     <Content Include="Assets\Models\Icon\coin_stars.binobj" />
+    <Content Include="Assets\Models\Icon\deal_border.png" />
+    <Content Include="Assets\Models\Icon\deal_logo.binobj" />
     <Content Include="Assets\Models\Icon\flecks.png" />
     <Content Include="Assets\Models\Icon\star.binobj" />
     <Content Include="Assets\Models\Icon\start_texture.png" />
@@ -3095,6 +3160,10 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
+    <Page Include="Controls\Calls\CallTitleBarIndicator.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Page Include="Controls\Calls\MediaStateBadge.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
@@ -3166,6 +3235,10 @@
     <Page Include="Controls\PlaybackMasterHeader.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Controls\PollMediaButton.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="Controls\TrimToolbar.xaml">
       <SubType>Designer</SubType>
@@ -3503,10 +3576,6 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
-    <Page Include="Controls\GroupCallActiveHeader.xaml">
-      <SubType>Designer</SubType>
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
     <Page Include="Controls\InlineBotResultsView.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
@@ -3723,6 +3792,10 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
+    <Page Include="Controls\Messages\Service\MessageUpgradedGiftOnChainPurchaseOfferContent.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Page Include="Controls\Messages\Service\MessageUpgradedGiftPurchaseOfferContent.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
@@ -3752,6 +3825,10 @@
       <SubType>Designer</SubType>
     </Page>
     <Page Include="Controls\Messages\Content\PollOptionContent.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Controls\Messages\Content\PollAddContent.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
@@ -3803,7 +3880,11 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
-    <Page Include="Controls\SuggestedActionSetBirthdateCard.xaml">
+    <Page Include="Controls\SettingsSuggestionCard.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Controls\ChatListHintCard.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
@@ -4555,6 +4636,26 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
+    <Page Include="Views\Stars\Popups\GiftResalePricePopup.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Views\Stars\Popups\GiftOnChainConfirmPopup.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Views\Stars\Popups\GiftMessagePopup.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Views\Stars\Popups\GiftOfferConfirmPopup.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Views\Stars\Popups\GiftOfferPopup.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
     <Page Include="Views\Stars\StarsPage.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
@@ -4596,6 +4697,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="Views\Wallet\Popups\WalletAboutPopup.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\Wallet\Popups\WalletFirstGramsPopup.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
@@ -4648,6 +4753,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="Views\Wallet\Popups\WalletBackupPopup.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Views\Wallet\Popups\WalletCollectiblePopup.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
@@ -5104,6 +5213,10 @@
       <SubType>Designer</SubType>
     </Page>
     <Page Include="Views\Supergroups\Popups\SupergroupTopicPopup.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Views\Supergroups\Popups\SupergroupBroadcastGroupPopup.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>

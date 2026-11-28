@@ -7,7 +7,9 @@
 
 using System.Collections.Generic;
 using System.Numerics;
+using System.Threading.Tasks;
 using Telegram.Td.Api;
+using EngineSendMessage = WalletEngine.SendMessage;
 
 namespace Telegram.Services.Wallet
 {
@@ -413,5 +415,80 @@ namespace Telegram.Services.Wallet
         /// nothing was spent.
         /// </remarks>
         public bool IsCommentUnavailable { get; }
+    }
+
+    public enum WalletTransactionStatus
+    {
+        /// <summary>
+        /// Signed, accepted by the account, and at the top of the history as pending.
+        /// </summary>
+        Sent,
+
+        /// <summary>
+        /// A message asks for something this wallet cannot sign as given, so nothing was signed.
+        /// </summary>
+        Unsupported,
+
+        /// <summary>
+        /// The balance does not cover the messages and their fees, so nothing was signed.
+        /// </summary>
+        InsufficientBalance,
+
+        /// <summary>
+        /// The account refused the signed transaction, which therefore never left.
+        /// </summary>
+        Refused
+    }
+
+    /// <summary>
+    /// What became of a transaction TDLib prepared and the wallet signed - a gift purchase, a
+    /// listing, an offer.
+    /// </summary>
+    public sealed class WalletTransactionResult
+    {
+        public WalletTransactionResult(WalletTransactionStatus status, BigInteger requiredNanograms = default, Error error = null, Task<bool> outcome = null)
+        {
+            Status = status;
+            RequiredNanograms = requiredNanograms;
+            Error = error;
+            Outcome = outcome ?? Task.FromResult(false);
+        }
+
+        public WalletTransactionStatus Status { get; }
+
+        /// <summary>
+        /// For <see cref="WalletTransactionStatus.Sent"/>, true once the transaction lands and false
+        /// once it no longer can. It never completes for a row this session stops tracking, such as
+        /// one dropped with a replaced wallet, so nothing may wait on it for more than a message.
+        /// </summary>
+        public Task<bool> Outcome { get; }
+
+        /// <summary>
+        /// What the wallet must hold for the transaction to go through, fees included; only for
+        /// <see cref="WalletTransactionStatus.InsufficientBalance"/>.
+        /// </summary>
+        public BigInteger RequiredNanograms { get; }
+
+        /// <summary>
+        /// The account's refusal; only for <see cref="WalletTransactionStatus.Refused"/>.
+        /// </summary>
+        public Error Error { get; }
+    }
+
+    /// <summary>
+    /// A collectible's transfer as the engine built and emulated it, for
+    /// <see cref="IWalletService.SendNftTransferAsync"/> to sign.
+    /// </summary>
+    public sealed class WalletNftTransfer
+    {
+        internal WalletNftTransfer(EngineSendMessage[] messages, BigInteger feeNanograms)
+        {
+            Messages = messages;
+            FeeNanograms = feeNanograms;
+        }
+
+        public BigInteger FeeNanograms { get; }
+
+        internal EngineSendMessage[] Messages { get; }
     }
 }

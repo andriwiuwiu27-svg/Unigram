@@ -93,14 +93,15 @@ namespace Telegram.Controls.Cells
 
             Preview.Visibility = Visibility.Visible;
 
-            if (settings.Background?.Type is BackgroundTypePattern && settings.Background?.Document == null)
+            // A stored wallpaper or pattern is only a link, and resolving it in LoadThemeSettings can fail.
+            if (settings.Background?.Type is BackgroundTypePattern or BackgroundTypeWallpaper && settings.Background.Document == null)
             {
                 Load();
 
                 async void Load()
                 {
                     var response = await theme.ClientService.SendAsync(new SearchBackground(settings.Background.Name));
-                    if (response is Background test)
+                    if (response is Background test && test.Document != null)
                     {
                         settings.Background.Document = test.Document;
                         Update(theme, _usedChatId);

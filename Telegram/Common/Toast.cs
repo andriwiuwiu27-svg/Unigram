@@ -52,13 +52,15 @@ namespace Telegram.Common
         /// </summary>
         public static void RegisterApplication()
         {
-            if (ApiInfo.HasPackageIdentity)
-            {
-                return;
-            }
-
             try
             {
+                if (ApiInfo.HasPackageIdentity)
+                {
+                    // The manifest names the app and the activator; only the class object is left.
+                    ToastActivator.Register();
+                    return;
+                }
+
                 using var key = Registry.CurrentUser.CreateSubKey(@"Software\Classes\AppUserModelId\" + UnpackagedApplicationId);
 
                 // The packaged app's VisualElements DisplayName, so a toast reads the same either way.
@@ -101,6 +103,15 @@ namespace Telegram.Common
                     {
                         t.Value.Unregister(false);
                     }
+#if WINUI3
+                    // An in-process task never fires in a full trust process: ToastActivator takes
+                    // the buttons, and there is nothing left to register.
+                    else if (t.Value.Name is "NewInteractiveTask")
+                    {
+                        t.Value.Unregister(false);
+                    }
+                }
+#else
                     else if (string.Equals(AnalyticsInfo.VersionInfo.DeviceFamily, "Windows.Xbox"))
                     {
                         t.Value.Unregister(false);
@@ -121,6 +132,7 @@ namespace Telegram.Common
 
                 //Register("InProcessNotificationTask", null, () => new PushNotificationTrigger());
                 Register("NewInteractiveTask", null, () => new ToastNotificationActionTrigger());
+#endif
                 //BackgroundTaskManager.Register("InteractiveTask", "Telegram.Tasks.InteractiveTask", new ToastNotificationActionTrigger());
             }
             catch { }

@@ -10,6 +10,7 @@ using System.Numerics;
 using Telegram.Common;
 using Telegram.Controls.Media;
 using Telegram.Converters;
+using Telegram.Navigation.Services;
 using Telegram.Td.Api;
 using Telegram.ViewModels.Chats;
 using Windows.UI.Xaml;
@@ -29,7 +30,7 @@ namespace Telegram.Controls.Cells
 
         private DispatcherTimer _countdownTimer;
 
-        public void OnNavigatedTo(NavigationEventArgs e)
+        public void OnNavigatedTo(NavigatedEventArgs e)
         {
             ViewModel.PropertyChanged += OnPropertyChanged;
 
@@ -37,7 +38,7 @@ namespace Telegram.Controls.Cells
             UpdateCountdown();
         }
 
-        public void OnNavigatedFrom(NavigationEventArgs e)
+        public void OnNavigatedFrom(NavigatedEventArgs e)
         {
             ViewModel.PropertyChanged -= OnPropertyChanged;
         }
@@ -65,7 +66,7 @@ namespace Telegram.Controls.Cells
             // exponent: printed raw, 50,000,000 of them read as ".50000000" rather than ".05".
             var split = Formatter.SplitAmount(BigInteger.Abs(Formatter.Nanostars(amount)), 9, 9);
 
-            CryptocurrencyAmountLabel.Text = split.Integer;
+            CryptocurrencyAmountLabel.Text = Icons.PremiumStar + " " + split.Integer;
             CryptocurrencyDecimalLabel.Text = split.Fraction;
 
             AmountLabel.Text = string.Format("~{0}", Formatter.FormatAmount((long)(amount.StarCount * usdRate), "USD"));

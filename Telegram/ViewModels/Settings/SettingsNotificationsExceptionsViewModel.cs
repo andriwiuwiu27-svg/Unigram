@@ -113,7 +113,7 @@ namespace Telegram.ViewModels.Settings
             var tsc = new TaskCompletionSource<object>();
 
             var confirm = await ShowPopupAsync(new ChooseSoundPopup(tsc), Scope.SoundId);
-            if (confirm != ContentDialogResult.Primary)
+            if (confirm != ModalPopupResult.Primary)
             {
                 return;
             }
@@ -166,7 +166,7 @@ namespace Telegram.ViewModels.Settings
                 var popup = new ChatMutePopup(Scope.MuteFor);
 
                 var confirm = await ShowPopupAsync(popup);
-                if (confirm != ContentDialogResult.Primary)
+                if (confirm != ModalPopupResult.Primary)
                 {
                     return;
                 }
@@ -184,7 +184,7 @@ namespace Telegram.ViewModels.Settings
         public async void RemoveAll()
         {
             var confirm = await ShowPopupAsync(Strings.NotificationsDeleteAllExceptionAlert, Strings.NotificationsDeleteAllExceptionTitle, Strings.Delete, Strings.Cancel, destructive: true);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 foreach (var chat in Items.ToList())
                 {

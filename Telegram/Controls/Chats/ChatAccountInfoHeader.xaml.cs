@@ -221,7 +221,7 @@ namespace Telegram.Controls.Chats
             }
 
             var confirm = await ViewModel.ShowPopupAsync(popup);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 ViewModel.ClientService.Send(new AllowUnpaidMessagesFromUser(privata.UserId, popup.IsChecked is true));
             }

@@ -107,6 +107,26 @@ namespace Telegram.Controls.Messages
             _templateApplied = true;
         }
 
+        private IClientService _clientService;
+        private long _sourceId;
+        private long _modelId;
+
+        // Source and Model are set only through here, or the early-out goes stale.
+        public void Update(IClientService clientService, long source, long model)
+        {
+            if (_clientService == clientService && _sourceId == source && _modelId == model)
+            {
+                return;
+            }
+
+            _clientService = clientService;
+            _sourceId = source;
+            _modelId = model;
+
+            Source = source != 0 ? new CustomEmojiFileSource(clientService, source) : null;
+            Model = model != 0 ? new CustomEmojiFileSource(clientService, model) : null;
+        }
+
         #region Source
 
         public AnimatedImageSource Source
@@ -354,8 +374,16 @@ namespace Telegram.Controls.Messages
                 _ => (null, null, 0)
             };
 
+            if (_light != white)
+            {
+                BackgroundOverlay.Visibility = white
+                    ? Visibility.Collapsed
+                    : Visibility.Visible;
+            }
+
             if (white && !_light)
             {
+                BackgroundOverlay.Visibility = Visibility.Collapsed;
                 Foreground =
                     Background =
                     SubtleBrush =
@@ -454,8 +482,7 @@ namespace Telegram.Controls.Messages
                 Pattern = GetTemplateChild(nameof(Pattern)) as MessageReplyPattern;
             }
 
-            Pattern.Source = source != 0 ? new CustomEmojiFileSource(clientService, source) : null;
-            Pattern.Model = model != 0 ? new CustomEmojiFileSource(clientService, model) : null;
+            Pattern.Update(clientService, source, model);
         }
 
         #endregion

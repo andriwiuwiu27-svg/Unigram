@@ -45,7 +45,7 @@ namespace Telegram.ViewModels.Settings.Privacy
             var popup = new SettingsBirthdatePopup(date: null);
 
             var confirm = await ShowPopupAsync(popup);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 CanSetBirthdate = false;
 

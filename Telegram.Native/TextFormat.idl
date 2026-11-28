@@ -28,5 +28,6 @@ namespace Telegram.Native
         MaxLinesMetrics MaxLines(Int32 offset, Int32 length, Double fontSize, Double width, Boolean rtl, Int32 maxLines);
         Windows.Foundation.Rect[] RangeMetrics(Int32 offset, Int32 length, Double fontSize, Double width, Boolean rtl, Boolean wrap, Int32 maxLines);
         Windows.Foundation.Rect[] LineMetrics(Int32 offset, Int32 length, Double fontSize, Double width, Boolean rtl, Boolean wrap);
+        Int32 TrimLine(Double fontSize, Double width, Boolean rtl, Int32 line, Double reserve);
     }
 }

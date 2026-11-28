@@ -287,7 +287,7 @@ namespace Telegram.ViewModels.Settings
         public async void ResetAll()
         {
             var confirm = await ShowPopupAsync(Strings.ShortcutsRestoreAllConfirm, Strings.ShortcutsRestoreAll, Strings.OK, Strings.Cancel, destructive: true);
-            if (confirm != ContentDialogResult.Primary)
+            if (confirm != ModalPopupResult.Primary)
             {
                 return;
             }

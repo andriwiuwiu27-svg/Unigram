@@ -39,9 +39,11 @@ namespace Telegram.Controls.Messages.Service
                 };
             }
 
-            VisualUtilities.DropShadow(Address, radius: 0, opacity: 1.0f,
-                target: AddressShadow, color: Colors.White, offset: new Vector3(1, 0, 0));
+            _addressShadow = new TextShadow(AddressShadow, radius: 0, opacity: 1.0f,
+                color: Colors.White, offset: new Vector3(1, 0, 0));
         }
+
+        private readonly TextShadow _addressShadow;
 
         private readonly Color _ribbonFailedTop = Color.FromArgb(0xFF, 0xFF, 0x5B, 0x54);
         private readonly Color _ribbonFailedBottom = Color.FromArgb(0xFF, 0xED, 0x1D, 0x27);
@@ -82,6 +84,7 @@ namespace Telegram.Controls.Messages.Service
             }
 
             Address.Text = builder.ToString();
+            _addressShadow.Update(Address);
 
             if (message.ClientService.TryGetUser(transfer.SenderUserId, out User user))
             {

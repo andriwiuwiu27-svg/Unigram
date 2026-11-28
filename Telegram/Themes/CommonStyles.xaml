@@ -1299,51 +1299,8 @@
 
                             </VisualStateGroup>
 
-                            <VisualStateGroup x:Name="ReorderHintStates">
-                                <VisualState x:Name="NoReorderHint" />
-
-                                <VisualState x:Name="BottomReorderHint">
-
-                                    <Storyboard>
-                                        <DragOverThemeAnimation TargetName="ContentBorder"
-                                                                ToOffset="{ThemeResource ListViewItemReorderHintThemeOffset}"
-                                                                Direction="Bottom" />
-                                    </Storyboard>
-                                </VisualState>
-
-                                <VisualState x:Name="TopReorderHint">
-
-                                    <Storyboard>
-                                        <DragOverThemeAnimation TargetName="ContentBorder"
-                                                                ToOffset="{ThemeResource ListViewItemReorderHintThemeOffset}"
-                                                                Direction="Top" />
-                                    </Storyboard>
-                                </VisualState>
-
-                                <VisualState x:Name="RightReorderHint">
-
-                                    <Storyboard>
-                                        <DragOverThemeAnimation TargetName="ContentBorder"
-                                                                ToOffset="{ThemeResource ListViewItemReorderHintThemeOffset}"
-                                                                Direction="Right" />
-                                    </Storyboard>
-                                </VisualState>
-
-                                <VisualState x:Name="LeftReorderHint">
-
-                                    <Storyboard>
-                                        <DragOverThemeAnimation TargetName="ContentBorder"
-                                                                ToOffset="{ThemeResource ListViewItemReorderHintThemeOffset}"
-                                                                Direction="Left" />
-                                    </Storyboard>
-                                </VisualState>
-
-                                <VisualStateGroup.Transitions>
-                                    <VisualTransition To="NoReorderHint"
-                                                      GeneratedDuration="0:0:0.2" />
-                                </VisualStateGroup.Transitions>
-
-                            </VisualStateGroup>
+                            <!-- No ReorderHintStates: on a templated item XAML only ever sets NoReorderHint, and
+                                 finding it when the template is applied creates every group here. -->
 
                             <VisualStateGroup x:Name="DragStates">
                                 <VisualState x:Name="NotDragging" />

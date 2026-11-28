@@ -105,13 +105,13 @@ namespace Telegram.Views.Popups
 
         private void Learn_Click(object sender, RoutedEventArgs e)
         {
-            Hide(ContentDialogResult.Primary);
+            Hide(ModalPopupResult.Primary);
             MessageHelper.OpenUrl(null, null, _url);
         }
 
         private void Copy_Click(object sender, RoutedEventArgs e)
         {
-            Hide(ContentDialogResult.Secondary);
+            Hide(ModalPopupResult.Secondary);
             MessageHelper.CopyText(XamlRoot, _value);
         }
     }

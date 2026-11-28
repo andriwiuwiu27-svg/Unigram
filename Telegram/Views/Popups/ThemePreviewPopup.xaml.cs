@@ -54,9 +54,11 @@ namespace Telegram.Views.Popups
             ThemePreview.Update(theme);
             BackgroundControl.Update(clientService);
 
-            if (theme.Settings?.Background != null)
+            // A file's wallpaper or pattern is only a link, and has no document when the search for
+            // it failed; the presenter cannot draw that, so the default set above stays.
+            if (theme.Settings?.Background is { } background && (background.Document != null || background.Type is not (BackgroundTypeWallpaper or BackgroundTypePattern)))
             {
-                BackgroundControl.Update(theme.Settings.Background, theme.Parent == TelegramTheme.Dark);
+                BackgroundControl.Update(background, theme.Parent == TelegramTheme.Dark);
             }
 
             RequestedTheme = theme.Parent == TelegramTheme.Light

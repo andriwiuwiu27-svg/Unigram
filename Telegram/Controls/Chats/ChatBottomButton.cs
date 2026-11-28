@@ -8,11 +8,20 @@
 using System.Numerics;
 using Telegram.Common;
 using Windows.UI.Composition;
+using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Hosting;
 
 namespace Telegram.Controls.Chats
 {
+    public enum ChatBottomButtonAppearance
+    {
+        Default,
+        Accent,
+        AccentText,
+        AccentWash
+    }
+
     /// <summary>
     /// This button is intended to be placed over the BubbleTextBox
     /// </summary>
@@ -27,15 +36,67 @@ namespace Telegram.Controls.Chats
         private ContentPresenter _label;
         private Visual _visual;
 
+        private Border AccentBackground;
+
+        private ChatBottomButtonAppearance _appearance;
+        private double _accentRadius = 20;
+
         public ChatBottomButton()
         {
             DefaultStyleKey = typeof(ChatBottomButton);
+        }
+
+        /// <summary>
+        /// The radius of the accent fill, which is inset from the button's edges and so cannot share
+        /// its CornerRadius: that one also shapes the focus rectangle.
+        /// </summary>
+        public double AccentRadius
+        {
+            get => _accentRadius;
+            set
+            {
+                _accentRadius = value;
+
+                if (AccentBackground != null)
+                {
+                    AccentBackground.CornerRadius = new CornerRadius(value);
+                }
+            }
+        }
+
+        public void SetAppearance(ChatBottomButtonAppearance appearance, bool animated)
+        {
+            if (_appearance != appearance)
+            {
+                _appearance = appearance;
+                VisualStateManager.GoToState(this, GetStateName(appearance), animated);
+            }
+        }
+
+        // Not ToString, which needs reflection metadata the release build does not promise to keep.
+        private static string GetStateName(ChatBottomButtonAppearance appearance)
+        {
+            return appearance switch
+            {
+                ChatBottomButtonAppearance.Accent => "Accent",
+                ChatBottomButtonAppearance.AccentText => "AccentText",
+                ChatBottomButtonAppearance.AccentWash => "AccentWash",
+                _ => "Default"
+            };
         }
 
         protected override void OnApplyTemplate()
         {
             ContentPresenter1 = GetTemplateChild(nameof(ContentPresenter1)) as ContentPresenter;
             ContentPresenter2 = GetTemplateChild(nameof(ContentPresenter2)) as ContentPresenter;
+            AccentBackground = GetTemplateChild(nameof(AccentBackground)) as Border;
+
+            if (AccentBackground != null)
+            {
+                AccentBackground.CornerRadius = new CornerRadius(_accentRadius);
+            }
+
+            VisualStateManager.GoToState(this, GetStateName(_appearance), false);
 
             _label = ContentPresenter1;
 

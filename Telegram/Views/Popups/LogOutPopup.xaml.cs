@@ -37,7 +37,7 @@ namespace Telegram.Views
 
         private void OnClosed(ModalPopup sender, ModalPopupClosedEventArgs args)
         {
-            if (args.Result == ContentDialogResult.Primary)
+            if (args.Result == ModalPopupResult.Primary)
             {
                 ViewModel.Logout();
             }

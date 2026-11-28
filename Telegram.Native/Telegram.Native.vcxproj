@@ -38,7 +38,9 @@
     <MinimumVisualStudioVersion>14.0</MinimumVisualStudioVersion>
     <AppContainerApplication Condition="'$(TelegramWinUI)' != 'true'">true</AppContainerApplication>
     <ApplicationType Condition="'$(TelegramWinUI)' != 'true'">Windows Store</ApplicationType>
-    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <!-- The SDK the apps target, not "10.0", the newest installed: a winmd from a newer SDK is
+         rejected by the app's reference (MSB3851), and the DLL is then never copied. -->
+    <WindowsTargetPlatformVersion>10.0.26100.0</WindowsTargetPlatformVersion>
     <WindowsTargetPlatformMinVersion>10.0.18362.0</WindowsTargetPlatformMinVersion>
     <ApplicationTypeRevision Condition="'$(TelegramWinUI)' != 'true'">10.0</ApplicationTypeRevision>
     <ProjectName>Telegram.Native</ProjectName>
@@ -430,6 +432,7 @@
     <ClInclude Include="Helpers\BlurHelper.h" />
     <ClInclude Include="Helpers\COMHelper.h" />
     <ClInclude Include="Helpers\DebugHelper.h" />
+    <ClInclude Include="Helpers\FileHelper.h" />
     <ClInclude Include="Helpers\LibraryHelper.h" />
     <ClInclude Include="Helpers\StringHelper.h" />
     <ClInclude Include="Highlight\SyntaxLanguage.h" />

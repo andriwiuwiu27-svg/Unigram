@@ -13,6 +13,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Telegram.Collections;
 using Telegram.Common;
+using Telegram.Controls;
 using Telegram.Navigation;
 using Telegram.Services;
 using Telegram.Td.Api;
@@ -291,7 +292,7 @@ namespace Telegram.ViewModels
             var title = Locale.Declension(Strings.R.DeleteTopics, 1);
 
             var confirm = await ShowPopupAsync(message, title, Strings.Delete, Strings.Cancel, destructive: true);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 // TODO: Handle the case where topics can't be deleted because user isn't admin
                 ClientService.Send(new DeleteForumTopic(Chat.Id, topic.Info.ForumTopicId));
@@ -320,7 +321,7 @@ namespace Telegram.ViewModels
             }
 
             var confirm = await ShowPopupAsync(message, title, primary, Strings.Cancel);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 ClientService.Send(new DeleteSavedMessagesTopicHistory(topic.Id));
             }
@@ -336,7 +337,7 @@ namespace Telegram.ViewModels
             //var chats = SelectedItems.ToList();
 
             //var confirm = await ShowPopupAsync(Strings.AreYouSureDeleteFewChats, Locale.Declension("ChatsSelected", chats.Count), Strings.Delete, Strings.Cancel);
-            //if (confirm == ContentDialogResult.Primary)
+            //if (confirm == ModalPopupResult.Primary)
             //{
             //    foreach (var chat in chats)
             //    {
@@ -383,7 +384,7 @@ namespace Telegram.ViewModels
             //var dialog = new DeleteChatPopup(ClientService, updated, Items.ChatList, true);
 
             //var confirm = await ShowPopupAsync(dialog);
-            //if (confirm == ContentDialogResult.Primary)
+            //if (confirm == ModalPopupResult.Primary)
             //{
             //    Delegate?.ShowChatsUndo(new[] { chat }, UndoType.Clear, items =>
             //    {
@@ -411,9 +412,43 @@ namespace Telegram.ViewModels
             var title = Strings.ClearHistory;
 
             var confirm = await ShowPopupAsync(message, title, Strings.Delete, Strings.Cancel, destructive: true);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 ClientService.Send(new DeleteDirectMessagesChatTopicHistory(ChatId, topic.Id));
+            }
+        }
+
+        // A topic's sender is banned from the channel the direct messages belong to, which only
+        // an administrator who can restrict members there can do, and only to a user.
+        public bool TryGetTopicSenderChannel(DirectMessagesChatTopic topic, out long channelId)
+        {
+            if (topic.SenderId is MessageSenderUser
+                && ClientService.TryGetSupergroupFull(Chat, out SupergroupFullInfo fullInfo)
+                && ClientService.TryGetChat(fullInfo.DirectMessagesChatId, out Chat channel)
+                && ClientService.TryGetSupergroup(channel, out Supergroup supergroup)
+                && supergroup.CanRestrictMembers())
+            {
+                channelId = channel.Id;
+                return true;
+            }
+
+            channelId = 0;
+            return false;
+        }
+
+        public void BanTopicSender(DirectMessagesChatTopic topic)
+        {
+            if (TryGetTopicSenderChannel(topic, out long channelId))
+            {
+                ClientService.Send(new BanChatMember(channelId, topic.SenderId, 0, false));
+            }
+        }
+
+        public void UnbanTopicSender(DirectMessagesChatTopic topic)
+        {
+            if (TryGetTopicSenderChannel(topic, out long channelId))
+            {
+                ClientService.Send(new SetChatMemberStatus(channelId, topic.SenderId, new ChatMemberStatusLeft()));
             }
         }
 
@@ -427,7 +462,7 @@ namespace Telegram.ViewModels
             //var chats = SelectedItems.ToList();
 
             //var confirm = await ShowPopupAsync(Strings.AreYouSureClearHistoryFewChats, Locale.Declension("ChatsSelected", chats.Count), Strings.ClearHistory, Strings.Cancel);
-            //if (confirm == ContentDialogResult.Primary)
+            //if (confirm == ModalPopupResult.Primary)
             //{
             //    Delegate?.ShowChatsUndo(chats, UndoType.Clear, items =>
             //    {
@@ -509,10 +544,17 @@ namespace Telegram.ViewModels
                 }
                 else
                 {
-                    Aggregator.Subscribe<UpdateDirectMessagesChatTopicReadInbox>(this, Handle)
+                    var subscription = Aggregator.Subscribe<UpdateDirectMessagesChatTopicReadInbox>(this, Handle)
                         .Subscribe<UpdateDirectMessagesChatTopicReadOutbox>(Handle)
                         .Subscribe<UpdateDirectMessagesChatTopicUnreadMentionCount>(Handle)
-                        .Subscribe<UpdateDirectMessagesChatTopicUnreadReactionCount>(Handle);
+                        .Subscribe<UpdateDirectMessagesChatTopicUnreadReactionCount>(Handle)
+                        .Subscribe<UpdateChatAction>(Handle);
+
+                    if (!_chatList)
+                    {
+                        subscription.Subscribe<UpdateChatLastMessage>(Handle)
+                            .Subscribe<UpdateChatReadOutbox>(Handle);
+                    }
                 }
             }
             else if (chat == null)
@@ -530,9 +572,18 @@ namespace Telegram.ViewModels
 
         private void Handle(UpdateChatAction update)
         {
-            if (update.ChatId == Chat?.Id && update.TopicId is MessageTopicForum topicForum)
+            if (update.ChatId != Chat?.Id)
+            {
+                return;
+            }
+
+            if (update.TopicId is MessageTopicForum topicForum)
             {
                 BeginOnUIThread(() => Delegate?.HandleForumTopic(topicForum.ForumTopicId, (cell, topic) => cell.UpdateForumTopicActions(topic, ClientService.GetChatActions(update.ChatId, update.TopicId))));
+            }
+            else if (update.TopicId is MessageTopicDirectMessages topicDirectMessages)
+            {
+                BeginOnUIThread(() => Delegate?.HandleDirectMessagesChatTopic(topicDirectMessages.DirectMessagesChatTopicId, (cell, topic) => cell.UpdateDirectMessagesChatTopicActions(topic, ClientService.GetChatActions(update.ChatId, update.TopicId))));
             }
         }
 
@@ -547,6 +598,10 @@ namespace Telegram.ViewModels
             {
                 BeginOnUIThread(() => Delegate?.HandleSavedMessagesTopic(0, (cell, topic) => cell.UpdateSavedMessagesTopicLastMessage(topic)));
             }
+            else if (_type == TopicListType.DirectMessages)
+            {
+                BeginOnUIThread(() => Delegate?.HandleDirectMessagesChatTopic(0, (cell, topic) => cell.UpdateDirectMessagesChatTopicLastMessage(topic)));
+            }
             else
             {
                 BeginOnUIThread(() => Delegate?.HandleForumTopic(0, (cell, topic) => cell.UpdateForumTopicLastMessage(topic)));
@@ -560,7 +615,16 @@ namespace Telegram.ViewModels
 
         private void Handle(UpdateChatReadOutbox update)
         {
-            if (update.ChatId == Chat?.Id)
+            if (update.ChatId != Chat?.Id)
+            {
+                return;
+            }
+
+            if (_type == TopicListType.DirectMessages)
+            {
+                BeginOnUIThread(() => Delegate?.HandleDirectMessagesChatTopic(0, (cell, topic) => cell.UpdateDirectMessagesChatTopicReadOutbox(topic)));
+            }
+            else
             {
                 BeginOnUIThread(() => Delegate?.HandleForumTopic(0, (cell, topic) => cell.UpdateForumTopicReadOutbox(topic)));
             }
@@ -689,7 +753,7 @@ namespace Telegram.ViewModels
             var popup = new SupergroupTopicPopup(ClientService, null);
 
             var confirm = await ShowPopupAsync(popup);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 var response = await ClientService.SendAsync(new CreateForumTopic(chat.Id, popup.SelectedName, false, popup.SelectedIcon));
                 if (response is ForumTopicInfo info)

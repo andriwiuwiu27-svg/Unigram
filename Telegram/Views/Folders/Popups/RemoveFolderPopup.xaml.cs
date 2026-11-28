@@ -16,7 +16,7 @@ using Windows.UI.Xaml.Controls;
 
 namespace Telegram.Views.Folders.Popups
 {
-    public sealed partial class RemoveFolderPopup : ContentPopup
+    public sealed partial class RemoveFolderPopup : ModalPopup
     {
         public RemoveFolderViewModel ViewModel => DataContext as RemoveFolderViewModel;
 
@@ -28,7 +28,7 @@ namespace Telegram.Views.Folders.Popups
             SecondaryButtonText = Strings.Cancel;
         }
 
-        private void ContentDialog_PrimaryButtonClick(ContentDialog sender, ContentDialogButtonClickEventArgs args)
+        private void OnPrimaryButtonClick(ModalPopup sender, ModalPopupButtonClickEventArgs args)
         {
             SelectedItems = ViewModel.SelectedItems.Select(x => x.Id).ToList();
         }

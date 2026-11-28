@@ -9,6 +9,7 @@
 #pragma warning disable RS0030
 
 using Telegram.Native;
+using Telegram.Navigation;
 using Windows.ApplicationModel;
 using Windows.Foundation.Metadata;
 using Windows.System.Profile;
@@ -117,10 +118,8 @@ namespace Telegram.Common
             return _build >= compare;
         }
 
-        public static NavigationCacheMode NavigationCacheMode => IsXbox
-                ? NavigationCacheMode.Disabled
-                : Constants.DEBUG
-                ? NavigationCacheMode.Enabled
-                : NavigationCacheMode.Enabled;
+        public static PageRetention PageRetention => IsXbox
+                ? PageRetention.Discard
+                : PageRetention.Cache;
     }
 }

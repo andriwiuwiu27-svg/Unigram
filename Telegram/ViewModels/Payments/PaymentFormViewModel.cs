@@ -341,7 +341,7 @@ namespace Telegram.ViewModels.Payments
                 choose.SecondaryButtonText = Strings.Cancel;
 
                 var confirm1 = await ShowPopupAsync(choose);
-                if (confirm1 == ContentDialogResult.Primary)
+                if (confirm1 == ModalPopupResult.Primary)
                 {
                     if (choose.SelectedIndex is SavedCredentials savedCredentials)
                     {
@@ -354,7 +354,7 @@ namespace Telegram.ViewModels.Payments
                         var option = new PaymentCredentialsPopup(Session, regular, paymentOption);
 
                         var confirm2 = await ShowPopupAsync(option);
-                        if (confirm2 == ContentDialogResult.Primary && option.Credentials != null)
+                        if (confirm2 == ModalPopupResult.Primary && option.Credentials != null)
                         {
                             _inputCredentials = new InputCredentialsNew(option.Credentials.Id, true);
                             Credentials = option.Credentials;
@@ -368,7 +368,7 @@ namespace Telegram.ViewModels.Payments
             var popup = new PaymentCredentialsPopup(Session, regular);
 
             var confirm = await ShowPopupAsync(popup);
-            if (confirm == ContentDialogResult.Primary && popup.Credentials != null)
+            if (confirm == ModalPopupResult.Primary && popup.Credentials != null)
             {
                 _inputCredentials = new InputCredentialsNew(popup.Credentials.Id, true);
                 Credentials = popup.Credentials;
@@ -385,7 +385,7 @@ namespace Telegram.ViewModels.Payments
             var popup = new PaymentAddressPopup(Session, _inputInvoice, regular.Invoice, _info);
 
             var confirm = await ShowPopupAsync(popup);
-            if (confirm == ContentDialogResult.Primary && popup.ValidatedInfo != null)
+            if (confirm == ModalPopupResult.Primary && popup.ValidatedInfo != null)
             {
                 ValidatedInfo = popup.ValidatedInfo;
             }
@@ -414,7 +414,7 @@ namespace Telegram.ViewModels.Payments
             popup.SecondaryButtonText = Strings.Cancel;
 
             var confirm = await ShowPopupAsync(popup);
-            if (confirm == ContentDialogResult.Primary && popup.SelectedIndex is ShippingOption index)
+            if (confirm == ModalPopupResult.Primary && popup.SelectedIndex is ShippingOption index)
             {
                 Shipping = index;
             }
@@ -438,7 +438,7 @@ namespace Telegram.ViewModels.Payments
             popup.SecondaryButtonText = Strings.Cancel;
 
             var confirm = await ShowPopupAsync(popup);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 TipAmount = Formatter.AmountBack(popup.Value, regular.Invoice.Currency);
             }
@@ -477,7 +477,7 @@ namespace Telegram.ViewModels.Payments
             var disclaimer = await ShowPopupAsync(string.Format(Strings.PaymentWarningText, bot.FirstName, provider.FirstName), Strings.PaymentWarning, Strings.OK);
 
             var confirm = await ShowPopupAsync(string.Format(Strings.PaymentTransactionMessage, Locale.FormatCurrency(TotalAmount, regular.Invoice.Currency), bot.FirstName, _title), Strings.PaymentTransactionReview, Strings.OK, Strings.Cancel);
-            if (confirm != ContentDialogResult.Primary)
+            if (confirm != ModalPopupResult.Primary)
             {
                 return;
             }
@@ -507,7 +507,7 @@ namespace Telegram.ViewModels.Payments
                 return;
             }
 
-            var popup = ContentPopup.Block(XamlRoot);
+            var popup = ModalPopup.Block(XamlRoot);
 
             var response = await ClientService.SendAsync(new SendPaymentForm(_inputInvoice, formId, infoId, shippingId, credentials, 0));
             if (response is PaymentResult result)
@@ -529,6 +529,8 @@ namespace Telegram.ViewModels.Payments
             }
             else
             {
+                // Block cancels any close while Tag is set.
+                popup.Tag = null;
                 popup.Hide();
             }
         }
@@ -580,7 +582,7 @@ namespace Telegram.ViewModels.Payments
             popup.SecondaryButtonText = Strings.Cancel;
 
             var confirm = await ShowPopupAsync(popup);
-            if (confirm != ContentDialogResult.Primary)
+            if (confirm != ModalPopupResult.Primary)
             {
                 return new TemporaryPasswordState(false, 0);
             }

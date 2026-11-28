@@ -29,14 +29,13 @@ using Windows.UI.Xaml.Shapes;
 
 namespace Telegram.Controls.Cells
 {
-    public sealed partial class ForumTopicVerticalCell : ControlEx, IForumTopicDelegate, IDirectMessagesTopicDelegate
+    public sealed partial class ForumTopicVerticalCell : ControlEx, IForumTopicDelegate
     {
         private bool _selected;
 
         private bool _vertical;
 
         private ForumTopic _forumTopic;
-        private DirectMessagesChatTopic _directMessagesChatTopic;
         private Chat _chat;
 
         private int _thumbnailId;
@@ -58,7 +57,6 @@ namespace Telegram.Controls.Cells
         #region InitializeComponent
 
         private AnimatedImage Animated;
-        private ProfilePicture Photo;
         private TextBlock TitleLabel;
         private Border PinnedBackground;
         private TextBlock PinnedIcon;
@@ -77,7 +75,6 @@ namespace Telegram.Controls.Cells
         protected override void OnApplyTemplate()
         {
             Animated = GetTemplateChild(nameof(Animated)) as AnimatedImage;
-            Photo = GetTemplateChild(nameof(Photo)) as ProfilePicture;
             TitleLabel = GetTemplateChild(nameof(TitleLabel)) as TextBlock;
             PinnedBackground = GetTemplateChild(nameof(PinnedBackground)) as Border;
             PinnedIcon = GetTemplateChild(nameof(PinnedIcon)) as TextBlock;
@@ -96,10 +93,6 @@ namespace Telegram.Controls.Cells
             if (_forumTopic != null)
             {
                 UpdateForumTopic(_viewModel, _forumTopic);
-            }
-            else if (_directMessagesChatTopic != null)
-            {
-                UpdateDirectMessagesChatTopic(_viewModel, _directMessagesChatTopic);
             }
         }
 
@@ -393,115 +386,6 @@ namespace Telegram.Controls.Cells
 
         #endregion
 
-        #region DirectMessagesChatTopic
-
-        public void UpdateDirectMessagesChatTopicLastMessage(DirectMessagesChatTopic topic)
-        {
-            // Not implemented for now
-        }
-
-        public void UpdateDirectMessagesChatTopicReadInbox(DirectMessagesChatTopic topic)
-        {
-            if (_viewModel == null || !_templateApplied)
-            {
-                return;
-            }
-
-            var unread = (topic.UnreadCount > 0 || topic.IsMarkedAsUnread) ? topic.UnreadReactionCount > 0 ? Visibility.Collapsed : Visibility.Visible : Visibility.Collapsed;
-            if (unread == Visibility.Visible)
-            {
-                UnreadBadge.Visibility = Visibility.Visible;
-                UnreadBadge.Text = topic.UnreadCount > 0 ? topic.UnreadCount.ToString() : string.Empty;
-            }
-            else
-            {
-                UnreadBadge.Visibility = Visibility.Collapsed;
-            }
-
-            //UpdateAutomation(_clientService, chat, chat.LastMessage);
-        }
-
-        public void UpdateDirectMessagesChatTopicReadOutbox(DirectMessagesChatTopic topic)
-        {
-            // Not implemented for now
-        }
-
-        public void UpdateDirectMessagesChatIsMarkedAsUnread(Chat chat)
-        {
-
-        }
-
-        public void UpdateDirectMessagesChatTopicUnreadMentionCount(DirectMessagesChatTopic topic)
-        {
-            if (_viewModel == null || !_templateApplied)
-            {
-                return;
-            }
-
-            UpdateDirectMessagesChatTopicReadInbox(topic);
-
-            var unread = topic.UnreadReactionCount > 0 ? Visibility.Visible : Visibility.Collapsed;
-            if (unread == Visibility.Visible)
-            {
-                UnreadMentionsBadge.Visibility = Visibility.Visible;
-                UnreadMentionsLabel.Text = Icons.HeartFilled12;
-            }
-            else
-            {
-                UnreadMentionsBadge.Visibility = Visibility.Collapsed;
-            }
-        }
-
-        public void UpdateNotificationSettings(DirectMessagesChatTopic topic)
-        {
-            if (_viewModel == null || !_templateApplied)
-            {
-                return;
-            }
-
-            UnreadBadge.IsUnmuted = true;
-        }
-
-        public void UpdateDirectMessagesChatTopicActions(DirectMessagesChatTopic topic, IDictionary<MessageSender, ChatAction> actions)
-        {
-            // Not implemented for now
-        }
-
-        public void UpdateDirectMessagesChatTopic(TopicListViewModel viewModel, DirectMessagesChatTopic topic)
-        {
-            _viewModel = viewModel;
-            _directMessagesChatTopic = topic;
-            _chat = _viewModel.ClientService.GetChat(topic.ChatId);
-
-            if (!_templateApplied)
-            {
-                return;
-            }
-
-            if (topic.SenderId == null)
-            {
-                TitleLabel.Text = Strings.AllTopicsShort;
-                Photo.Source = null;
-                AllTopics.Visibility = Visibility.Visible;
-            }
-            else
-            {
-                TitleLabel.Text = _viewModel.ClientService.GetTitle(topic.SenderId);
-                Photo.Source = ProfilePictureSource.MessageSender(_viewModel.ClientService, topic.SenderId);
-                AllTopics.Visibility = Visibility.Collapsed;
-            }
-
-            //UpdateDirectMessagesChatTopicName(topic);
-            //UpdateDirectMessagesChatTopicIcon(topic);
-            //UpdateChatEmojiStatus(topic);
-
-            //UpdateChatReadInbox(chat);
-            UpdateDirectMessagesChatTopicUnreadMentionCount(topic);
-            UpdateNotificationSettings(topic);
-        }
-
-        #endregion
-
         public void ShowPreview(Point? position)
         {
             Logger.Info();
@@ -539,10 +423,6 @@ namespace Telegram.Controls.Cells
             if (_forumTopic != null)
             {
                 _ = viewModel.NavigatedToAsync(new ChatMessageTopic(chat.Id, new MessageTopicForum(_forumTopic.Info.ForumTopicId)), NavigationMode.New, new NavigationState());
-            }
-            else if (_directMessagesChatTopic != null)
-            {
-                _ = viewModel.NavigatedToAsync(new ChatMessageTopic(chat.Id, new MessageTopicDirectMessages(_directMessagesChatTopic.Id)), NavigationMode.New, new NavigationState());
             }
 
             // Unloaded doesn't fire for a view hosted in a flyout, so the flyout's own Closed

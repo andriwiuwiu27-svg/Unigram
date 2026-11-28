@@ -23,6 +23,19 @@ namespace Telegram.Generators.Emit
         }
 
         /// <summary>
+        /// A constructor with no fields carries nothing but its type, so the pointer parser hands
+        /// out one instance of it instead of allocating per occurrence. That holds only while the
+        /// class stays stateless, which is why it is not emitted partial.
+        /// </summary>
+        public static bool IsSharedInstance(SchemaClass type)
+        {
+            return !type.IsFunction
+                && !type.IsProxy
+                && type.Properties.Count == 0
+                && !IsHandledByClient(Naming.ToPascalCase(type.Name));
+        }
+
+        /// <summary>
         /// The objects ClientService keeps cached and updates in place rather than replacing, so
         /// that the references the app already handed out keep seeing current data. They get an
         /// Update that copies every field over.
@@ -66,7 +79,7 @@ namespace Telegram.Generators.Emit
                 return;
             }
 
-            builder.AppendLine("public partial class " + className + " : " + baseName);
+            builder.AppendLine((IsSharedInstance(type) ? "public class " : "public partial class ") + className + " : " + baseName);
             builder.AppendLine("{");
 
             foreach (var prop in type.Properties)
@@ -428,10 +441,32 @@ namespace Telegram.Generators.Emit
             else
             {
                 builder.AppendLine("    ReadStartObjectPtr(ref reader);");
-                builder.AppendLine("    return new " + className + "();");
+                builder.AppendLine("    return SharedInstances." + className + " ??= new " + className + "();");
             }
 
             builder.AppendLine("}");
+        }
+
+        /// <summary>
+        /// The holder for <see cref="IsSharedInstance"/>'s objects, filled on first use. It has no
+        /// initializers, and so no class constructor for every read to check on .NET Native. A race
+        /// at most builds a spare instance; nothing depends on there being exactly one.
+        /// </summary>
+        public static void WriteSharedInstances(StringBuilder builder, List<SchemaClass> classes)
+        {
+            builder.AppendLine("  private static class SharedInstances");
+            builder.AppendLine("  {");
+
+            foreach (var type in classes)
+            {
+                if (IsSharedInstance(type))
+                {
+                    var className = Naming.ToPascalCase(type.Name);
+                    builder.AppendLine("    internal static " + className + "? " + className + ";");
+                }
+            }
+
+            builder.AppendLine("  }");
         }
 
         /// <summary>Fields bucketed by the byte length of their name, in ascending order.</summary>

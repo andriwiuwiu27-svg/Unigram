@@ -21,6 +21,7 @@ using Telegram.Services.Wallet;
 using Telegram.Td.Api;
 using Telegram.ViewModels.Delegates;
 using Telegram.ViewModels.Profile;
+using Telegram.ViewModels.Stories;
 using Telegram.ViewModels.Supergroups;
 using Telegram.Views;
 using Telegram.Views.Chats;
@@ -56,11 +57,17 @@ namespace Telegram.ViewModels
             _translateService = translateService;
 
             _giftsTabViewModel.ItemsReady += Gifts_ItemsReady;
+            _giftsTabViewModel.PinnedGiftsChanged += Gifts_PinnedGiftsChanged;
 
             SetTimerCommand = new RelayCommand<int?>(SetTimer);
         }
 
         private void Gifts_ItemsReady(object sender, EventArgs e)
+        {
+            Delegate?.UpdateChatGifts(Chat);
+        }
+
+        private void Gifts_PinnedGiftsChanged(object sender, EventArgs e)
         {
             Delegate?.UpdateChatGifts(Chat);
         }
@@ -241,6 +248,7 @@ namespace Telegram.ViewModels
                 .Subscribe<UpdateChatEmojiStatus>(Handle)
                 .Subscribe<UpdateChatAccentColors>(Handle)
                 .Subscribe<UpdateChatActiveStories>(Handle)
+                .Subscribe<UpdateChatActionBar>(Handle)
                 .Subscribe<UpdateChatNotificationSettings>(Handle);
         }
 
@@ -304,7 +312,7 @@ namespace Telegram.ViewModels
                     // Never the main tab and always last, so the strip is shown without it.
                     if (user.Type is UserTypeBot)
                     {
-                        AddPendingTab(LoadSimilarBotsTabAsync(), int.MaxValue);
+                        AddPendingTab(LoadSimilarBotsTabAsync(user.Id), int.MaxValue);
                     }
 
                     await UpdateSharedCountAsync(chat, tabs, mainTab);
@@ -336,7 +344,7 @@ namespace Telegram.ViewModels
 
                 if (typeSupergroup.IsChannel)
                 {
-                    AddPendingTab(LoadSimilarChannelsTabAsync(), int.MaxValue);
+                    AddPendingTab(LoadSimilarChannelsTabAsync(chat.Id), int.MaxValue);
                     await UpdateSharedCountAsync(chat, tabs, mainTab);
                 }
                 else
@@ -393,25 +401,24 @@ namespace Telegram.ViewModels
             await AddPendingTabsAsync();
         }
 
-        private async Task<ProfileTabItem> LoadSimilarBotsTabAsync()
+        // The count shares TDLib's cache with the list, so the tab's own load does not reach the server again.
+        private async Task<ProfileTabItem> LoadSimilarBotsTabAsync(long botUserId)
         {
-            await _botsTabViewModel.Items.LoadMoreItemsAsync(0);
-
-            if (_botsTabViewModel.Items.Count > 0)
+            var response = await ClientService.SendAsync(new GetBotSimilarBotCount(botUserId, false));
+            if (response is Count count && count.CountValue > 0)
             {
-                return new ProfileTabItem(new ProfileTabSimilarBots(), null, _botsTabViewModel.TotalCount, Strings.R.Bots);
+                return new ProfileTabItem(new ProfileTabSimilarBots(), null, count.CountValue, Strings.R.Bots);
             }
 
             return null;
         }
 
-        private async Task<ProfileTabItem> LoadSimilarChannelsTabAsync()
+        private async Task<ProfileTabItem> LoadSimilarChannelsTabAsync(long chatId)
         {
-            await _channelsTabViewModel.Items.LoadMoreItemsAsync(0);
-
-            if (_channelsTabViewModel.Items.Count > 0)
+            var response = await ClientService.SendAsync(new GetChatSimilarChatCount(chatId, false));
+            if (response is Count count && count.CountValue > 0)
             {
-                return new ProfileTabItem(new ProfileTabSimilarChannels(), null, _channelsTabViewModel.TotalCount, Strings.R.Channels);
+                return new ProfileTabItem(new ProfileTabSimilarChannels(), null, count.CountValue, Strings.R.Channels);
             }
 
             return null;
@@ -662,6 +669,14 @@ namespace Telegram.ViewModels
             }
         }
 
+        public void Handle(UpdateChatActionBar update)
+        {
+            if (update.ChatId == _chat?.Id)
+            {
+                BeginOnUIThread(() => Delegate?.UpdateChatActionBar(_chat));
+            }
+        }
+
         public async void SendMessage()
         {
             var chat = _chat;
@@ -736,6 +751,20 @@ namespace Telegram.ViewModels
             NavigationService.Navigate(typeof(ChatStoriesPage), new ChatStoriesArgs(chat.Id, ChatStoriesType.Archive));
         }
 
+        // Posted as the chat the profile is of, which the publish sheet does not let change.
+        public void AddStory()
+        {
+            var chat = _chat;
+            if (chat == null)
+            {
+                return;
+            }
+
+            var stories = new StoryListViewModel(ClientService, Settings, Aggregator);
+            stories.NavigationService = NavigationService;
+            stories.AddStory(chat.Id, false);
+        }
+
         public async void Block()
         {
             var chat = _chat;
@@ -745,7 +774,7 @@ namespace Telegram.ViewModels
             }
 
             var confirm = await ShowPopupAsync(Strings.AreYouSureBlockContact, Strings.AppName, Strings.OK, Strings.Cancel);
-            if (confirm != ContentDialogResult.Primary)
+            if (confirm != ModalPopupResult.Primary)
             {
                 return;
             }
@@ -762,7 +791,7 @@ namespace Telegram.ViewModels
             }
 
             var confirm = await ShowPopupAsync(Strings.AreYouSureUnblockContact, Strings.AppName, Strings.OK, Strings.Cancel);
-            if (confirm != ContentDialogResult.Primary)
+            if (confirm != ModalPopupResult.Primary)
             {
                 return;
             }
@@ -868,7 +897,7 @@ namespace Telegram.ViewModels
         public void ViewUsername()
         {
             var chat = _chat;
-            if (chat == null)
+            if (chat == null || _forumTopic != null)
             {
                 return;
             }
@@ -887,7 +916,11 @@ namespace Telegram.ViewModels
                 return;
             }
 
-            if (ClientService.HasActiveUsername(chat, out string username))
+            if (_forumTopic != null)
+            {
+                CopyForumTopicLink(chat);
+            }
+            else if (ClientService.HasActiveUsername(chat, out string username))
             {
                 MessageHelper.CopyText(XamlRoot, $"@{username}");
             }
@@ -901,9 +934,22 @@ namespace Telegram.ViewModels
                 return;
             }
 
-            if (ClientService.HasActiveUsername(chat, out string username))
+            if (_forumTopic != null)
+            {
+                CopyForumTopicLink(chat);
+            }
+            else if (ClientService.HasActiveUsername(chat, out string username))
             {
                 MessageHelper.CopyLink(ClientService, XamlRoot, new InternalLinkTypePublicChat(username, string.Empty, false, string.Empty));
+            }
+        }
+
+        private async void CopyForumTopicLink(Chat chat)
+        {
+            var response = await ClientService.SendAsync(new GetForumTopicLink(chat.Id, _forumTopic.Info.ForumTopicId));
+            if (response is MessageLink link)
+            {
+                MessageHelper.CopyLink(XamlRoot, link.Link, link.IsPublic);
             }
         }
 
@@ -929,7 +975,10 @@ namespace Telegram.ViewModels
             if (ClientService.TryGetUser(chat, out User user) &&
                 ClientService.TryGetUserFull(chat, out UserFullInfo fullInfo))
             {
-                ShowPopup(new GiftPopup(ClientService, NavigationService, user, fullInfo));
+                if (GiftPopup.CanReceiveGifts(ClientService, NavigationService, user, fullInfo))
+                {
+                    ShowPopup(new GiftPopup(ClientService, NavigationService, user, fullInfo));
+                }
             }
             else
             {
@@ -955,7 +1004,7 @@ namespace Telegram.ViewModels
             }
 
             var confirm = await ShowPopupAsync(Strings.AreYouSureSecretChat, Strings.AreYouSureSecretChatTitle, Strings.Start, Strings.Cancel);
-            if (confirm != ContentDialogResult.Primary)
+            if (confirm != ModalPopupResult.Primary)
             {
                 return;
             }
@@ -983,7 +1032,7 @@ namespace Telegram.ViewModels
             if (!protectedContent && (Constants.DEBUG || !IsPremium || AppSettings.ToolTip.Required("DisableSharing")))
             {
                 var confirm = await ShowPopupAsync(new DisableSharingPopup(ClientService));
-                if (confirm != ContentDialogResult.Primary)
+                if (confirm != ModalPopupResult.Primary)
                 {
                     return;
                 }
@@ -1033,6 +1082,14 @@ namespace Telegram.ViewModels
             else
             {
                 MembersTab.Add();
+            }
+        }
+
+        public void InviteToBot()
+        {
+            if (ClientService.TryGetUser(_chat, out User user) && user.Type is UserTypeBot { CanBeEdited: true })
+            {
+                ShowPopup(new ChooseChatsPopup(), new ChooseChatsConfigurationInviteToBot(user.Id));
             }
         }
 
@@ -1122,12 +1179,12 @@ namespace Telegram.ViewModels
                 var popup = new ChangePrivacyPopup(user, ChangePrivacyType.LastSeen, IsPremium, IsPremiumAvailable);
 
                 var confirm = await ShowPopupAsync(popup);
-                if (confirm == ContentDialogResult.Primary)
+                if (confirm == ModalPopupResult.Primary)
                 {
                     ClientService.Send(new SetUserPrivacySettingRules(new UserPrivacySettingShowStatus(), new UserPrivacySettingRules(new UserPrivacySettingRule[] { new UserPrivacySettingRuleAllowAll() })));
                     ShowToast(Strings.PremiumLastSeenSet, ToastPopupIcon.Info);
                 }
-                else if (confirm == ContentDialogResult.Secondary && IsPremiumAvailable && !IsPremium)
+                else if (confirm == ModalPopupResult.Secondary && IsPremiumAvailable && !IsPremium)
                 {
                     NavigationService.ShowPromo(new PremiumSourceFeature(new PremiumFeatureAdvancedChatManagement()));
                 }
@@ -1229,7 +1286,7 @@ namespace Telegram.ViewModels
                 var popup = new SupergroupTopicPopup(ClientService, _forumTopic.Info);
 
                 var confirm = await ShowPopupAsync(popup);
-                if (confirm == ContentDialogResult.Primary)
+                if (confirm == ModalPopupResult.Primary)
                 {
                     ClientService.Send(new EditForumTopic(chat.Id, _forumTopic.Info.ForumTopicId, popup.SelectedName, true, popup.SelectedIcon.CustomEmojiId));
                 }
@@ -1350,7 +1407,7 @@ namespace Telegram.ViewModels
             var dialog = new DeleteChatPopup(ClientService, updated, null, false);
 
             var confirm = await ShowPopupAsync(dialog);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 var check = dialog.IsChecked == true;
 
@@ -1399,7 +1456,7 @@ namespace Telegram.ViewModels
             }
 
             var confirm = await ShowPopupAsync(message, Strings.AppName, Strings.OK, Strings.Cancel);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 if (chat.Type is ChatTypePrivate privata)
                 {
@@ -1427,7 +1484,7 @@ namespace Telegram.ViewModels
             //}
 
             //var confirm = await ShowPopupAsync(Strings.AreYouSureDeleteContact, Strings.AppName, Strings.OK, Strings.Cancel);
-            //if (confirm != ContentDialogResult.Primary)
+            //if (confirm != ModalPopupResult.Primary)
             //{
             //    return;
             //}
@@ -1485,7 +1542,7 @@ namespace Telegram.ViewModels
                 var popup = new ChatMutePopup(mutedFor);
 
                 var confirm = await ShowPopupAsync(popup);
-                if (confirm != ContentDialogResult.Primary)
+                if (confirm != ModalPopupResult.Primary)
                 {
                     return;
                 }
@@ -1531,7 +1588,7 @@ namespace Telegram.ViewModels
                 dialog.Value = chat.MessageAutoDeleteTime;
 
                 var confirm = await ShowPopupAsync(dialog);
-                if (confirm != ContentDialogResult.Primary || chat.MessageAutoDeleteTime == dialog.Value)
+                if (confirm != ModalPopupResult.Primary || chat.MessageAutoDeleteTime == dialog.Value)
                 {
                     return;
                 }
@@ -1571,7 +1628,7 @@ namespace Telegram.ViewModels
             };
 
             var confirm = await ShowPopupAsync(popup);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 DeleteReactions = null;
                 Delegate?.UpdateChat(Chat);
@@ -1602,7 +1659,7 @@ namespace Telegram.ViewModels
             };
 
             var confirm = await ShowPopupAsync(popup);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 ReportReactions = null;
                 Delegate?.UpdateChat(Chat);

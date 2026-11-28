@@ -11,6 +11,8 @@ using System;
 using System.Numerics;
 using System.Threading;
 using System.Threading.Tasks;
+using Telegram.Common;
+using Telegram.Native;
 using Telegram.Native.Composition;
 using Telegram.Navigation;
 using Telegram.Services;
@@ -181,6 +183,7 @@ namespace Telegram.Controls.Cells
         protected readonly CanvasDevice _device;
         protected bool _disposed;
 
+        private readonly Direct2DDevice _owner;
         private readonly CompositionGraphicsDevice _graphicsDevice;
         private readonly CompositionDrawingSurface _surface;
         private readonly CompositionSurfaceBrush _brush;
@@ -188,11 +191,14 @@ namespace Telegram.Controls.Cells
 
         protected ThumbnailVisual()
         {
-            _device = ElementComposition.GetSharedDevice();
-
             var compositor = BootStrapper.Current.Compositor;
 
-            _graphicsDevice = CanvasComposition.CreateCompositionGraphicsDevice(compositor, _device);
+            // A graphics device of its own, as frames are drawn from the capture's thread, and the
+            // frames are made on its device so that they can be drawn on it.
+            _owner = Direct2D.Current;
+            _graphicsDevice = _owner.CreateGraphicsDevice();
+            _device = CanvasComposition.GetCanvasDevice(_graphicsDevice);
+
             _surface = _graphicsDevice.CreateDrawingSurface(new Size(0, 0), CompositionPixelFormat.B8G8R8A8UIntNormalized, CompositionAlphaMode.Premultiplied);
 
             _brush = compositor.CreateSurfaceBrush(_surface);
@@ -262,6 +268,7 @@ namespace Telegram.Controls.Cells
 
                 _brush.Dispose();
                 _surface.Dispose();
+                _owner.ReleaseGraphicsDevice(_graphicsDevice);
                 _graphicsDevice.Dispose();
             }
 

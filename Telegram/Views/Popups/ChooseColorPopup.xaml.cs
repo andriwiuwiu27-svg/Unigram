@@ -11,7 +11,7 @@ using Windows.UI.Xaml.Controls;
 
 namespace Telegram.Views.Popups
 {
-    public sealed partial class ChooseColorPopup : ContentPopup
+    public sealed partial class ChooseColorPopup : ModalPopup
     {
         public ChooseColorPopup()
         {
@@ -21,8 +21,6 @@ namespace Telegram.Views.Popups
             PrimaryButtonText = Strings.OK;
             SecondaryButtonText = Strings.Cancel;
             CloseButtonText = Strings.UseSystemAccentColor;
-            CloseButtonResult = ContentDialogResult.Primary;
-            CloseButtonClick += ContentDialog_CloseButtonClick;
         }
 
         private Color _color;
@@ -54,11 +52,6 @@ namespace Telegram.Views.Popups
         {
             _color = args.NewColor;
             TextField.Color = args.NewColor;
-        }
-
-        private void ContentDialog_CloseButtonClick(ContentDialog sender, ContentDialogButtonClickEventArgs args)
-        {
-            _color = default;
         }
     }
 }

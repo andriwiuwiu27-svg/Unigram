@@ -15,6 +15,7 @@ using Telegram.Td.Api;
 using Telegram.Views.Popups;
 using Windows.ApplicationModel.Activation;
 using Windows.ApplicationModel.DataTransfer.ShareTarget;
+using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Media;
 
@@ -38,7 +39,43 @@ namespace Telegram.Views.Host
 
         public INavigationService NavigationService { get; }
 
-        public async void Activate(ShareTargetActivatedEventArgs args, INavigationService navigationService, AuthorizationState state)
+        private ShareTargetActivatedEventArgs _pendingArgs;
+        private INavigationService _pendingNavigationService;
+        private AuthorizationState _pendingState;
+
+        public void Activate(ShareTargetActivatedEventArgs args, INavigationService navigationService, AuthorizationState state)
+        {
+            // WinUI creates the window's content island after the content is set, so a share that
+            // opens its window gets here before there is a XamlRoot to show the popup in.
+            if (XamlRoot == null)
+            {
+                _pendingArgs = args;
+                _pendingNavigationService = navigationService;
+                _pendingState = state;
+
+                Loaded += OnPendingLoaded;
+                return;
+            }
+
+            ActivateLoaded(args, navigationService, state);
+        }
+
+        private void OnPendingLoaded(object sender, RoutedEventArgs e)
+        {
+            Loaded -= OnPendingLoaded;
+
+            var args = _pendingArgs;
+            var navigationService = _pendingNavigationService;
+            var state = _pendingState;
+
+            _pendingArgs = null;
+            _pendingNavigationService = null;
+            _pendingState = null;
+
+            ActivateLoaded(args, navigationService, state);
+        }
+
+        private async void ActivateLoaded(ShareTargetActivatedEventArgs args, INavigationService navigationService, AuthorizationState state)
         {
             WatchDog.TrackEvent("ShareTarget");
 
@@ -108,9 +145,9 @@ namespace Telegram.Views.Host
             chooseChats.Closed -= OnClosed;
             chooseChats.AccountClick -= OnAccountClick;
 
-            if (args.Result != ContentDialogResult.Primary && chooseChats.ViewModel.Configuration is ChooseChatsConfigurationShareOperation shareOperation)
+            if (args.Result != ModalPopupResult.Primary && chooseChats.ViewModel.Configuration is ChooseChatsConfigurationShareOperation shareOperation)
             {
-                shareOperation.ShareOperation.TryReportCompleted();
+                shareOperation.ShareOperation.TryReportCompleted(Window);
             }
         }
     }

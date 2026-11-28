@@ -176,6 +176,21 @@ namespace Telegram.Controls
         public PencilCanvas()
         {
             DefaultStyleKey = typeof(PencilCanvas);
+            Unloaded += OnUnloaded;
+        }
+
+        // The targets are as large as the photo on screen. Loaded again, the strokes are redrawn
+        // from the list on the next draw.
+        private void OnUnloaded(object sender, RoutedEventArgs e)
+        {
+            StopFill();
+            StopAnimations();
+            EndPick();
+            DisposeBlur();
+
+            _renderTarget?.Dispose();
+            _renderTarget = null;
+            _needToCreateSizeDependentResources = true;
         }
 
         protected override void OnApplyTemplate()
@@ -450,6 +465,7 @@ namespace Telegram.Controls
 
         private void CreateSizeDependentResources()
         {
+            _renderTarget?.Dispose();
             _renderTarget = new CanvasRenderTarget(Canvas, Canvas.Size);
 
             _needToCreateSizeDependentResources = false;

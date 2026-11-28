@@ -95,12 +95,12 @@ namespace Telegram.Views.Popups
             Change(ViewModel.ChangeToColorAsync(false));
         }
 
-        private async void Change(Task<ContentDialogResult> task)
+        private async void Change(Task<ModalPopupResult> task)
         {
             var confirm = await task;
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
-                Hide(ContentDialogResult.Primary);
+                Hide(ModalPopupResult.Primary);
             }
         }
     }

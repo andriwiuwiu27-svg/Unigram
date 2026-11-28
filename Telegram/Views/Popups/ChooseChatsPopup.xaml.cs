@@ -520,6 +520,19 @@ namespace Telegram.Views.Popups
         public ReceivedGift Gift { get; }
     }
 
+    /// <summary>
+    /// A gift in the wallet, sent to a Telegram account.
+    /// </summary>
+    public partial class ChooseChatsConfigurationDepositGift : ChooseChatsConfiguration
+    {
+        public ChooseChatsConfigurationDepositGift(UpgradedGift gift)
+        {
+            Gift = gift;
+        }
+
+        public UpgradedGift Gift { get; }
+    }
+
     public partial class ChooseChatsConfigurationCreateGroupCall : ChooseChatsConfiguration
     {
 
@@ -664,11 +677,11 @@ namespace Telegram.Views.Popups
             return true;
         }
 
-        public override Task<ContentDialogResult> ConfirmSelectionAsync(ChooseChatsViewModel viewModel, IList<Chat> chats)
+        public override Task<ModalPopupResult> ConfirmSelectionAsync(ChooseChatsViewModel viewModel, IList<Chat> chats)
         {
             if (!viewModel.ClientService.TryGetChat(ChatId, out Chat chat))
             {
-                return Task.FromResult(ContentDialogResult.Primary);
+                return Task.FromResult(ModalPopupResult.Primary);
             }
 
             if (chat.Type is ChatTypeSupergroup { IsChannel: true })
@@ -695,6 +708,19 @@ namespace Telegram.Views.Popups
 
             return viewModel.ShowPopupAsync(message, title, Strings.Add, Strings.Cancel);
         }
+    }
+
+    public partial class ChooseChatsConfigurationInviteToBot : ChooseChatsConfiguration
+    {
+        // inviteUsersToBot takes 1-10 users.
+        public const int MaxQuantity = 10;
+
+        public ChooseChatsConfigurationInviteToBot(long botUserId)
+        {
+            BotUserId = botUserId;
+        }
+
+        public long BotUserId { get; }
     }
 
     public partial class ChooseChatsConfigurationShareStory : ChooseChatsConfiguration
@@ -835,14 +861,14 @@ namespace Telegram.Views.Popups
 
         public UpgradedGift Gift { get; }
 
-        public override Task<ContentDialogResult> ConfirmSelectionAsync(ChooseChatsViewModel viewModel, IList<Chat> chats)
+        public override Task<ModalPopupResult> ConfirmSelectionAsync(ChooseChatsViewModel viewModel, IList<Chat> chats)
         {
             if (Gift.UsedThemeChatId != chats[0].Id && viewModel.ClientService.TryGetChat(Gift.UsedThemeChatId, out Chat usedChat))
             {
                 return viewModel.ShowPopupAsync(string.Format(Strings.GiftThemesSetInReuseInfo, usedChat.Title), Strings.AppName, Strings.GiftThemesSetInReuseConfirm, Strings.Cancel);
             }
 
-            return Task.FromResult(ContentDialogResult.Primary);
+            return Task.FromResult(ModalPopupResult.Primary);
         }
     }
 
@@ -1042,7 +1068,7 @@ namespace Telegram.Views.Popups
             return true;
         }
 
-        public virtual Task<ContentDialogResult> ConfirmSelectionAsync(ChooseChatsViewModel viewModel, IList<Chat> chats)
+        public virtual Task<ModalPopupResult> ConfirmSelectionAsync(ChooseChatsViewModel viewModel, IList<Chat> chats)
         {
             if (NumberOfSentMessages > 0)
             {
@@ -1094,7 +1120,7 @@ namespace Telegram.Views.Popups
                 }
             }
 
-            return Task.FromResult(ContentDialogResult.Primary);
+            return Task.FromResult(ModalPopupResult.Primary);
         }
     }
 
@@ -1170,7 +1196,7 @@ namespace Telegram.Views.Popups
             }
 
             // An export date of 0 means the gift cannot go to the blockchain at all.
-            if (ViewModel.Configuration is ChooseChatsConfigurationTransferGift { Gift: { ExportDate: > 0, Gift: SentGiftUpgraded } })
+            if (ViewModel.Configuration is ChooseChatsConfigurationTransferGift { Gift: { MintDate: > 0, Gift: SentGiftUpgraded } })
             {
                 var wallet = ViewModel.ClientService.Options.CanUseTonWallet;
                 var button = new SettingsButton
@@ -1182,6 +1208,19 @@ namespace Telegram.Views.Popups
                 };
 
                 button.Click += ExportGift_Click;
+                Header = button;
+            }
+            else if (ViewModel.Configuration is ChooseChatsConfigurationDepositGift)
+            {
+                var button = new SettingsButton
+                {
+                    Content = Strings.Gift2MoveToMyGifts,
+                    Glyph = Icons.PersonFilled,
+                    Style = BootStrapper.Current.Resources["GlyphBadgeButtonPopupStyle"] as Style,
+                    Margin = new Thickness(12, 0, 12, 0),
+                };
+
+                button.Click += MoveToMyGifts_Click;
                 Header = button;
             }
 
@@ -1218,6 +1257,20 @@ namespace Telegram.Views.Popups
             }
         }
 
+        private void MoveToMyGifts_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is SettingsButton button)
+            {
+                button.Click -= MoveToMyGifts_Click;
+            }
+
+            if (ViewModel.Configuration is ChooseChatsConfigurationDepositGift depositGift)
+            {
+                Hide();
+                _ = GiftOnChainHelper.DepositAsync(ViewModel.ClientService, ViewModel.NavigationService, depositGift.Gift, new MessageSenderUser(ViewModel.ClientService.Options.MyId));
+            }
+        }
+
         private void Send_ContextRequested(object sender, ContextRequestedEventArgs args)
         {
             if (ViewModel.Configuration is ChooseChatsConfigurationShareMessages shareMessages)
@@ -1233,7 +1286,7 @@ namespace Telegram.Views.Popups
                     void SendAsCopy()
                     {
                         ViewModel.SendAsCopy = true;
-                        Hide(ContentDialogResult.Primary);
+                        Hide(ModalPopupResult.Primary);
                     }
 
                     flyout.CreateFlyoutItem(SendAsCopy, senders.Count > 1 ? Strings.HideSenderNames : Strings.HideSendersName, Icons.PersonOff);
@@ -1244,7 +1297,7 @@ namespace Telegram.Views.Popups
                     void RemoveCaptions()
                     {
                         ViewModel.RemoveCaptions = true;
-                        Hide(ContentDialogResult.Primary);
+                        Hide(ModalPopupResult.Primary);
                     }
 
                     flyout.CreateFlyoutItem(RemoveCaptions, Strings.HideCaption, Icons.TextDescriptionOff);
@@ -1255,7 +1308,7 @@ namespace Telegram.Views.Popups
                 void DisableNotifications()
                 {
                     ViewModel.SendDisableNotifications = true;
-                    Hide(ContentDialogResult.Primary);
+                    Hide(ModalPopupResult.Primary);
                 }
 
                 flyout.CreateFlyoutItem(DisableNotifications, Strings.SendWithoutSound, Icons.AlertOff);
@@ -1284,7 +1337,7 @@ namespace Telegram.Views.Popups
         private void SchedulingStateSendWhenOnline()
         {
             ViewModel.SendSchedulingState = new MessageSchedulingStateSendWhenOnline();
-            Hide(ContentDialogResult.Primary);
+            Hide(ModalPopupResult.Primary);
         }
 
         private async void SchedulingStateSendAtDate()
@@ -1311,10 +1364,10 @@ namespace Telegram.Views.Popups
             };
 
             var confirm = await popup.ShowAsync(XamlRoot);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 ViewModel.SendSchedulingState = popup.SchedulingState;
-                Hide(ContentDialogResult.Primary);
+                Hide(ModalPopupResult.Primary);
             }
         }
 
@@ -1355,7 +1408,7 @@ namespace Telegram.Views.Popups
             popup.ChatFolders.Visibility = Visibility.Collapsed;
 
             var confirm = await popup.PickAsync(navigationService.XamlRoot, Array.Empty<long>(), options, ListViewSelectionMode.None);
-            if (confirm != ContentDialogResult.Primary)
+            if (confirm != ModalPopupResult.Primary)
             {
                 return null;
             }
@@ -1392,7 +1445,7 @@ namespace Telegram.Views.Popups
             popup.PrimaryButtonText = Strings.OK;
 
             var confirm = await popup.PickAsync(navigationService.XamlRoot, selected, options);
-            if (confirm != ContentDialogResult.Primary)
+            if (confirm != ModalPopupResult.Primary)
             {
                 return null;
             }
@@ -1405,7 +1458,7 @@ namespace Telegram.Views.Popups
             return (await PickChatsAsync(navigationService, title, Array.Empty<long>(), ChooseChatsOptions.InviteUsers, selectionMode, allowEmptySelection))?.Select(x => clientService.GetUser(x)).Where(x => x != null).ToList();
         }
 
-        public Task<ContentDialogResult> PickAsync(XamlRoot xamlRoot, IList<long> selectedItems, ChooseChatsOptions options, ListViewSelectionMode selectionMode = ListViewSelectionMode.Multiple)
+        public Task<ModalPopupResult> PickAsync(XamlRoot xamlRoot, IList<long> selectedItems, ChooseChatsOptions options, ListViewSelectionMode selectionMode = ListViewSelectionMode.Multiple)
         {
             ViewModel.SelectionMode = selectionMode;
             ViewModel.Options = options;
@@ -1417,7 +1470,7 @@ namespace Telegram.Views.Popups
             return ShowAsync(xamlRoot);
         }
 
-        private Task<ContentDialogResult> ShowAsync(XamlRoot xamlRoot)
+        private Task<ModalPopupResult> ShowAsync(XamlRoot xamlRoot)
         {
             ViewModel.Items.Clear();
 
@@ -1521,7 +1574,7 @@ namespace Telegram.Views.Popups
                 popup.IsPrimaryButtonEnabled = true;
 
                 var confirm = await popup.PickAsync(navigationService.XamlRoot, target.OfType<FolderChat>().Select(x => x.ChatId).ToArray(), ChooseChatsOptions.All);
-                if (confirm != ContentDialogResult.Primary)
+                if (confirm != ModalPopupResult.Primary)
                 {
                     return null;
                 }
@@ -1555,7 +1608,7 @@ namespace Telegram.Views.Popups
                 popup.IsPrimaryButtonEnabled = true;
 
                 var confirm = await popup.PickAsync(navigationService.XamlRoot, target.OfType<FolderChat>().Select(x => x.ChatId).ToArray(), ChooseChatsOptions.All);
-                if (confirm != ContentDialogResult.Primary)
+                if (confirm != ModalPopupResult.Primary)
                 {
                     return null;
                 }
@@ -1911,6 +1964,7 @@ namespace Telegram.Views.Popups
             var maxQuantity = ViewModel.Configuration switch
             {
                 ChooseChatsConfigurationRequestUsers requestUsers => requestUsers.MaxQuantity,
+                ChooseChatsConfigurationInviteToBot => ChooseChatsConfigurationInviteToBot.MaxQuantity,
                 ChooseChatsConfigurationCreateGroupCall => ViewModel.ClientService.Options.GroupCallParticipantCountMax,
                 _ => int.MaxValue
             };
@@ -2007,7 +2061,7 @@ namespace Telegram.Views.Popups
                     var markdown = ClientEx.ParseMarkdown(text);
 
                     var confirm = await ToastPopup.ShowActionAsync(XamlRoot, markdown, Strings.UserBlockedNonPremiumButton, ToastPopupIcon.Premium);
-                    if (confirm == ContentDialogResult.Primary)
+                    if (confirm == ModalPopupResult.Primary)
                     {
                         Hide();
                         ViewModel.NavigationService.ShowPromo();
@@ -2103,7 +2157,7 @@ namespace Telegram.Views.Popups
         {
             if (ViewModel.ShouldCloseOnCommit)
             {
-                Hide(ContentDialogResult.Primary);
+                Hide(ModalPopupResult.Primary);
             }
             else if (await ViewModel.ConfirmPaidMessagesAsync())
             {
@@ -2182,7 +2236,7 @@ namespace Telegram.Views.Popups
         private void Accept()
         {
             ViewModel.Caption = CaptionInput.GetFormattedText();
-            Hide(ContentDialogResult.Primary);
+            Hide(ModalPopupResult.Primary);
         }
 
         private void Emoji_Click(object sender, RoutedEventArgs e)

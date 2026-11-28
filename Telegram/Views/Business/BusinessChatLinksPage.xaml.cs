@@ -9,6 +9,7 @@ using Telegram.Common;
 using Telegram.Controls;
 using Telegram.Controls.Cells.Business;
 using Telegram.Controls.Media;
+using Telegram.Navigation.Services;
 using Telegram.Td.Api;
 using Telegram.ViewModels.Business;
 using Telegram.ViewModels.Delegates;
@@ -30,7 +31,7 @@ namespace Telegram.Views.Business
             Title = Strings.BusinessLinks;
         }
 
-        protected override async void OnNavigatedTo(NavigationEventArgs e)
+        protected override async void OnNavigatedTo(NavigatedEventArgs e)
         {
             if (ViewModel.ClientService.TryGetUser(ViewModel.ClientService.Options.MyId, out User user))
             {

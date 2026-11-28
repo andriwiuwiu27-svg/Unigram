@@ -248,7 +248,7 @@ namespace Telegram
             };
         }
 
-        protected override INavigationService CreateNavigationService(ISession session, WindowContext window, Frame frame, string id, bool root)
+        protected override INavigationService CreateNavigationService(ISession session, WindowContext window, NavigationFrame frame, string id, bool root)
         {
             if (root)
             {
@@ -367,7 +367,9 @@ namespace Telegram
             // #2034: Will this work? No one knows.
             NightModeService.Current.Update(null);
 
-            OnStartSync(StartKind.Activate);
+            // Off the UI thread: RequestAccessAsync is brokered through RuntimeBroker, which can stall
+            // right after a resume long enough for calls queued to the UI ASTA to time out.
+            _ = Task.Run(() => OnStartSync(StartKind.Activate));
         }
 
         public override Task OnSuspendingAsync(object s, SuspendingEventArgs e)

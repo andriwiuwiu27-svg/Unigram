@@ -1510,7 +1510,7 @@ namespace Telegram.Views.Popups
         private async void ShowPremiumPromo(string text, PremiumFeature feature)
         {
             var confirm = await ToastPopup.ShowActionAsync(XamlRoot, text, Strings.QrPremiumSubscribe, ToastPopupIcon.Premium);
-            if (confirm != ContentDialogResult.Primary)
+            if (confirm != ModalPopupResult.Primary)
             {
                 return;
             }

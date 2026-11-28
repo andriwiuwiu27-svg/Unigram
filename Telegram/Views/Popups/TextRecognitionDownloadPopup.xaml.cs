@@ -29,7 +29,7 @@ namespace Telegram.Views.Popups
 
         private void Handle(UpdateTextRecognition update)
         {
-            this.BeginOnUIThread(() => Hide(ContentDialogResult.Primary));
+            this.BeginOnUIThread(() => Hide(ModalPopupResult.Primary));
         }
 
         private void UpdateFile(File file)

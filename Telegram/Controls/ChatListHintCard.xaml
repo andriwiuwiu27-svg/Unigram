@@ -1,4 +1,4 @@
-﻿<HyperlinkButton x:Class="Telegram.Controls.SuggestedActionSetBirthdateCard"
+﻿<HyperlinkButton x:Class="Telegram.Controls.ChatListHintCard"
                  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                  xmlns:controls="using:Telegram.Controls"
@@ -7,17 +7,17 @@
                  mc:Ignorable="d"
                  HorizontalAlignment="Stretch"
                  HorizontalContentAlignment="Stretch"
-                 Margin="12,4,12,0"
-                 CornerRadius="4"
+                 Background="Transparent"
+                 BorderThickness="0"
+                 Padding="0"
+                 Margin="0"
+                 CornerRadius="0"
                  d:DesignHeight="300"
                  d:DesignWidth="400">
 
     <HyperlinkButton.Template>
         <ControlTemplate TargetType="HyperlinkButton">
             <Grid x:Name="RootGrid"
-                  Background="{ThemeResource SettingsItemBackground}"
-                  BorderBrush="{ThemeResource SettingsItemBorderBrush}"
-                  BorderThickness="1"
                   CornerRadius="{TemplateBinding CornerRadius}">
                 <VisualStateManager.VisualStateGroups>
                     <VisualStateGroup x:Name="CommonStates">
@@ -69,23 +69,45 @@
             <RowDefinition />
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
             <ColumnDefinition />
             <ColumnDefinition Width="Auto" />
         </Grid.ColumnDefinitions>
-        <TextBlock Text="{CustomResource BirthdaySetupTitle}"
-                   Style="{StaticResource BaseTextBlockStyle}"
-                   Margin="12,6,0,0" />
+        <Border x:Name="Divider"
+                BorderBrush="{ThemeResource NavigationViewContentGridBorderBrush}"
+                BorderThickness="0,0,0,1"
+                Grid.ColumnSpan="3"
+                Grid.RowSpan="2" />
 
-        <TextBlock Text="{CustomResource BirthdaySetupMessage}"
-                   Style="{StaticResource BodyTextBlockStyle}"
-                   Margin="12,0,0,8"
+        <controls:RecentUserHeads x:Name="Users"
+                                  x:Load="False"
+                                  ItemOverlap="12"
+                                  RecentUserHeadChanged="Users_RecentUserHeadChanged"
+                                  BorderBrush="{ThemeResource TextControlBackground}"
+                                  VerticalAlignment="Center"
+                                  Margin="8,0,0,0"
+                                  Grid.RowSpan="2" />
+
+        <TextBlock x:Name="Title"
+                   Style="{StaticResource BaseTextBlockStyle}"
+                   FontFamily="{ThemeResource EmojiThemeFontFamilyWithSymbols}"
+                   Margin="8,6,0,0"
+                   Grid.Column="1" />
+
+        <TextBlock x:Name="Subtitle"
+                   Style="{StaticResource InfoCaptionTextBlockStyle}"
+                   Margin="8,0,0,8"
+                   Grid.Column="1"
                    Grid.Row="1" />
 
         <controls:GlyphButton x:Name="Hide"
                               AutomationProperties.Name="{CustomResource Hide}"
                               Glyph="&#xE711;"
                               VerticalAlignment="Center"
+                              CornerRadius="16"
+                              Width="40"
+                              Height="40"
                               Grid.RowSpan="2"
-                              Grid.Column="1" />
+                              Grid.Column="2" />
     </Grid>
 </HyperlinkButton>

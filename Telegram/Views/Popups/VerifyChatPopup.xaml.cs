@@ -18,11 +18,11 @@ namespace Telegram.Views.Popups
 {
     public partial class VerifyChatPopupResult
     {
-        public ContentDialogResult Result { get; set; }
+        public ModalPopupResult Result { get; set; }
 
         public FormattedText Text { get; set; }
 
-        public VerifyChatPopupResult(ContentDialogResult result, FormattedText text)
+        public VerifyChatPopupResult(ModalPopupResult result, FormattedText text)
         {
             Result = result;
             Text = text;

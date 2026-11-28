@@ -7,14 +7,6 @@
                   mc:Ignorable="d"
                   ShowHeader="False"
                   NavigationMode="Root">
-    <Page.Transitions>
-        <TransitionCollection>
-            <NavigationThemeTransition>
-                <SuppressNavigationTransitionInfo />
-            </NavigationThemeTransition>
-        </TransitionCollection>
-    </Page.Transitions>
-
     <local:ChatView x:Name="View"
                     x:FieldModifier="public" />
 </local:HostedPage>

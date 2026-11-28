@@ -7,6 +7,7 @@
 
 using System.Threading.Tasks;
 using Microsoft.Windows.AppLifecycle;
+using Telegram.Services;
 
 namespace Telegram.Compat
 {
@@ -21,11 +22,28 @@ namespace Telegram.Compat
         /// Windows App SDK's own restart is synchronous and does not come back at all when it
         /// succeeds, so the task this returns only ever completes on failure - which is also true
         /// of the one it replaces, just less obviously.
+        ///
+        /// Not coming back means Main never resumes to close TDLib, so it is closed here first,
+        /// and opened again if the restart fails.
         /// </summary>
-        public static Task RequestRestartAsync(string arguments)
+        public static async Task RequestRestartAsync(string arguments)
         {
-            AppInstance.Restart(arguments ?? string.Empty);
-            return Task.CompletedTask;
+            var lifetime = LifetimeService.Current;
+
+            Program.BeginExit(force: true);
+
+            var closing = lifetime.CloseAllAsync();
+            await Task.WhenAny(closing, Task.Delay(LifetimeService.CloseTimeout));
+
+            var reason = AppInstance.Restart(arguments ?? string.Empty);
+            Logger.Warning(reason);
+
+            foreach (var clientService in lifetime.ResolveAll<IClientService>())
+            {
+                clientService.TryInitialize();
+            }
+
+            Program.CancelExit();
         }
     }
 }

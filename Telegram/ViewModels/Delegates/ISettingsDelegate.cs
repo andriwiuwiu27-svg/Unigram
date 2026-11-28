@@ -9,5 +9,9 @@ namespace Telegram.ViewModels.Delegates
 {
     public interface ISettingsDelegate : IUserDelegate
     {
+        /// <summary>
+        /// Null when there is no card to show.
+        /// </summary>
+        void UpdateSuggestion(SettingsSuggestion suggestion);
     }
 }

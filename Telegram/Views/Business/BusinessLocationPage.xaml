@@ -10,14 +10,6 @@
                   ShowHeader="False"
                   Loaded="OnLoaded">
 
-    <Page.Transitions>
-        <TransitionCollection>
-            <NavigationThemeTransition>
-                <SlideNavigationTransitionInfo Effect="FromRight" />
-            </NavigationThemeTransition>
-        </TransitionCollection>
-    </Page.Transitions>
-
     <Grid Background="{ThemeResource SettingsPageBackground}">
         <ScrollViewer x:Name="ScrollingHost"
                       VerticalScrollBarVisibility="Auto"

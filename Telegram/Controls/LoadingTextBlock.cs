@@ -206,13 +206,13 @@ namespace Telegram.Controls
             var width = MathF.Max(actualWidth - left, actualHeight - top);
             var diaginal = MathF.Sqrt((width * width) + (width * width));
 
-            var rect1 = CanvasGeometry.CreateRectangle(null, 0, 0, show ? 0 : actualWidth, show ? 0 : actualHeight);
+            using var rect1 = CanvasGeometry.CreateRectangle(null, 0, 0, show ? 0 : actualWidth, show ? 0 : actualHeight);
 
-            var elli1 = CanvasGeometry.CreateCircle(null, left, top, 0);
-            var group1 = CanvasGeometry.CreateGroup(null, new[] { elli1, rect1 }, CanvasFilledRegionDetermination.Alternate);
+            using var elli1 = CanvasGeometry.CreateCircle(null, left, top, 0);
+            using var group1 = CanvasGeometry.CreateGroup(null, new[] { elli1, rect1 }, CanvasFilledRegionDetermination.Alternate);
 
-            var elli2 = CanvasGeometry.CreateCircle(null, left, top, diaginal);
-            var group2 = CanvasGeometry.CreateGroup(null, new[] { elli2, rect1 }, CanvasFilledRegionDetermination.Alternate);
+            using var elli2 = CanvasGeometry.CreateCircle(null, left, top, diaginal);
+            using var group2 = CanvasGeometry.CreateGroup(null, new[] { elli2, rect1 }, CanvasFilledRegionDetermination.Alternate);
 
             var ellipse = BootStrapper.Current.Compositor.CreatePathGeometry(new CompositionPath(group2));
             var clip = BootStrapper.Current.Compositor.CreateGeometricClip(ellipse);
@@ -359,7 +359,12 @@ namespace Telegram.Controls
             }
 
             var compositor = BootStrapper.Current.Compositor;
-            var group = CanvasGeometry.CreateGroup(null, geometries, CanvasFilledRegionDetermination.Winding);
+            using var group = CanvasGeometry.CreateGroup(null, geometries, CanvasFilledRegionDetermination.Winding);
+
+            foreach (var geometry in geometries)
+            {
+                geometry.Dispose();
+            }
 
             _skeleton.Clip = compositor.CreateGeometricClip(compositor.CreatePathGeometry(new CompositionPath(group)));
         }

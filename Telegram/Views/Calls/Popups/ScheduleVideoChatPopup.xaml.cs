@@ -44,7 +44,7 @@ namespace Telegram.Views.Calls.Popups
 
             Message.Text = string.Format(channel ? Strings.VoipChannelScheduleInfo : Strings.VoipGroupScheduleInfo, Locale.FormatTtl((int)(Value - DateTime.UtcNow).TotalSeconds));
 
-            DefaultButton = ContentDialogButton.Primary;
+            DefaultButton = ModalPopupButton.Primary;
         }
 
         public DateTime Value

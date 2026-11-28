@@ -7,7 +7,9 @@
 
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Threading.Tasks;
+using Telegram.Common;
 using Telegram.Controls;
 using Telegram.Controls.Gallery;
 using Telegram.Services;
@@ -15,41 +17,35 @@ using Telegram.Td;
 using Telegram.Td.Api;
 using Telegram.ViewModels.Gallery;
 using Telegram.Views;
+using Telegram.Views.Authorization;
 using Telegram.Views.Popups;
 using Telegram.Views.Settings;
 using Windows.Foundation;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Media;
-using Windows.UI.Xaml.Media.Animation;
 using Windows.UI.Xaml.Navigation;
 
 namespace Telegram.Navigation.Services
 {
     public interface INavigationService
     {
-        void GoBack(NavigationState state = null, NavigationTransitionInfo infoOverride = null);
+        void GoBack(NavigationState state = null, PageTransition transition = PageTransition.Default);
         void GoBackAt(int index, bool back = true);
+        void GoBackTo(Type page, object parameter = null, NavigationState state = null);
         void GoForward();
 
-        object Content { get; }
+        NavigationPage Content { get; }
 
         XamlRoot XamlRoot { get; }
 
-        bool Navigate(Type page, object parameter = null, NavigationState state = null, NavigationTransitionInfo infoOverride = null, bool navigationStackEnabled = true);
+        bool Navigate(Type page, object parameter = null, NavigationState state = null, PageTransition transition = PageTransition.Default);
         void GoBack(NavigatingEventArgs args);
-        void GoBack(NavigatingCancelEventArgs args);
 
         event EventHandler<NavigatedEventArgs> Navigated;
 
         bool CanGoBack { get; }
         bool CanGoForward { get; }
-
-        string NavigationState { get; set; }
-
-        IDictionary<string, object> CacheKeyToParameter { get; }
-
-        void Refresh();
 
         void Suspend();
         void Resume();
@@ -59,15 +55,13 @@ namespace Telegram.Navigation.Services
 
         Task<WindowContext> OpenAsync(ViewServiceOptions parameters);
         Task<WindowContext> OpenAsync(Type page, object parameter = null, string title = null, Size size = default);
-        Task<ContentDialogResult> ShowPopupAsync(ContentPopup popup, object parameter = null, ElementTheme requestedTheme = ElementTheme.Default);
-        void ShowPopup(ContentPopup popup, object parameter = null, ElementTheme requestedTheme = ElementTheme.Default);
-        Task<ContentDialogResult> ShowPopupAsync(ModalPopup popup, object parameter = null, ElementTheme requestedTheme = ElementTheme.Default);
+        Task<ModalPopupResult> ShowPopupAsync(ModalPopup popup, object parameter = null, ElementTheme requestedTheme = ElementTheme.Default);
         void ShowPopup(ModalPopup popup, object parameter = null, ElementTheme requestedTheme = ElementTheme.Default);
 
-        Task<ContentDialogResult> ShowPopupAsync(string message, string title = null, string primary = null, string secondary = null, string tertiary = null, bool destructive = false, ElementTheme requestedTheme = ElementTheme.Default);
-        //Task<ContentDialogResult> ShowPopupAsync(FrameworkElement target, string message, string title = null, string primary = null, string secondary = null, bool destructive = false, ElementTheme requestedTheme = ElementTheme.Default);
-        Task<ContentDialogResult> ShowPopupAsync(FormattedText message, string title = null, string primary = null, string secondary = null, string tertiary = null, bool destructive = false, ElementTheme requestedTheme = ElementTheme.Default);
-        ////Task<ContentDialogResult> ShowPopupAsync(FrameworkElement target, FormattedText message, string title = null, string primary = null, string secondary = null, bool destructive = false, ElementTheme requestedTheme = ElementTheme.Default);
+        Task<ModalPopupResult> ShowPopupAsync(string message, string title = null, string primary = null, string secondary = null, string tertiary = null, bool destructive = false, ElementTheme requestedTheme = ElementTheme.Default);
+        //Task<ModalPopupResult> ShowPopupAsync(FrameworkElement target, string message, string title = null, string primary = null, string secondary = null, bool destructive = false, ElementTheme requestedTheme = ElementTheme.Default);
+        Task<ModalPopupResult> ShowPopupAsync(FormattedText message, string title = null, string primary = null, string secondary = null, string tertiary = null, bool destructive = false, ElementTheme requestedTheme = ElementTheme.Default);
+        ////Task<ModalPopupResult> ShowPopupAsync(FrameworkElement target, FormattedText message, string title = null, string primary = null, string secondary = null, bool destructive = false, ElementTheme requestedTheme = ElementTheme.Default);
         void ShowPopup(string message, string title = null, string primary = null, string secondary = null, string tertiary = null, bool destructive = false, ElementTheme requestedTheme = ElementTheme.Default);
         void ShowPopup(FormattedText message, string title = null, string primary = null, string secondary = null, string tertiary = null, bool destructive = false, ElementTheme requestedTheme = ElementTheme.Default);
         Task<InputPopupResult> ShowInputAsync(InputPopupType type, string message, string title = null, string placeholderText = null, string primary = null, string secondary = null, bool destructive = false, ElementTheme requestedTheme = ElementTheme.Default);
@@ -90,42 +84,54 @@ namespace Telegram.Navigation.Services
 
         void ClearCache(bool removeCachedPagesInBackStack = false);
 
-        Frame Frame { get; }
-        FrameFacade FrameFacade { get; }
+        NavigationFrame Frame { get; }
 
         WindowContext Window { get; }
 
         ISession Session { get; }
 
-        void AddToBackStack(Type type, object parameter = null, NavigationTransitionInfo info = null);
-        void InsertToBackStack(int index, Type type, object parameter = null, NavigationTransitionInfo info = null);
+        IReadOnlyList<NavigationStackItem> BackStack { get; }
+        IReadOnlyList<NavigationStackItem> ForwardStack { get; }
+
+        void AddToBackStack(Type type, object parameter = null);
+        void InsertToBackStack(int index, Type type, object parameter = null);
         void RemoveFromBackStack(int index);
         void ClearBackStack();
+        void ClearForwardStack();
+
+        void RaiseBackRequested(BackRequestedRoutedEventArgs args);
+        void RaiseForwardRequested(HandledEventArgs args);
+        void RaiseShortcutInvoked(ShortcutInvokedEventArgs args);
     }
 
+    /// <summary>
+    /// A history entry. Title and position are the page's own, taken when it was left.
+    /// </summary>
     public partial class NavigationStackItem : BindableBase
     {
-        public NavigationStackItem(Type sourcePageType, object parameter, string title, HostedNavigationMode mode)
+        public NavigationStackItem(Type sourcePageType, object parameter, NavigationState state = null, PageTransition transition = PageTransition.Default)
         {
             SourcePageType = sourcePageType;
             Parameter = parameter;
-            Title = title;
-            Position = null;
-            Mode = mode;
-        }
-
-        public NavigationStackItem(Type sourcePageType, object parameter, HostedPage page)
-        {
-            SourcePageType = sourcePageType;
-            Parameter = parameter;
-            Title = page.GetTitle();
-            Position = page.GetPosition();
-            Mode = page.NavigationMode;
+            State = state ?? new NavigationState();
+            Transition = transition;
+            Mode = HostedNavigationMode.Child;
         }
 
         public Type SourcePageType { get; }
 
-        public object Parameter { get; }
+        public object Parameter { get; internal set; }
+
+        /// <summary>
+        /// What the entry's view model is handed when navigated to: filled by whoever navigates to it,
+        /// forward or back.
+        /// </summary>
+        public NavigationState State { get; }
+
+        /// <summary>
+        /// How the entry was entered, played in reverse to leave it on back.
+        /// </summary>
+        public PageTransition Transition { get; }
 
         private string _title;
         public string Title
@@ -134,9 +140,19 @@ namespace Telegram.Navigation.Services
             set => Set(ref _title, value);
         }
 
-        public HostedNavigationMode Mode { get; }
+        public HostedNavigationMode Mode { get; private set; }
 
-        public HostedPagePositionBase Position { get; }
+        public HostedPagePositionBase Position { get; private set; }
+
+        internal void Capture(NavigationPage page)
+        {
+            if (page is HostedPage hosted)
+            {
+                Title = hosted.GetTitle();
+                Position = hosted.GetPosition();
+                Mode = hosted.NavigationMode;
+            }
+        }
 
         public override string ToString()
         {
@@ -144,49 +160,170 @@ namespace Telegram.Navigation.Services
         }
     }
 
-    // DOCS: https://github.com/Windows-XAML/Template10/wiki/Docs-%7C-NavigationService
+    public class ShortcutInvokedEventArgs : HandledEventArgs
+    {
+        public ShortcutInvokedEventArgs(InvokedShortcut shortcut, VirtualKeyModifiers modifiers)
+        {
+            Shortcut = shortcut;
+            Modifiers = modifiers;
+        }
+
+        public InvokedShortcut Shortcut { get; }
+
+        public VirtualKeyModifiers Modifiers { get; }
+    }
+
     public partial class NavigationService : INavigationService
     {
+        // Never gone forward into: a password screen is left behind on back.
         private static readonly HashSet<Type> _unallowedTypes = new()
         {
             typeof(SettingsPasswordPage),
             typeof(SettingsPasscodePage)
         };
 
+        // Steps of a flow that ends elsewhere: kept in neither stack.
+        private static readonly HashSet<Type> _authorizationTypes = new()
+        {
+            typeof(AuthorizationCodePage),
+            typeof(AuthorizationEmailAddressPage),
+            typeof(AuthorizationEmailCodePage),
+            typeof(AuthorizationPasswordPage),
+            //typeof(AuthorizationRecoveryPage),
+            typeof(AuthorizationRegistrationPage)
+        };
+
         private readonly IViewService viewService = new ViewService();
+
+        // Both end with the entry next in their direction, as the platform's stacks do.
+        private readonly List<NavigationStackItem> _backStack = new();
+        private readonly List<NavigationStackItem> _forwardStack = new();
+
+        private NavigationStackItem _current;
+
+        // The navigation in progress, for the frame's handlers.
+        private NavigationStackItem _pendingEntry;
+        private bool _pendingReplace;
+
+        private bool _blocked;
+
+        public NavigationService(ISession session, WindowContext window, NavigationFrame frame, string id)
+        {
+            Window = window;
+            Dispatcher = window?.Dispatcher;
+            Session = session;
+            FrameId = id;
+            Frame = frame;
+
+            // A service that only shows popups has no frame.
+            if (frame != null)
+            {
+                frame.NavigationService = this;
+                frame.Navigating += OnNavigating;
+                frame.Preparing += OnPreparing;
+                frame.Navigated += OnNavigated;
+                frame.Released += OnReleased;
+            }
+        }
+
         public WindowContext Window { get; }
-        public FrameFacade FrameFacade { get; }
-        public Frame Frame => FrameFacade.Frame;
-        public object Content => Frame?.Content;
+
+        public NavigationFrame Frame { get; }
+
+        public string FrameId { get; }
+
+        public NavigationPage Content => Frame?.Content;
+
         public XamlRoot XamlRoot => Window.XamlRoot;
 
         public IDispatcherContext Dispatcher { get; }
 
-
-        public string NavigationState
-        {
-            get => Frame.GetNavigationState();
-            set => Frame.SetNavigationState(value);
-        }
-
         public ISession Session { get; private set; }
 
-        public IDictionary<string, object> CacheKeyToParameter { get; } = new Dictionary<string, object>();
+        public BootStrapper.BackButton BackButtonHandling { get; internal set; }
 
-        public List<NavigationStackItem> BackStack { get; } = new();
+        public IReadOnlyList<NavigationStackItem> BackStack => _backStack;
+
+        public IReadOnlyList<NavigationStackItem> ForwardStack => _forwardStack;
 
         public event EventHandler BackStackChanged;
 
+        public bool IsNavigating { get; private set; }
+
+        public Type CurrentPageType => _current?.SourcePageType;
+
+        public object CurrentPageParam => _current?.Parameter;
+
+        public NavigationStackItem CurrentEntry => _current;
+
+        private Type _rootPageType;
+
+        /// <summary>
+        /// The page the history always starts from: an entry for it goes under any page that would
+        /// otherwise have nothing to go back to. The detail pane's empty page.
+        /// </summary>
+        public Type RootPageType
+        {
+            get => _rootPageType;
+            set
+            {
+                _rootPageType = value;
+                EnsureRoot();
+            }
+        }
+
+        private void EnsureRoot()
+        {
+            if (_rootPageType != null && _current != null && _backStack.Count == 0 && _current.SourcePageType != _rootPageType)
+            {
+                _backStack.Add(new NavigationStackItem(_rootPageType, null));
+            }
+        }
+
+        #region Routing
+
+        public event EventHandler<BackRequestedRoutedEventArgs> BackRequested;
+        public void RaiseBackRequested(BackRequestedRoutedEventArgs args)
+        {
+            BackRequested?.Invoke(this, args);
+
+            if (BackButtonHandling == BootStrapper.BackButton.Attach && !args.Handled && (args.Handled = CanGoBack))
+            {
+                GoBack();
+            }
+        }
+
+        public event EventHandler<HandledEventArgs> ForwardRequested;
+        public void RaiseForwardRequested(HandledEventArgs args)
+        {
+            ForwardRequested?.Invoke(this, args);
+
+            if (!args.Handled && CanGoForward)
+            {
+                GoForward();
+            }
+        }
+
+        public event EventHandler<ShortcutInvokedEventArgs> ShortcutInvoked;
+        public void RaiseShortcutInvoked(ShortcutInvokedEventArgs args)
+        {
+            ShortcutInvoked?.Invoke(this, args);
+        }
+
+        #endregion
+
+        #region History
+
         public void GoBackAt(int index, bool back = true)
         {
-            while (FrameFacade.BackStackDepth > index + 1)
+            while (_backStack.Count > index + 1)
             {
                 RemoveFromBackStack(index + 1);
             }
 
-            if (FrameFacade.CanGoBack && back)
+            if (CanGoBack && back)
             {
-                FrameFacade.GoBack();
+                GoBack();
             }
             else
             {
@@ -194,106 +331,291 @@ namespace Telegram.Navigation.Services
             }
         }
 
-        public void InsertToBackStack(int index, Type type, object parameter = null, NavigationTransitionInfo info = null)
+        /// <summary>
+        /// Drops the history above its first entry and goes back to <paramref name="page"/>, as if it
+        /// had been under the current page all along. Neither the current page nor anything ahead of
+        /// it is kept.
+        /// </summary>
+        public void GoBackTo(Type page, object parameter = null, NavigationState state = null)
         {
-            Frame.BackStack.Insert(index, new PageStackEntry(type, parameter, info));
-            BackStack.Insert(index, new NavigationStackItem(type, parameter, null, HostedNavigationMode.Child));
+            if (_blocked)
+            {
+                return;
+            }
+
+            while (_backStack.Count > 1)
+            {
+                _backStack.RemoveAt(1);
+            }
+
+            NavigateCore(new NavigationStackItem(page, parameter, state, PageTransition.Backward), PageTransition.Backward, NavigationMode.Back, true);
         }
 
-        public void AddToBackStack(Type type, object parameter = null, NavigationTransitionInfo info = null)
+        public void InsertToBackStack(int index, Type type, object parameter = null)
         {
-            Frame.BackStack.Add(new PageStackEntry(type, parameter, info));
-            BackStack.Add(new NavigationStackItem(type, parameter, null, HostedNavigationMode.Child));
+            _backStack.Insert(index, new NavigationStackItem(type, parameter));
+        }
+
+        public void AddToBackStack(Type type, object parameter = null)
+        {
+            _backStack.Add(new NavigationStackItem(type, parameter));
         }
 
         public void RemoveFromBackStack(int index)
         {
-            if (Frame.BackStack.Count > index)
+            if (_backStack.Count > index)
             {
-                Frame.BackStack.RemoveAt(index);
-            }
-
-            if (BackStack.Count > index)
-            {
-                BackStack.RemoveAt(index);
+                _backStack.RemoveAt(index);
             }
         }
 
         public void ClearBackStack()
         {
-            Frame.BackStack.Clear();
-            BackStack.Clear();
+            _backStack.Clear();
         }
 
-        public NavigationService(ISession session, WindowContext window, Frame frame, string id)
+        public void ClearForwardStack()
         {
-            Window = window;
-            Dispatcher = window?.Dispatcher;
-            Session = session;
-            FrameFacade = new FrameFacade(this, frame, id);
-            FrameFacade.Navigating += OnNavigating;
-            FrameFacade.Navigated += OnNavigated;
+            _forwardStack.Clear();
         }
 
-        private void OnNavigating(object sender, NavigatingEventArgs e)
+        public void ClearCache(bool removeCachedPagesInBackStack = false)
         {
-            if (e.Suspending)
+            Logger.Info($"Frame: {FrameId}");
+            Frame?.ClearCache();
+        }
+
+        #endregion
+
+        #region Navigator
+
+        public virtual bool Navigate(Type page, object parameter = null, NavigationState state = null, PageTransition transition = PageTransition.Default)
+        {
+            Logger.Info($"Page: {page}, Parameter: {parameter}, Transition: {transition}");
+
+            if (page == null)
+            {
+                throw new ArgumentNullException(nameof(page));
+            }
+
+            if (_blocked)
+            {
+                return false;
+            }
+
+            // Not again to the page already shown.
+            if (page == CurrentPageType && (parameter == CurrentPageParam || (parameter?.Equals(CurrentPageParam) ?? false)))
+            {
+                return false;
+            }
+
+            return NavigateCore(new NavigationStackItem(page, parameter, state, transition), transition, NavigationMode.New, false);
+        }
+
+        /// <summary>
+        /// Navigates to <paramref name="entry"/>. With <paramref name="replace"/>, the entry takes the
+        /// current one's place: that one is dropped rather than kept for going back, and the forward
+        /// stack goes too.
+        /// </summary>
+        protected bool NavigateCore(NavigationStackItem entry, PageTransition transition, NavigationMode mode, bool replace)
+        {
+            _pendingEntry = entry;
+            _pendingReplace = replace;
+
+            try
+            {
+                IsNavigating = true;
+                return Frame.Navigate(entry.SourcePageType, entry.Parameter, transition, mode);
+            }
+            finally
+            {
+                IsNavigating = false;
+
+                _pendingEntry = null;
+                _pendingReplace = false;
+            }
+        }
+
+        public void GoBack(NavigationState state = null, PageTransition transition = PageTransition.Default)
+        {
+            if (!CanGoBack || _blocked)
             {
                 return;
             }
 
-            if (FrameFacade.Content is Page page)
+            var entry = _backStack[^1];
+
+            if (state != null)
             {
-                if (e.NavigationMode is NavigationMode.New or NavigationMode.Forward)
+                foreach (var item in state)
                 {
-                    if (page is HostedPage hosted)
-                    {
-                        BackStack.Add(new NavigationStackItem(CurrentPageType, CurrentPageParam, hosted));
-                    }
-                    else
-                    {
-                        BackStack.Add(new NavigationStackItem(CurrentPageType, CurrentPageParam, null, HostedNavigationMode.Child));
-                    }
+                    entry.State[item.Key] = item.Value;
+                }
+            }
+
+            if (transition == PageTransition.Default)
+            {
+                transition = Reverse(_current?.Transition ?? PageTransition.Default);
+            }
+
+            NavigateCore(entry, transition, NavigationMode.Back, false);
+        }
+
+        public void GoForward()
+        {
+            if (!CanGoForward || _blocked)
+            {
+                return;
+            }
+
+            var entry = _forwardStack[^1];
+            NavigateCore(entry, entry.Transition, NavigationMode.Forward, false);
+        }
+
+        /// <summary>
+        /// Replays a navigation that a view model cancelled, once it has decided to let it through.
+        /// </summary>
+        public void GoBack(NavigatingEventArgs args)
+        {
+            if (args == null || args.NavigationMode == NavigationMode.Back)
+            {
+                GoBack();
+            }
+            else if (args.NavigationMode == NavigationMode.Forward)
+            {
+                GoForward();
+            }
+            else if (args.NavigationMode == NavigationMode.New)
+            {
+                Navigate(args.TargetPageType, args.TargetPageParameter, transition: args.Transition);
+            }
+            else
+            {
+                Logger.Info("Unhandled: " + args.NavigationMode);
+            }
+        }
+
+        // Back plays the way in backwards. An entry that came in without motion leaves without it.
+        private static PageTransition Reverse(PageTransition transition)
+        {
+            return transition switch
+            {
+                PageTransition.None => PageTransition.None,
+                PageTransition.Default => PageTransition.Default,
+                PageTransition.Entrance => PageTransition.Exit,
+                _ => PageTransition.Backward
+            };
+        }
+
+        public bool CanGoBack => _backStack.Count > 0;
+
+        public bool CanGoForward => _forwardStack.Count > 0;
+
+        private void OnNavigating(object sender, NavigatingEventArgs e)
+        {
+            if (e.Content is not NavigationPage page)
+            {
+                return;
+            }
+
+            // Before anything changes, the view model included: the entry being left keeps the
+            // page's title and scroll position, and a page reused in place would answer for the
+            // next chat.
+            if (e.NavigationMode is NavigationMode.New or NavigationMode.Forward)
+            {
+                _current?.Capture(page);
+            }
+
+            // The logical leave: the view model is told now, the page is torn down once released.
+            if (page.DataContext is INavigable dataContext)
+            {
+                e.Cancel = !NavigatingFrom(dataContext, e.SourcePageType, e.Parameter, false, e.NavigationMode, e.Transition);
+
+                if (e.Cancel)
+                {
+                    return;
                 }
 
-                // call navagable override (navigating)
-                var dataContext = ViewModelForPage(page);
-                if (dataContext != null)
-                {
-                    // allow the viewmodel to cancel navigation
-                    e.Cancel = !NavigatingFrom(page, e.SourcePageType, e.Parameter, dataContext, false, e.NavigationMode);
+                NavigateFrom(dataContext, false);
+            }
+        }
 
-                    if (e.Cancel)
-                    {
-                        return;
-                    }
+        private void OnPreparing(object sender, NavigatedEventArgs e)
+        {
+            var page = e.Content;
 
-                    NavigateFrom(page, dataContext, false);
-                }
+            try
+            {
+                page.XamlRoot ??= XamlRoot;
+            }
+            catch
+            {
+                // Guard against navigation failure
+            }
 
-                if (page is IActivablePage cleanup)
-                {
-                    cleanup.Deactivate(e.SourcePageType != page.GetType());
-                }
+            if (page is IActivablePage activable)
+            {
+                activable.Activate(this);
+            }
+            else if (page is BlankPage blank)
+            {
+                blank.Activate(this);
+            }
+
+            // Before the page enters the tree, so that it is never laid out without one.
+            var dataContext = ViewModelForPage(page, true);
+            if (dataContext != null)
+            {
+                // A view model that already has a service keeps it: MainPage hands its children the
+                // detail one, and the root frame must not take it over.
+                dataContext.NavigationService ??= this;
+                dataContext.Dispatcher ??= Dispatcher;
             }
         }
 
         private async void OnNavigated(object sender, NavigatedEventArgs e)
         {
-            if (e.NavigationMode == NavigationMode.Back && Frame.ForwardStack.Count > 0)
+            var entry = _pendingEntry ?? new NavigationStackItem(e.SourcePageType, e.Parameter);
+            var replace = _pendingReplace;
+
+            _pendingEntry = null;
+            _pendingReplace = false;
+
+            var previous = _current;
+            _current = entry;
+
+            UpdateStacks(previous, entry, e, replace);
+
+            Navigated?.Invoke(this, e);
+            OverlayWindow.TryHide(XamlRoot, ModalPopupResult.None);
+
+            if (e.Content.DataContext is INavigable dataContext)
             {
-                if (_unallowedTypes.Contains(Frame.ForwardStack[0].SourcePageType))
-                {
-                    Frame.ForwardStack.Clear();
-                }
+                await dataContext.NavigatedToAsync(e.Parameter, e.NavigationMode, entry.State);
             }
+        }
 
-            if (e.NavigationMode is NavigationMode.Back && BackStack.Count > 0)
+        private void UpdateStacks(NavigationStackItem previous, NavigationStackItem entry, NavigatedEventArgs e, bool replace)
+        {
+            var keep = previous != null && !replace && !_authorizationTypes.Contains(previous.SourcePageType);
+
+            if (e.NavigationMode == NavigationMode.Back)
             {
-                var entry = BackStack[^1];
-                BackStack.Remove(entry);
+                if (_backStack.Count > 0 && _backStack[^1] == entry)
+                {
+                    _backStack.RemoveAt(_backStack.Count - 1);
+                }
 
-                // This is solely used by MasterDetailView for the animation
+                if (replace || (previous != null && _unallowedTypes.Contains(previous.SourcePageType)))
+                {
+                    _forwardStack.Clear();
+                }
+                else if (keep)
+                {
+                    _forwardStack.Add(previous);
+                }
+
+                // MasterDetailView animates the header from where the list was.
                 e.VerticalOffset = entry.Position switch
                 {
                     HostedPageScrollViewerPosition scrollViewerPosition => scrollViewerPosition.ScrollPosition,
@@ -301,83 +623,105 @@ namespace Telegram.Navigation.Services
                     _ => 0
                 };
 
-                bool ParameterEquals(object x, object y)
-                {
-                    if (x == null || y == null)
-                    {
-                        return x == y;
-                    }
-
-                    return x.Equals(y);
-                }
-
-                if (entry.Position != null && e.Content is HostedPage page && ParameterEquals(entry.Parameter, e.Parameter) && entry.SourcePageType == page.GetType())
+                if (entry.Position != null && e.Content is HostedPage page && entry.SourcePageType == page.GetType())
                 {
                     page.SetPosition(entry.Position);
                 }
             }
-
-            var parameter = e.Parameter;
-            if (parameter is string cacheKey && e.SourcePageType == typeof(ChatPage))
+            else
             {
-                parameter = CacheKeyToParameter[cacheKey];
+                if (e.NavigationMode == NavigationMode.Forward)
+                {
+                    if (_forwardStack.Count > 0 && _forwardStack[^1] == entry)
+                    {
+                        _forwardStack.RemoveAt(_forwardStack.Count - 1);
+                    }
+                }
+                else
+                {
+                    _forwardStack.Clear();
+                }
+
+                if (keep)
+                {
+                    _backStack.Add(previous);
+                }
             }
 
-            Navigated?.Invoke(this, e);
-            OverlayWindow.TryHide(XamlRoot, ContentDialogResult.None);
+            EnsureRoot();
+        }
 
-            await NavigateToAsync(e.NavigationMode, parameter, FrameFacade.Frame.Content);
+        private void OnReleased(object sender, NavigationPageReleasedEventArgs e)
+        {
+            if (e.Page is IActivablePage activable)
+            {
+                activable.Deactivate(e.Navigation);
+            }
+        }
+
+        /// <summary>
+        /// Releases every page and unhooks the frame, for a host that is going away.
+        /// </summary>
+        public void Detach()
+        {
+            if (Frame == null)
+            {
+                return;
+            }
+
+            Frame.Clear();
+
+            Frame.Navigating -= OnNavigating;
+            Frame.Preparing -= OnPreparing;
+            Frame.Navigated -= OnNavigated;
+            Frame.Released -= OnReleased;
+            Frame.NavigationService = null;
         }
 
         public async void Resume()
         {
-            var page = FrameFacade.Content as Page;
+            var page = Content;
             if (page != null)
             {
-                if (page is IActivablePage cleanup)
+                if (page is IActivablePage activable)
                 {
-                    cleanup.Activate(this);
+                    activable.Activate(this);
                 }
 
-                // call navagable override (navigating)
                 var dataContext = ViewModelForPage(page);
                 if (dataContext != null)
                 {
                     dataContext.NavigationService ??= this;
                     dataContext.Dispatcher ??= Dispatcher;
-                    var pageState = FrameFacade.PageStateSettingsService(page.GetType(), parameter: CurrentPageParam).Values;
-                    await dataContext.NavigatedToAsync(CurrentPageParam, NavigationMode.New, pageState);
+                    await dataContext.NavigatedToAsync(CurrentPageParam, NavigationMode.New, _current?.State ?? new NavigationState());
                 }
             }
         }
 
         public void Suspend()
         {
-            var page = FrameFacade.Content as Page;
+            var page = Content;
             if (page != null)
             {
-                // call navagable override (navigating)
                 var dataContext = ViewModelForPage(page);
                 if (dataContext != null)
                 {
-                    NavigateFrom(page, dataContext, true);
+                    NavigateFrom(dataContext, true);
                 }
 
-                if (page is IActivablePage cleanup)
+                if (page is IActivablePage activable)
                 {
-                    cleanup.Deactivate(false);
+                    activable.Deactivate(false);
                 }
             }
         }
-
-        private bool _blocked;
 
         public void Block()
         {
             _blocked = true;
         }
 
-        private INavigable ViewModelForPage(Page page, bool allowCreate = false)
+        private INavigable ViewModelForPage(NavigationPage page, bool allowCreate = false)
         {
             if (page.DataContext is not INavigable or null && allowCreate)
             {
@@ -393,7 +737,7 @@ namespace Telegram.Navigation.Services
         }
 
         // before navigate (cancellable)
-        private bool NavigatingFrom(Page page, Type targetPageType, object targetPageParameter, INavigable dataContext, bool suspending, NavigationMode mode)
+        private bool NavigatingFrom(INavigable dataContext, Type targetPageType, object targetPageParameter, bool suspending, NavigationMode mode, PageTransition transition)
         {
             Logger.Info($"Suspending: {suspending}");
 
@@ -403,8 +747,9 @@ namespace Telegram.Navigation.Services
             var args = new NavigatingEventArgs
             {
                 NavigationMode = mode,
-                SourcePageType = FrameFacade.CurrentPageType,
-                Parameter = FrameFacade.CurrentPageParam,
+                Transition = transition,
+                SourcePageType = CurrentPageType,
+                Parameter = CurrentPageParam,
                 Suspending = suspending,
                 TargetPageType = targetPageType,
                 TargetPageParameter = targetPageParameter
@@ -414,62 +759,17 @@ namespace Telegram.Navigation.Services
         }
 
         // after navigate
-        private void NavigateFrom(Page page, INavigable dataContext, bool suspending)
+        private void NavigateFrom(INavigable dataContext, bool suspending)
         {
             Logger.Info($"Suspending: {suspending}");
 
             dataContext.NavigationService ??= this;
             dataContext.Dispatcher ??= Dispatcher;
 
-            var pageState = FrameFacade.PageStateSettingsService(page.GetType()).Values;
-            dataContext.NavigatedFrom(pageState, suspending);
+            dataContext.NavigatedFrom(_current?.State, suspending);
         }
 
-        private async Task NavigateToAsync(NavigationMode mode, object parameter, object frameContent = null)
-        {
-            Logger.Info($"Mode: {mode}, Parameter: {parameter} FrameContent: {frameContent}");
-
-            frameContent ??= FrameFacade.Frame.Content;
-
-            var page = frameContent as Page;
-            if (page != null)
-            {
-                try
-                {
-                    page.XamlRoot ??= XamlRoot;
-                }
-                catch
-                {
-                    // Guard against navigation failure
-                }
-
-                if (page is IActivablePage cleanup)
-                {
-                    cleanup.Activate(this);
-                }
-                else if (page is BlankPage blank)
-                {
-                    blank.Activate(this);
-                }
-
-                //if (mode == NavigationMode.New)
-                //{
-                //    var pageState = FrameFacadeInternal.PageStateSettingsService(page.GetType()).Values;
-                //    pageState?.Clear();
-                //}
-
-                var dataContext = ViewModelForPage(page, true);
-                if (dataContext != null)
-                {
-                    // prepare for state load. A view model that already has a service keeps it: MainPage
-                    // hands its children the detail one, and the root frame must not take it over.
-                    dataContext.NavigationService ??= this;
-                    dataContext.Dispatcher ??= Dispatcher;
-                    var pageState = FrameFacade.PageStateSettingsService(page.GetType(), parameter: parameter).Values;
-                    await dataContext.NavigatedToAsync(parameter, mode, pageState);
-                }
-            }
-        }
+        #endregion
 
         public Task<WindowContext> OpenAsync(ViewServiceOptions parameters) => viewService.OpenAsync(parameters);
 
@@ -479,55 +779,12 @@ namespace Telegram.Navigation.Services
             return viewService.OpenAsync(Session, page, parameter, title, size);
         }
 
-        public void ShowPopup(ContentPopup popup, object parameter = null, ElementTheme requestedTheme = ElementTheme.Default)
-        {
-            _ = ShowPopupAsync(popup, parameter, requestedTheme);
-        }
-
-        public Task<ContentDialogResult> ShowPopupAsync(ContentPopup popup, object parameter = null, ElementTheme requestedTheme = ElementTheme.Default)
-        {
-            if (requestedTheme != ElementTheme.Default)
-            {
-                popup.RequestedTheme = requestedTheme;
-            }
-
-            var viewModel = BootStrapper.Current.ViewModelForPage(popup, Session);
-            if (viewModel != null)
-            {
-                viewModel.NavigationService = this;
-                viewModel.Dispatcher = Dispatcher;
-
-                void OnOpened(ContentDialog sender, ContentDialogOpenedEventArgs args)
-                {
-                    popup.Opened -= OnOpened;
-                }
-
-                void OnClosed(ContentDialog sender, ContentDialogClosedEventArgs args)
-                {
-                    if (popup.IsFinalized)
-                    {
-                        viewModel.NavigatedFrom(null, false);
-                        popup.OnNavigatedFrom();
-                        popup.Closed -= OnClosed;
-                    }
-                }
-
-                popup.DataContext = viewModel;
-
-                _ = viewModel.NavigatedToAsync(parameter, NavigationMode.New, null);
-                popup.OnNavigatedTo(parameter);
-                popup.Closed += OnClosed;
-            }
-
-            return popup.ShowQueuedAsync(XamlRoot);
-        }
-
         public void ShowPopup(ModalPopup popup, object parameter = null, ElementTheme requestedTheme = ElementTheme.Default)
         {
             _ = ShowPopupAsync(popup, parameter, requestedTheme);
         }
 
-        public Task<ContentDialogResult> ShowPopupAsync(ModalPopup popup, object parameter = null, ElementTheme requestedTheme = ElementTheme.Default)
+        public Task<ModalPopupResult> ShowPopupAsync(ModalPopup popup, object parameter = null, ElementTheme requestedTheme = ElementTheme.Default)
         {
             if (requestedTheme != ElementTheme.Default)
             {
@@ -542,12 +799,9 @@ namespace Telegram.Navigation.Services
 
                 void OnClosed(ModalPopup sender, ModalPopupClosedEventArgs args)
                 {
-                    if (popup.IsFinalized)
-                    {
-                        viewModel.NavigatedFrom(null, false);
-                        popup.OnNavigatedFrom();
-                        popup.Closed -= OnClosed;
-                    }
+                    viewModel.NavigatedFrom(null, false);
+                    popup.OnNavigatedFrom();
+                    popup.Closed -= OnClosed;
                 }
 
                 popup.DataContext = viewModel;
@@ -560,36 +814,36 @@ namespace Telegram.Navigation.Services
             return popup.ShowAsync(XamlRoot);
         }
 
-        public Task<ContentDialogResult> ShowPopupAsync(string message, string title = null, string primary = null, string secondary = null, string tertiary = null, bool destructive = false, ElementTheme requestedTheme = ElementTheme.Default)
+        public Task<ModalPopupResult> ShowPopupAsync(string message, string title = null, string primary = null, string secondary = null, string tertiary = null, bool destructive = false, ElementTheme requestedTheme = ElementTheme.Default)
         {
-            if (ContentPopup.IsAnyPopupOpen(XamlRoot))
+            if (ModalPopup.IsAnyPopupOpen(XamlRoot))
             {
-                return MessagePopup.ShowNestedAsync(XamlRoot, message, title, primary, secondary ?? tertiary, destructive, requestedTheme);
+                return MessagePopup.ShowNestedAsync(XamlRoot, message, title, primary, secondary, tertiary, destructive, requestedTheme);
             }
 
             return MessagePopup.ShowAsync(XamlRoot, message, title, primary, secondary, tertiary, destructive, requestedTheme);
         }
 
-        //public Task<ContentDialogResult> ShowPopupAsync(FrameworkElement target, string message, string title = null, string primary = null, string secondary = null, bool destructive = false, ElementTheme requestedTheme = ElementTheme.Default)
+        //public Task<ModalPopupResult> ShowPopupAsync(FrameworkElement target, string message, string title = null, string primary = null, string secondary = null, bool destructive = false, ElementTheme requestedTheme = ElementTheme.Default)
         //{
         //    return MessagePopup.ShowAsync(target, message, title, primary, secondary, destructive, requestedTheme);
         //}
 
-        public Task<ContentDialogResult> ShowPopupAsync(FormattedText message, string title = null, string primary = null, string secondary = null, string tertiary = null, bool destructive = false, ElementTheme requestedTheme = ElementTheme.Default)
+        public Task<ModalPopupResult> ShowPopupAsync(FormattedText message, string title = null, string primary = null, string secondary = null, string tertiary = null, bool destructive = false, ElementTheme requestedTheme = ElementTheme.Default)
         {
             return MessagePopup.ShowAsync(XamlRoot, message, title, primary, secondary, tertiary, destructive, requestedTheme);
         }
 
-        ////public Task<ContentDialogResult> ShowPopupAsync(FrameworkElement target, FormattedText message, string title = null, string primary = null, string secondary = null, bool destructive = false, ElementTheme requestedTheme = ElementTheme.Default)
+        ////public Task<ModalPopupResult> ShowPopupAsync(FrameworkElement target, FormattedText message, string title = null, string primary = null, string secondary = null, bool destructive = false, ElementTheme requestedTheme = ElementTheme.Default)
         ////{
         ////    return MessagePopup.ShowAsync(target, message, title, primary, secondary, destructive, requestedTheme);
         ////}
 
         public void ShowPopup(string message, string title = null, string primary = null, string secondary = null, string tertiary = null, bool destructive = false, ElementTheme requestedTheme = ElementTheme.Default)
         {
-            if (ContentPopup.IsAnyPopupOpen(XamlRoot))
+            if (ModalPopup.IsAnyPopupOpen(XamlRoot))
             {
-                _ = MessagePopup.ShowNestedAsync(XamlRoot, message, title, primary, secondary ?? tertiary, destructive, requestedTheme);
+                _ = MessagePopup.ShowNestedAsync(XamlRoot, message, title, primary, secondary, tertiary, destructive, requestedTheme);
                 return;
             }
 
@@ -598,9 +852,9 @@ namespace Telegram.Navigation.Services
 
         public void ShowPopup(FormattedText message, string title = null, string primary = null, string secondary = null, string tertiary = null, bool destructive = false, ElementTheme requestedTheme = ElementTheme.Default)
         {
-            if (ContentPopup.IsAnyPopupOpen(XamlRoot))
+            if (ModalPopup.IsAnyPopupOpen(XamlRoot))
             {
-                _ = MessagePopup.ShowNestedAsync(XamlRoot, message, title, primary, secondary ?? tertiary, destructive, requestedTheme);
+                _ = MessagePopup.ShowNestedAsync(XamlRoot, message, title, primary, secondary, tertiary, destructive, requestedTheme);
                 return;
             }
 
@@ -621,11 +875,7 @@ namespace Telegram.Navigation.Services
         {
             foreach (var popup in VisualTreeHelper.GetOpenPopupsForXamlRoot(XamlRoot))
             {
-                if (popup.Child is ContentPopup dialog && type == dialog.GetType())
-                {
-                    dialog.Hide();
-                }
-                else if (popup.Child is ModalPopup modal && type == modal.GetType())
+                if (popup.Child is ModalPopup modal && type == modal.GetType())
                 {
                     modal.Hide();
                 }
@@ -664,168 +914,5 @@ namespace Telegram.Navigation.Services
         }
 
         public event EventHandler<NavigatedEventArgs> Navigated;
-
-        public virtual bool Navigate(Type page, object parameter = null, NavigationState state = null, NavigationTransitionInfo infoOverride = null, bool navigationStackEnabled = true)
-        {
-            Logger.Info($"Page: {page}, Parameter: {parameter}, NavigationTransitionInfo: {infoOverride}");
-
-            if (page == null)
-            {
-                throw new ArgumentNullException(nameof(page));
-            }
-
-            if (_blocked)
-            {
-                return false;
-            }
-
-            // use CurrentPageType/Param instead of LastNavigationType/Parameter to avoid new navigation to the current
-            // page in some race conditions.
-            if ((page.FullName == CurrentPageType?.FullName) && (parameter == CurrentPageParam))
-            {
-                return false;
-            }
-
-            if ((page.FullName == CurrentPageType?.FullName) && (parameter?.Equals(CurrentPageParam) ?? false))
-            {
-                return false;
-            }
-
-            if (state != null)
-            {
-                var pageState = FrameFacade.PageStateSettingsService(page, 1, parameter).Values;
-                foreach (var item in state)
-                {
-                    pageState[item.Key] = item.Value;
-                }
-            }
-
-            if (page == typeof(ChatPage))
-            {
-                var cacheKey = Guid.NewGuid().ToString();
-                var cacheParameter = parameter;
-
-                parameter = cacheKey;
-                CacheKeyToParameter[cacheKey] = cacheParameter;
-            }
-
-            try
-            {
-                IsNavigating = true;
-                return FrameFacade.Navigate(page, parameter, infoOverride, navigationStackEnabled);
-            }
-            finally
-            {
-                IsNavigating = false;
-            }
-        }
-
-        public void GoBack(NavigatingEventArgs args)
-        {
-            if (args == null || args.NavigationMode == NavigationMode.Back)
-            {
-                GoBack();
-            }
-            else if (args.NavigationMode == NavigationMode.Forward)
-            {
-                GoForward();
-            }
-            else if (args.NavigationMode == NavigationMode.New)
-            {
-                Navigate(args.SourcePageType, args.Parameter, infoOverride: args.NavigationTransitionInfo);
-            }
-            else
-            {
-                Logger.Info("Unhandled: " + args.NavigationMode);
-            }
-        }
-
-        public void GoBack(NavigatingCancelEventArgs args)
-        {
-            if (args == null || args.NavigationMode == NavigationMode.Back)
-            {
-                GoBack();
-            }
-            else if (args.NavigationMode == NavigationMode.Forward)
-            {
-                GoForward();
-            }
-            else if (args.NavigationMode == NavigationMode.New)
-            {
-                Navigate(args.SourcePageType, args.Parameter, infoOverride: args.NavigationTransitionInfo);
-            }
-            else
-            {
-                Logger.Info("Unhandled: " + args.NavigationMode);
-            }
-        }
-
-        public void Refresh() { FrameFacade.Refresh(); }
-
-        public void GoBack(NavigationState state = null, NavigationTransitionInfo infoOverride = null)
-        {
-            if (FrameFacade.CanGoBack && !_blocked)
-            {
-                if (state != null)
-                {
-                    var entry = Frame.BackStack[Frame.BackStack.Count - 1];
-
-                    var parameter = entry.Parameter;
-                    if (parameter is string cacheKey && entry.SourcePageType == typeof(ChatPage))
-                    {
-                        parameter = CacheKeyToParameter[cacheKey];
-                    }
-
-                    var pageState = FrameFacade.PageStateSettingsService(entry.SourcePageType, 0, parameter).Values;
-
-                    foreach (var item in state)
-                    {
-                        pageState[item.Key] = item.Value;
-                    }
-                }
-
-                FrameFacade.GoBack(infoOverride);
-            }
-        }
-
-        public bool CanGoBack => FrameFacade.CanGoBack;
-
-        public void GoForward()
-        {
-            FrameFacade.GoForward();
-        }
-
-        public bool CanGoForward => FrameFacade.CanGoForward;
-
-        public void ClearCache(bool removeCachedPagesInBackStack = false)
-        {
-            Logger.Info($"Frame: {FrameFacade.FrameId}");
-
-            int currentSize = FrameFacade.Frame.CacheSize;
-
-            if (removeCachedPagesInBackStack)
-            {
-                FrameFacade.Frame.CacheSize = 0;
-            }
-            else
-            {
-                if (FrameFacade.Frame.BackStackDepth == 0)
-                {
-                    FrameFacade.Frame.CacheSize = 1;
-                }
-                else
-                {
-                    FrameFacade.Frame.CacheSize = FrameFacade.Frame.BackStackDepth;
-                }
-            }
-
-            FrameFacade.Frame.CacheSize = currentSize;
-        }
-
-        public bool IsNavigating { get; private set; }
-
-        public Type CurrentPageType => FrameFacade.CurrentPageType;
-        public object CurrentPageParam => FrameFacade.CurrentPageParam;
     }
 }
-

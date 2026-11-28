@@ -1116,7 +1116,7 @@ namespace Telegram.Views.Wallet.Popups
             popup.Validating += Comment_Validating;
 
             var confirm = await _navigationService.ShowPopupAsync(popup);
-            if (confirm != ContentDialogResult.Primary)
+            if (confirm != ModalPopupResult.Primary)
             {
                 return;
             }

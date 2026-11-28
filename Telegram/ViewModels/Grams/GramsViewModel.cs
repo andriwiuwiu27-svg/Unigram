@@ -9,6 +9,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Telegram.Collections;
 using Telegram.Common;
+using Telegram.Controls;
 using Telegram.Navigation;
 using Telegram.Navigation.Services;
 using Telegram.Services;
@@ -90,7 +91,7 @@ namespace Telegram.ViewModels.Grams
                 : passwordState.PasswordHint;
 
             var result = await ShowInputAsync(InputPopupType.Password, Strings.PleaseEnterCurrentPasswordWithdraw, Strings.TwoStepVerification, placeholder, Strings.OK, Strings.Cancel);
-            if (result.Result != ContentDialogResult.Primary)
+            if (result.Result != ModalPopupResult.Primary)
             {
                 return;
             }
@@ -123,7 +124,7 @@ namespace Telegram.ViewModels.Grams
             if (passwordMissing)
             {
                 var confirm = await ShowPopupAsync(builder.ToString(), Strings.EditAdminTransferAlertTitle, Strings.EditAdminTransferSetPassword, Strings.Cancel);
-                if (confirm == ContentDialogResult.Primary)
+                if (confirm == ModalPopupResult.Primary)
                 {
                     NavigationService.NavigateToPasswordSetup();
                 }

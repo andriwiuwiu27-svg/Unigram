@@ -206,6 +206,8 @@ namespace winrt::Telegram::Native::implementation
         // Frames stamped before skipBefore are decoded but neither converted nor returned, up to
         // MaxSkippedFrames of them, so a caller that has fallen behind catches up rather than
         // showing every frame late. Looping back to the start clears it.
+        // False with completed unset is no frame yet rather than a failure: the call stopped inside
+        // an edit list's lead-in, and the next one carries on from there.
         bool RenderSync(uint8_t* pixels, int32_t width, int32_t height, bool preview, double& seconds, bool& completed, double skipBefore = 0);
 
         int PixelWidth()
@@ -307,6 +309,11 @@ namespace winrt::Telegram::Native::implementation
         // Half a second at 60 fps: what one catching-up call may decode before it shows a frame
         // anyway, so a caller far behind pays for it over several calls rather than in one.
         static constexpr int32_t MaxSkippedFrames = 30;
+
+        // Packets an edit list cuts, decoded for their references and never shown, that one call
+        // may take. A trimmed file can open on dozens of them, and at full resolution all of them
+        // in one call holds up every other animation decoded in the same batch.
+        static constexpr int32_t MaxLeadInPackets = 2;
 
         int32_t pixelWidth = 0;
         int32_t pixelHeight = 0;

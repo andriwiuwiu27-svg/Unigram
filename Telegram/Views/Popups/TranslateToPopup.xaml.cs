@@ -172,7 +172,7 @@ namespace Telegram.Views.Popups
             if (e.Key == VirtualKey.Enter && _diff.Count > 0)
             {
                 SelectedItem = _diff[0].Id;
-                Hide(ContentDialogResult.Primary);
+                Hide(ModalPopupResult.Primary);
             }
         }
 
@@ -211,7 +211,7 @@ namespace Telegram.Views.Popups
             if (e.ClickedItem is TranslateToLanguage language)
             {
                 SelectedItem = language.Id;
-                Hide(ContentDialogResult.Primary);
+                Hide(ModalPopupResult.Primary);
             }
         }
 

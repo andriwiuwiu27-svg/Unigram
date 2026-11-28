@@ -27,6 +27,11 @@ namespace Telegram.Services
         void Close(bool restart);
         void Delete(bool restart);
 
+        /// <summary>
+        /// Closes TDLib for good and completes once it reports <see cref="AuthorizationStateClosed"/>.
+        /// </summary>
+        Task CloseAsync();
+
         //void Send(Function function);
         //void Send(Function function, ClientResultHandler handler);
         void Send(Function function, Action<Object> handler = null);
@@ -97,6 +102,11 @@ namespace Telegram.Services
         PaidReactionType DefaultPaidReactionType { get; }
 
         StarAmount OwnedStarCount { get; }
+
+        /// <summary>
+        /// False until the balance has loaded, while <see cref="OwnedStarCount"/> reads as zero.
+        /// </summary>
+        bool IsOwnedStarCountAvailable { get; }
         long OwnedGramCount { get; }
 
         TonWalletState TonWalletState { get; }
@@ -304,6 +314,18 @@ namespace Telegram.Services
 
         bool HasSuggestedAction(SuggestedAction action);
 
+        bool TryGetSuggestedAction<T>(out T action) where T : SuggestedAction;
+
+        /// <summary>
+        /// Whether <see cref="SuggestedActionViewChecksHint"/> is pending, without a lookup.
+        /// </summary>
+        bool IsChecksHintSuggested { get; }
+
+        /// <summary>
+        /// Whether any <see cref="SuggestedActionConvertToBroadcastGroup"/> is pending, without a lookup.
+        /// </summary>
+        bool IsBroadcastGroupSuggested { get; }
+
         Settings.NotificationsSettings Notifications { get; }
 
         void AddRecentlyOpenedChat(long chatId);
@@ -449,6 +471,8 @@ namespace Telegram.Services
         private bool _cleanAfterClose;
         private bool _initializeAfterClose;
 
+        private TaskCompletionSource<bool> _closed;
+
         private static readonly Thread _runThread;
 
         static ClientService()
@@ -511,6 +535,33 @@ namespace Telegram.Services
             _initializeAfterClose = restart;
             _cleanAfterClose = true;
             _client.Send(new Close());
+        }
+
+        public Task CloseAsync()
+        {
+            // RunContinuationsAsynchronously: it completes on the receive thread, which must not
+            // run whatever was waiting on it.
+            var closed = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            var pending = Interlocked.CompareExchange(ref _closed, closed, null);
+            if (pending != null)
+            {
+                return pending.Task;
+            }
+
+            // Read after the source is published, while the handler stores the state before it
+            // takes the source: one of the two always sees the other.
+            if (_authorizationState is AuthorizationStateClosed)
+            {
+                Interlocked.Exchange(ref _closed, null)?.TrySetResult(true);
+                return closed.Task;
+            }
+
+            // _cleanAfterClose is left alone, so a Delete already in flight still deletes.
+            _initializeAfterClose = false;
+            _client.Send(new Close());
+
+            return closed.Task;
         }
 
         private void Initialize(bool online = true)
@@ -1099,7 +1150,7 @@ namespace Telegram.Services
                 var updated = await GetStarTransactionsAsync(MyId, string.Empty, null, string.Empty, 1) as StarTransactions;
                 if (updated is null || updated.StarAmount.StarCount < starCount)
                 {
-                    return new ErrorStarsNeeded();
+                    return new ErrorStarsNeeded { StarCount = starCount };
                 }
             }
 
@@ -1544,6 +1595,8 @@ namespace Telegram.Services
                 return _ownedStarCount;
             }
         }
+
+        public bool IsOwnedStarCountAvailable => _ownedStarCount != null;
 
         public long OwnedGramCount
         {
@@ -3023,43 +3076,45 @@ namespace Telegram.Services
 
         private readonly HashSet<SuggestedAction> _suggestedActions = new(new SuggestedActionComparer());
 
+        // Opening a chat reads these, and chats are switched constantly, so they are worked out when
+        // the set changes, which is rare, instead of looked up under the lock on every open.
+        private volatile bool _isChecksHintSuggested;
+        private volatile bool _isBroadcastGroupSuggested;
+
+        public bool IsChecksHintSuggested => _isChecksHintSuggested;
+
+        public bool IsBroadcastGroupSuggested => _isBroadcastGroupSuggested;
+
+        // TDLib's identity: the type plus the supergroup, the custom name and URL, and which of the
+        // two server email suggestions it is. Everything else, SetPassword's AuthorizationDelay and
+        // ExtendPremium's URL included, is payload: removals arrive with whatever value is current.
         private class SuggestedActionComparer : IEqualityComparer<SuggestedAction>
         {
             public bool Equals(SuggestedAction x, SuggestedAction y)
             {
+                if (x == null || y == null || x.GetType() != y.GetType())
+                {
+                    return x == y;
+                }
+
                 return x switch
                 {
-                    SuggestedActionCheckPassword => y is SuggestedActionCheckPassword,
-                    SuggestedActionCheckPhoneNumber => y is SuggestedActionCheckPhoneNumber,
-                    SuggestedActionEnableArchiveAndMuteNewChats => y is SuggestedActionEnableArchiveAndMuteNewChats,
-                    SuggestedActionGiftPremiumForChristmas => y is SuggestedActionGiftPremiumForChristmas,
-                    SuggestedActionRestorePremium => y is SuggestedActionRestorePremium,
-                    SuggestedActionSetBirthdate => y is SuggestedActionSetBirthdate,
-                    SuggestedActionSubscribeToAnnualPremium => y is SuggestedActionSubscribeToAnnualPremium,
-                    SuggestedActionUpgradePremium => y is SuggestedActionUpgradePremium,
-                    SuggestedActionViewChecksHint => y is SuggestedActionViewChecksHint,
-                    SuggestedActionConvertToBroadcastGroup convertToBroadcastGroup => y is SuggestedActionConvertToBroadcastGroup yc && yc.SupergroupId == convertToBroadcastGroup.SupergroupId,
-                    SuggestedActionSetPassword setPassword => y is SuggestedActionSetPassword ys && ys.AuthorizationDelay == setPassword.AuthorizationDelay,
-                    _ => false
+                    SuggestedActionConvertToBroadcastGroup xc => xc.SupergroupId == ((SuggestedActionConvertToBroadcastGroup)y).SupergroupId,
+                    SuggestedActionCustom xc => xc.Name == ((SuggestedActionCustom)y).Name && xc.Url == ((SuggestedActionCustom)y).Url,
+                    SuggestedActionSetLoginEmailAddress xe => xe.CanBeHidden == ((SuggestedActionSetLoginEmailAddress)y).CanBeHidden,
+                    _ => true
                 };
             }
 
             public int GetHashCode(SuggestedAction obj)
             {
+                var type = obj.GetType().GetHashCode();
                 return obj switch
                 {
-                    SuggestedActionCheckPassword => 0,
-                    SuggestedActionCheckPhoneNumber => 1,
-                    SuggestedActionEnableArchiveAndMuteNewChats => 2,
-                    SuggestedActionGiftPremiumForChristmas => 3,
-                    SuggestedActionRestorePremium => 4,
-                    SuggestedActionSetBirthdate => 5,
-                    SuggestedActionSubscribeToAnnualPremium => 6,
-                    SuggestedActionUpgradePremium => 7,
-                    SuggestedActionViewChecksHint => 8,
-                    SuggestedActionConvertToBroadcastGroup convertToBroadcastGroup => HashCode.Combine(9, convertToBroadcastGroup.SupergroupId),
-                    SuggestedActionSetPassword setPassword => HashCode.Combine(10, setPassword.AuthorizationDelay),
-                    _ => -1
+                    SuggestedActionConvertToBroadcastGroup convert => HashCode.Combine(type, convert.SupergroupId),
+                    SuggestedActionCustom custom => HashCode.Combine(type, custom.Name),
+                    SuggestedActionSetLoginEmailAddress email => HashCode.Combine(type, email.CanBeHidden),
+                    _ => type
                 };
             }
         }
@@ -3070,6 +3125,24 @@ namespace Telegram.Services
             {
                 return _suggestedActions.Contains(action);
             }
+        }
+
+        public bool TryGetSuggestedAction<T>(out T action) where T : SuggestedAction
+        {
+            lock (_suggestedActions)
+            {
+                foreach (var item in _suggestedActions)
+                {
+                    if (item is T typed)
+                    {
+                        action = typed;
+                        return true;
+                    }
+                }
+            }
+
+            action = null;
+            return false;
         }
 
         #endregion
@@ -3774,6 +3847,11 @@ namespace Telegram.Services
                         _authorizationStateTask.TrySetResult(true);
                         _authorizationState = updateAuthorizationState.AuthorizationState;
                     }
+
+                    if (updateAuthorizationState.AuthorizationState is AuthorizationStateClosed)
+                    {
+                        Interlocked.Exchange(ref _closed, null)?.TrySetResult(true);
+                    }
                     break;
                 case UpdateChatActiveStories updateActiveStories:
                     {
@@ -4065,6 +4143,16 @@ namespace Telegram.Services
                         if (_chats.TryGetValue(updateChatReplyMarkup.ChatId, out Chat value))
                         {
                             value.ReplyMarkupMessageId = updateChatReplyMarkup.ReplyMarkupMessage?.Id ?? 0;
+                        }
+
+                        break;
+                    }
+
+                case UpdateChatTextCompositionParameters updateChatTextCompositionParameters:
+                    {
+                        if (_chats.TryGetValue(updateChatTextCompositionParameters.ChatId, out Chat value))
+                        {
+                            value.TextCompositionParameters = updateChatTextCompositionParameters.TextCompositionParameters;
                         }
 
                         break;
@@ -4467,8 +4555,22 @@ namespace Telegram.Services
 
                             foreach (var action in updateSuggestedActions.AddedActions)
                             {
+                                // Replace rather than keep the old instance, which may carry a stale payload.
+                                _suggestedActions.Remove(action);
                                 _suggestedActions.Add(action);
                             }
+
+                            var checksHint = false;
+                            var broadcastGroup = false;
+
+                            foreach (var action in _suggestedActions)
+                            {
+                                checksHint |= action is SuggestedActionViewChecksHint;
+                                broadcastGroup |= action is SuggestedActionConvertToBroadcastGroup;
+                            }
+
+                            _isChecksHintSuggested = checksHint;
+                            _isBroadcastGroupSuggested = broadcastGroup;
                         }
 
                         break;

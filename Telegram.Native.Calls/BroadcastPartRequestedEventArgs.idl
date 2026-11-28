@@ -2,7 +2,19 @@ import "Telegram.Native.Calls.idl";
 
 namespace Telegram.Native.Calls
 {
-    delegate void BroadcastPartRequestedDeferral(Int64 time, Int64 response, byte[] data);
+    enum BroadcastPartStatus
+    {
+        Success = 0,
+        // Not there yet (also FLOOD_WAIT and a CDN redirect): asked again shortly.
+        NotReady = 1,
+        // The time is no longer or not yet served: the broadcast finds the live edge again.
+        ResyncNeeded = 2,
+        // GROUPCALL_JOIN_MISSING: the call has to join again.
+        RejoinNeeded = 3
+    };
+
+    // The response is the server's time when it answered, in milliseconds, whatever the status.
+    delegate void BroadcastPartRequestedDeferral(BroadcastPartStatus status, Int64 response, byte[] data);
 
     [default_interface]
     runtimeclass AudioBroadcastPartRequestedEventArgs

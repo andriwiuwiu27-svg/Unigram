@@ -291,7 +291,7 @@ namespace Telegram.Controls.RichEditor
             }
 
             var confirm = await MessagePopup.ShowAsync(_view.XamlRoot, text, "Editor Meter", "OK", "Copy");
-            if (confirm == ContentDialogResult.Secondary)
+            if (confirm == ModalPopupResult.Secondary)
             {
                 MessageHelper.CopyText(_view.XamlRoot, text);
             }

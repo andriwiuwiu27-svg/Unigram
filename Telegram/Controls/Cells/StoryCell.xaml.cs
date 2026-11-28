@@ -13,25 +13,72 @@ using Telegram.ViewModels.Stories;
 using Windows.Foundation;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
+using Windows.UI.Xaml.Media;
 
 namespace Telegram.Controls.Cells
 {
-    public sealed partial class StoryCell : UserControl
+    public sealed partial class StoryCell : Control
     {
         private StoryViewModel _viewModel;
         public StoryViewModel ViewModel => _viewModel;
 
+        private bool _pinned;
+        private string _glyph;
+
         private ThumbnailController _thumbnailController;
+        private GlyphShadow _glyphShadow;
 
         public StoryCell()
         {
-            InitializeComponent();
-            LayoutRoot.Constraint = new Size(256, 320);
+            DefaultStyleKey = typeof(StoryCell);
         }
+
+        #region InitializeComponent
+
+        private AspectView LayoutRoot;
+        private ImageBrush ThumbnailTexture;
+        private ImageBrush Texture;
+        private Border GlyphShadowHost;
+        private TextBlock Glyph;
+        private Border Overlay;
+        private TextBlock Subtitle;
+        private bool _templateApplied;
+
+        protected override void OnApplyTemplate()
+        {
+            LayoutRoot = GetTemplateChild(nameof(LayoutRoot)) as AspectView;
+            ThumbnailTexture = GetTemplateChild(nameof(ThumbnailTexture)) as ImageBrush;
+            Texture = GetTemplateChild(nameof(Texture)) as ImageBrush;
+            GlyphShadowHost = GetTemplateChild(nameof(GlyphShadowHost)) as Border;
+            Glyph = GetTemplateChild(nameof(Glyph)) as TextBlock;
+            Overlay = GetTemplateChild(nameof(Overlay)) as Border;
+            Subtitle = GetTemplateChild(nameof(Subtitle)) as TextBlock;
+
+            LayoutRoot.Constraint = new Size(256, 320);
+
+            _glyph = null;
+            _glyphShadow = null;
+            _thumbnailController = null;
+
+            _templateApplied = true;
+
+            if (_viewModel != null)
+            {
+                Update(_viewModel, _pinned);
+            }
+        }
+
+        #endregion
 
         public void Update(StoryViewModel story, bool pinned = false)
         {
             _viewModel = story;
+            _pinned = pinned;
+
+            if (!_templateApplied)
+            {
+                return;
+            }
 
             var glyph = pinned
                 ? Icons.PinFilled16
@@ -43,16 +90,23 @@ namespace Telegram.Controls.Cells
                     _ => null
                 };
 
-            if (glyph != null)
+            if (glyph != _glyph)
             {
-                Glyph.Text = glyph;
-                VisualUtilities.DropShadow(Glyph, target: Shadow);
-            }
-            else
-            {
-                Glyph.Text = string.Empty;
-            }
+                _glyph = glyph;
 
+                if (glyph != null)
+                {
+                    Glyph.Text = glyph;
+
+                    _glyphShadow ??= new GlyphShadow(GlyphShadowHost);
+                    _glyphShadow.Show(glyph, Glyph);
+                }
+                else
+                {
+                    Glyph.Text = string.Empty;
+                    _glyphShadow?.Hide();
+                }
+            }
 
             if (story.Content is StoryContentPhoto photo)
             {

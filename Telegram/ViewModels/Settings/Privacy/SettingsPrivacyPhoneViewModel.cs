@@ -7,6 +7,7 @@
 
 using System.ComponentModel;
 using System.Threading.Tasks;
+using Telegram.Controls;
 using Telegram.Converters;
 using Telegram.Navigation;
 using Telegram.Navigation.Services;
@@ -70,11 +71,11 @@ namespace Telegram.ViewModels.Settings.Privacy
                 args.Cancel = true;
 
                 var confirm = await ShowPopupAsync(Strings.PrivacySettingsChangedAlert, Strings.UnsavedChanges, Strings.ApplyTheme, Strings.PassportDiscard);
-                if (confirm == ContentDialogResult.Primary)
+                if (confirm == ModalPopupResult.Primary)
                 {
                     ContinueImpl(args);
                 }
-                else if (confirm == ContentDialogResult.Secondary)
+                else if (confirm == ModalPopupResult.Secondary)
                 {
                     _completed = true;
                     NavigationService.GoBack(args);

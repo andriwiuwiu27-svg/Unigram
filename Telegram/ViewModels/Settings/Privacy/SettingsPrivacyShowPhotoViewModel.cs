@@ -6,6 +6,7 @@
 //
 
 using System.Threading.Tasks;
+using Telegram.Controls;
 using Telegram.Navigation.Services;
 using Telegram.Services;
 using Telegram.Td.Api;
@@ -68,7 +69,7 @@ namespace Telegram.ViewModels.Settings.Privacy
         public async void RemovePhoto()
         {
             var confirm = await ShowPopupAsync(Strings.RemovePhotoForRestDescription, Strings.RemovePhotoForRestDescription, Strings.Remove, Strings.Cancel, destructive: true);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 if (ClientService.TryGetUserFull(ClientService.Options.MyId, out UserFullInfo userFull))
                 {

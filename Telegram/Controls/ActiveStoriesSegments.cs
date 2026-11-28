@@ -439,7 +439,10 @@ namespace Telegram.Controls
                 result = CanvasGeometry.CreatePath(builder);
             }
 
-            return compositor.CreatePathGeometry(new CompositionPath(result));
+            using (result)
+            {
+                return compositor.CreatePathGeometry(new CompositionPath(result));
+            }
         }
 
         public void ShowIndeterminate(int side, int unreadCount, bool closeFriends)

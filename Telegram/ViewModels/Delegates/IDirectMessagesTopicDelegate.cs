@@ -5,6 +5,7 @@
 // file LICENSE or copy at https://www.gnu.org/licenses/gpl-3.0.txt)
 //
 
+using System.Collections.Generic;
 using Telegram.Td.Api;
 
 namespace Telegram.ViewModels.Delegates
@@ -16,5 +17,6 @@ namespace Telegram.ViewModels.Delegates
         void UpdateDirectMessagesChatTopicReadInbox(DirectMessagesChatTopic topic);
         void UpdateDirectMessagesChatTopicReadOutbox(DirectMessagesChatTopic topic);
         void UpdateDirectMessagesChatTopicUnreadMentionCount(DirectMessagesChatTopic topic);
+        void UpdateDirectMessagesChatTopicActions(DirectMessagesChatTopic topic, IDictionary<MessageSender, ChatAction> actions);
     }
 }

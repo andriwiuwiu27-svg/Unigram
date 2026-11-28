@@ -16,6 +16,7 @@ using Telegram.Converters;
 using Telegram.Native.Controls;
 using Telegram.Navigation;
 using Telegram.Navigation.Services;
+using Telegram.Services;
 using Telegram.Streams;
 using Telegram.Td.Api;
 using Telegram.ViewModels;
@@ -32,11 +33,8 @@ using Windows.UI.Xaml.Media.Imaging;
 
 namespace Telegram.Controls.Messages
 {
-    public partial class ReactionButton : ToggleButtonEx
+    public partial class ReactionButton : ReactionButtonBase
     {
-        private CustomEmojiIcon Icon;
-        private Popup Overlay;
-        protected AnimatedTextBlock Count;
         private RecentUserHeads RecentChoosers;
 
         public ReactionButton()
@@ -46,12 +44,9 @@ namespace Telegram.Controls.Messages
             Click += OnClick;
         }
 
-        protected override AutomationPeer OnCreateAutomationPeer()
-        {
-            return new ReactionButtonAutomationPeer(this);
-        }
+        internal override AutomationControlType AutomationControlType => AutomationControlType.ListItem;
 
-        public string GetAutomationName()
+        public override string GetAutomationName()
         {
             if (_reaction is MessageReaction interaction)
             {
@@ -93,16 +88,13 @@ namespace Telegram.Controls.Messages
 
         protected MessageViewModel _message;
         protected MessageReaction _reaction;
-        private ReactionType _reactionType;
         private bool _chosen;
 
         private UnreadReaction _unread;
 
-        // Bumped on Recycle, so that an Animate still awaiting TDLib can tell it no longer belongs
-        // to the message it started for: the button may be connected again by then, elsewhere.
-        private int _generation;
-
         public MessageReaction Reaction => _reaction;
+
+        protected override IClientService ClientService => _message?.ClientService;
 
         /// <summary>
         /// Lets go of the message before the button goes back to <see cref="ReactionsPanel"/>'s pool,
@@ -111,22 +103,19 @@ namespace Telegram.Controls.Messages
         /// </summary>
         internal void Recycle()
         {
-            _generation++;
+            StopAnimation();
 
             _message = null;
             _reaction = null;
             _unread = null;
-
-            if (Overlay != null)
-            {
-                Overlay.IsOpen = false;
-                Overlay.Child = null;
-            }
         }
 
         public void SetUnread(UnreadReaction unread)
         {
-            if (Icon == null)
+            // A pooled button keeps its template, so it can be asked before it is loaded, and Loaded
+            // may only come on the next tick. Animate drops its effect when not connected by the time
+            // TDLib answers, which a cached reaction does before that tick.
+            if (!IsTemplateApplied || !IsConnected)
             {
                 _unread = unread;
             }
@@ -143,7 +132,7 @@ namespace Telegram.Controls.Messages
 
         public void SetReaction(MessageViewModel message, MessageReaction reaction)
         {
-            if (Icon == null)
+            if (!IsTemplateApplied)
             {
                 _message = message;
                 _reaction = reaction;
@@ -161,30 +150,7 @@ namespace Telegram.Controls.Messages
 
             _chosen = reaction.IsChosen;
 
-            if (reaction.Type.AreTheSame(_reactionType))
-            {
-                return;
-            }
-
-            _reactionType = reaction.Type;
-
-            using (Icon.BeginBatchUpdate())
-            {
-                var custom = reaction.Type is ReactionTypeCustomEmoji;
-                var size = reaction.Type is ReactionTypeCustomEmoji or ReactionTypePaid ? 20 : 32;
-
-                Icon.Width = Icon.Height = size;
-                Icon.FrameSize = new Size(size, size);
-                Icon.LoopCount = custom ? 3 : 1;
-                Icon.IsCachingEnabled = reaction.Type is not ReactionTypePaid;
-                Icon.IsViewportAware = custom;
-
-                Icon.Source = new ReactionFileSource(message.ClientService, reaction.Type)
-                {
-                    UseCenterAnimation = true,
-                    IsAnimated = false
-                };
-            }
+            UpdateIcon(message.ClientService, reaction.Type);
         }
 
         protected virtual void UpdateInteraction(MessageViewModel message, MessageReaction interaction, bool recycled, bool chosen)
@@ -237,45 +203,24 @@ namespace Telegram.Controls.Messages
             photo.Source = ProfilePictureSource.MessageSender(_message.ClientService, sender);
         }
 
-        protected override void OnApplyTemplate()
+        protected override void OnTemplateApplied()
         {
-            Count = GetTemplateChild(nameof(Count)) as AnimatedTextBlock;
-            Overlay = GetTemplateChild(nameof(Overlay)) as Popup;
-            Icon = GetTemplateChild(nameof(Icon)) as CustomEmojiIcon;
-            Icon.Ready += OnReady;
-            Icon.Paused += OnPaused;
-
             if (_reaction != null)
             {
                 SetReaction(_message, _reaction);
             }
 
             SetUnread(_unread);
-
-            base.OnApplyTemplate();
         }
 
-        private void OnReady(object sender, EventArgs e)
+        protected override void OnIconReady()
         {
             SetUnread(_unread);
         }
 
-        private void OnPaused(object sender, EventArgs e)
+        protected override void OnLoaded()
         {
-            this.BeginOnUIThread(OnPaused);
-        }
-
-        private void OnPaused()
-        {
-            if (Icon?.Source is ReactionFileSource reaction && Icon.Source.IsAnimated && IsConnected)
-            {
-                Icon.Source = reaction.Clone(false);
-            }
-        }
-
-        protected override void OnToggle()
-        {
-            //base.OnToggle();
+            SetUnread(_unread);
         }
 
         public virtual async void OnContextRequested(ContextRequestedEventArgs args)
@@ -388,7 +333,7 @@ namespace Telegram.Controls.Messages
 
                 flyout.ShowAt(this, args);
 
-                var function = _message.ClientService.GetCustomEmojiStickerSets(new[] { customEmoji.CustomEmojiId });
+                var function = message.ClientService.GetCustomEmojiStickerSets(new[] { customEmoji.CustomEmojiId });
 
                 await Task.WhenAll(function, Task.Delay(250));
 
@@ -405,7 +350,7 @@ namespace Telegram.Controls.Messages
                     {
                         var player = new CustomEmojiIcon();
                         player.LoopCount = 0;
-                        player.Source = DelayedFileSource.FromStickerSetInfo(_message.ClientService, stickerSets.Sets[0]);
+                        player.Source = DelayedFileSource.FromStickerSetInfo(message.ClientService, stickerSets.Sets[0]);
 
                         player.HorizontalAlignment = HorizontalAlignment.Left;
                         player.FlowDirection = FlowDirection.LeftToRight;
@@ -452,12 +397,13 @@ namespace Telegram.Controls.Messages
 
         private async void ShowCustomEmoji()
         {
-            if (_reactionType is not ReactionTypeCustomEmoji customEmoji)
+            var message = _message;
+            if (message == null || _reactionType is not ReactionTypeCustomEmoji customEmoji)
             {
                 return;
             }
 
-            var response = await _message.ClientService.SendAsync(new GetCustomEmojiStickers(new[] { customEmoji.CustomEmojiId }));
+            var response = await message.ClientService.SendAsync(new GetCustomEmojiStickers(new[] { customEmoji.CustomEmojiId }));
             if (response is Stickers stickers)
             {
                 var sets = new HashSet<long>();
@@ -467,14 +413,14 @@ namespace Telegram.Controls.Messages
                     sets.Add(sticker.SetId);
                 }
 
-                await StickersPopup.ShowAsync(_message.Delegate.NavigationService, sets);
+                await StickersPopup.ShowAsync(message.Delegate.NavigationService, sets);
             }
         }
 
         private void OnClick(object sender, RoutedEventArgs e)
         {
             var chosen = _reaction;
-            if (chosen != null && Icon != null && _message?.Id != 0)
+            if (chosen != null && IsTemplateApplied && _message?.Id != 0)
             {
                 OnClick(_message, chosen);
             }
@@ -499,107 +445,6 @@ namespace Telegram.Controls.Messages
                 Animate();
                 message.ClientService.Send(new AddMessageReaction(message.ChatId, message.Id, chosen.Type, false, false));
             }
-        }
-
-        protected async void Animate()
-        {
-            var clientService = _message?.ClientService;
-            if (clientService == null)
-            {
-                return;
-            }
-
-            var generation = _generation;
-
-            if (_reactionType is ReactionTypeEmoji emoji)
-            {
-                var response = await clientService.SendAsync(new GetEmojiReaction(emoji.Emoji));
-                if (response is EmojiReaction reaction && reaction.AroundAnimation != null)
-                {
-                    var around = await clientService.DownloadFileAsync(reaction.AroundAnimation.StickerValue, 32);
-                    if (around.Local.IsDownloadingCompleted && IsConnected && generation == _generation)
-                    {
-                        this.BeginOnUIThread(() => Animate(around, true));
-                    }
-                }
-            }
-            else if (_reactionType is ReactionTypeCustomEmoji customEmoji)
-            {
-                var response = await clientService.SendAsync(new GetCustomEmojiReactionAnimations());
-                if (response is Stickers stickers)
-                {
-                    var random = new Random();
-                    var next = random.Next(0, stickers.StickersValue.Count);
-
-                    var around = await clientService.DownloadFileAsync(stickers.StickersValue[next].StickerValue, 32);
-                    if (around.Local.IsDownloadingCompleted && IsConnected && generation == _generation)
-                    {
-                        this.BeginOnUIThread(() => Animate(around, true));
-                    }
-                }
-            }
-            else if (_reactionType is ReactionTypePaid)
-            {
-                var random = new Random();
-                var next = random.Next(1, 6);
-
-                var around = TdExtensions.GetLocalFile($"Assets\\Animations\\PaidReactionAround{next}.tgs");
-                if (around.Local.IsDownloadingCompleted && IsConnected)
-                {
-                    this.BeginOnUIThread(() => Animate(around, false));
-                }
-            }
-        }
-
-        protected void Animate(File around, bool cache)
-        {
-            if (Icon?.Source is ReactionFileSource reaction && !Icon.Source.IsAnimated)
-            {
-                Icon.Source = reaction.Clone(true);
-            }
-
-            Icon?.Play();
-
-            var popup = Overlay;
-            var dispatcher = DispatcherQueue.GetForCurrentThread();
-
-            var aroundView = new AnimatedImage();
-            aroundView.Width = 32 * 3;
-            aroundView.Height = 32 * 3;
-            aroundView.LoopCount = 1;
-            aroundView.FrameSize = new Size(32 * 3, 32 * 3);
-            aroundView.DecodeFrameType = DecodePixelType.Logical;
-            aroundView.IsCachingEnabled = cache;
-            aroundView.AutoPlay = true;
-            aroundView.Source = new LocalFileSource(around);
-            aroundView.LoopCompleted += (s, args) =>
-            {
-                dispatcher.TryEnqueue(Continue);
-            };
-
-            var root = new Grid();
-            root.Name = "ReactionAnimation";
-            root.Width = 32 * 3;
-            root.Height = 32 * 3;
-            root.Children.Add(aroundView);
-
-            popup.Child = root;
-            popup.XamlRoot = XamlRoot;
-            popup.IsOpen = true;
-        }
-
-        private void Continue()
-        {
-            Logger.Info();
-
-            var popup = Overlay;
-            if (popup == null)
-            {
-                return;
-            }
-
-            popup.IsOpen = false;
-            popup.Child = null;
         }
 
         protected override void OnKeyDown(KeyRoutedEventArgs e)
@@ -676,26 +521,5 @@ namespace Telegram.Controls.Messages
         //    }
         //    return new CompositionPath(result);
         //}
-    }
-
-    public partial class ReactionButtonAutomationPeer : ToggleButtonAutomationPeer
-    {
-        private readonly ReactionButton _owner;
-
-        public ReactionButtonAutomationPeer(ReactionButton owner)
-            : base(owner)
-        {
-            _owner = owner;
-        }
-
-        protected override string GetNameCore()
-        {
-            return _owner.GetAutomationName() ?? base.GetNameCore();
-        }
-
-        protected override AutomationControlType GetAutomationControlTypeCore()
-        {
-            return AutomationControlType.ListItem;
-        }
     }
 }

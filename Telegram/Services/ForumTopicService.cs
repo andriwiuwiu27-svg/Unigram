@@ -342,7 +342,8 @@ namespace Telegram.Services
         protected override Task<Object> LoadMoreItemsAsync(int count)
         {
             var tsc = new TaskCompletionSource<Object>();
-            var request = new GetForumTopics(_chatId, string.Empty, _nextOffsetDate, _nextOffsetMessageId, _nextOffsetForumTopicId, count);
+            // TODO: filter by icon (icon_custom_emoji_id) and by open/closed state.
+            var request = new GetForumTopics(_chatId, string.Empty, 0, false, false, _nextOffsetDate, _nextOffsetMessageId, _nextOffsetForumTopicId, count);
 
             _clientService.Send(request, response =>
             {

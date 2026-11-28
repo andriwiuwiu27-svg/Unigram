@@ -38,7 +38,7 @@ namespace Telegram.Views.Calls.Popups
                 return;
             }
 
-            Hide(ContentDialogResult.Primary);
+            Hide(ModalPopupResult.Primary);
         }
     }
 }

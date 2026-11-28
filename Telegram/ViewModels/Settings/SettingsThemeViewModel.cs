@@ -11,6 +11,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Telegram.Collections;
 using Telegram.Common;
+using Telegram.Controls;
 using Telegram.Navigation;
 using Telegram.Services;
 using Telegram.Services.Settings;
@@ -141,7 +142,7 @@ namespace Telegram.ViewModels.Settings
             popup.SecondaryButtonText = Strings.Cancel;
 
             var confirm = await ShowPopupAsync(popup);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 _theme.Name = popup.Text;
                 Title = popup.Text;
@@ -160,7 +161,7 @@ namespace Telegram.ViewModels.Settings
             popup.Color = brush.Color;
 
             var confirm = await ShowPopupAsync(popup);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 brush.Color = popup.Color;
 

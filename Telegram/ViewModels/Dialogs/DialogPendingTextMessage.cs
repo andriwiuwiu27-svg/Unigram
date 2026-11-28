@@ -472,7 +472,6 @@ namespace Telegram.ViewModels
                 PageBlockFooter b => Length(b.Footer),
                 PageBlockThinking b => Length(b.Text),
                 PageBlockPullQuote b => Length(b.Text) + Length(b.Credit),
-                PageBlockExpandableBlockQuote b => Length(b.Text) + Length(b.Credit),
                 PageBlockMathematicalExpression b => b.Expression?.Length ?? 0,
                 // Atomic
                 PageBlockAnchor _ => 0,
@@ -495,6 +494,7 @@ namespace Telegram.ViewModels
                 PageBlockCover b => Length(b.Cover),
                 PageBlockList b => LengthListItems(b.Items),
                 PageBlockBlockQuote b => Length(b.Blocks) + Length(b.Credit),
+                PageBlockExpandableBlockQuote b => Length(b.Blocks) + Length(b.Credit),
                 PageBlockCollage b => Length(b.Blocks) + Length(b.Caption),
                 PageBlockSlideshow b => Length(b.Blocks) + Length(b.Caption),
                 PageBlockEmbeddedPost b => 1 + Length(b.Blocks) + Length(b.Caption),
@@ -679,14 +679,6 @@ namespace Telegram.ViewModels
                         var credit = SubstringRichText(b.Credit, ref remaining);
                         return new PageBlockPullQuote(text, credit);
                     }
-                case PageBlockExpandableBlockQuote b:
-                    {
-                        // Rich text + credit, like the pull quote above — not a list of
-                        // blocks like PageBlockBlockQuote.
-                        var text = SubstringRichText(b.Text, ref remaining) ?? new RichTextPlain("");
-                        var credit = SubstringRichText(b.Credit, ref remaining);
-                        return new PageBlockExpandableBlockQuote(text, credit);
-                    }
                 case PageBlockMathematicalExpression b:
                     {
                         var expr = b.Expression ?? string.Empty;
@@ -775,6 +767,12 @@ namespace Telegram.ViewModels
                         var inner = SubstringList(b.Blocks, ref remaining);
                         var credit = SubstringRichText(b.Credit, ref remaining);
                         return new PageBlockBlockQuote(inner, credit);
+                    }
+                case PageBlockExpandableBlockQuote b:
+                    {
+                        var inner = SubstringList(b.Blocks, ref remaining);
+                        var credit = SubstringRichText(b.Credit, ref remaining);
+                        return new PageBlockExpandableBlockQuote(inner, credit);
                     }
                 case PageBlockCollage b:
                     {

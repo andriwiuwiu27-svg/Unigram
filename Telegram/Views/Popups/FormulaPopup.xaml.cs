@@ -88,7 +88,7 @@ namespace Telegram.Views.Popups
 
                 if (Source.Length > 0)
                 {
-                    Hide(ContentDialogResult.Primary);
+                    Hide(ModalPopupResult.Primary);
                 }
                 else
                 {

@@ -10,6 +10,8 @@ using Telegram.Controls.Cells;
 using Telegram.Controls.Cells.Revenue;
 using Telegram.Controls.Media;
 using Telegram.Converters;
+using Telegram.Navigation;
+using Telegram.Navigation.Services;
 using Telegram.Td.Api;
 using Telegram.ViewModels.Chats;
 using Windows.UI.Xaml;
@@ -25,10 +27,11 @@ namespace Telegram.Views.Chats
         public ChatRevenuePage()
         {
             InitializeComponent();
+            Transition = PageTransition.Entrance;
             Title = Strings.Monetization;
         }
 
-        protected override void OnNavigatedTo(NavigationEventArgs e)
+        protected override void OnNavigatedTo(NavigatedEventArgs e)
         {
             StarsRoot.DataContext = ViewModel.Stars;
             StarsRoot.OnNavigatedTo(e);
@@ -43,7 +46,7 @@ namespace Telegram.Views.Chats
                 : Visibility.Collapsed;
         }
 
-        protected override void OnNavigatedFrom(NavigationEventArgs e)
+        protected override void OnNavigatedFrom(NavigatedEventArgs e)
         {
             StarsRoot.OnNavigatedFrom(e);
             ViewModel.PropertyChanged -= OnPropertyChanged;

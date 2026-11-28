@@ -446,10 +446,7 @@ namespace Telegram.Controls.Gallery
                 titleBar.ButtonBackgroundColor = Colors.Transparent;
                 titleBar.ButtonForegroundColor = Colors.White;
 
-                if (!ApiInfo.HasPackageIdentity)
-                {
-                    WindowContext.SetIcon(WindowContext.GetWindowHandle(window));
-                }
+                WindowContext.SetIcon(WindowContext.GetWindowHandle(window));
 
                 var presenter = CompactOverlayPresenter.Create();
                 presenter.InitialSize = CompactOverlaySize.Small;

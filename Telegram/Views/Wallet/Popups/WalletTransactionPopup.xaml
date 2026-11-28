@@ -66,6 +66,29 @@
 
         <controls:TableView Margin="-8,16,-8,0"
                             Grid.Row="2">
+            <!-- The gift market's rows, shown only for its transactions. -->
+            <controls:TableViewItem x:Name="StatusRow"
+                                    Header="{CustomResource WalletOnchainGiftRowStatus}"
+                                    Visibility="Collapsed" />
+
+            <controls:TableViewItem x:Name="PriceRow"
+                                    Visibility="Collapsed" />
+
+            <controls:TableViewItem x:Name="OldPriceRow"
+                                    Header="{CustomResource GiftOnchainRowOldPrice}"
+                                    Visibility="Collapsed">
+                <TextBlock x:Name="OldPrice"
+                           TextDecorations="Strikethrough" />
+            </controls:TableViewItem>
+
+            <controls:TableViewItem x:Name="ExpirationRow"
+                                    Header="{CustomResource GiftOnchainRowExpiration}"
+                                    Visibility="Collapsed" />
+
+            <controls:TableViewItem x:Name="CancellationFeeRow"
+                                    Header="{CustomResource GiftOnchainRowCancellationFee}"
+                                    Visibility="Collapsed" />
+
             <!-- Recipient or Sender: only one of the two is true of any transfer, so the header is
                  set with the value rather than being two rows one of which is always empty. -->
             <controls:TableViewItem x:Name="PeerRow"

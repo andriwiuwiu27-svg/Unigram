@@ -38,7 +38,7 @@ namespace Telegram.Views.Stories.Popups
         private readonly StorageMedia _media;
 
         // Kept, so that coming back to it after more editing finds what was chosen.
-        private PostStoryPopup _postOptions;
+        private readonly PostStoryPopup _postOptions;
 
         private bool _accepting;
         private bool _confirming;
@@ -49,7 +49,7 @@ namespace Telegram.Views.Stories.Popups
         // The decode can finish after the editor closed and its tools let go of the surface.
         private bool _unloaded;
 
-        public EditStoryPopup(INavigationService navigationService, IClientService clientService, StorageMedia media)
+        public EditStoryPopup(INavigationService navigationService, IClientService clientService, StorageMedia media, PostStoryPopup postOptions)
             : base(navigationService.XamlRoot)
         {
             InitializeComponent();
@@ -57,6 +57,7 @@ namespace Telegram.Views.Stories.Popups
             _navigationService = navigationService;
             _clientService = clientService;
             _media = media;
+            _postOptions = postOptions;
 
             Surface.Initialize(clientService, media);
             Surface.InitializeFrame(FrameSize);
@@ -91,11 +92,6 @@ namespace Telegram.Views.Stories.Popups
                 Surface.Play();
             }
         }
-
-        /// <summary>
-        /// The caption and settings the story is posted with, once the editor closed with Primary.
-        /// </summary>
-        public PostStoryPopup PostOptions => _postOptions;
 
         private async void OnLoaded(object sender, RoutedEventArgs e)
         {
@@ -226,10 +222,6 @@ namespace Telegram.Views.Stories.Popups
                 video.IsMuted = TrimToolbar.IsMuted;
             }
 
-            // Over the editor rather than after it, so that backing out of it is going back to
-            // editing.
-            _postOptions ??= new PostStoryPopup(_clientService, _navigationService);
-
             // Paused under the sheet, and resumed only on going back to editing.
             var playing = Surface.Player?.IsPlaying == true;
             if (playing)
@@ -237,12 +229,14 @@ namespace Telegram.Views.Stories.Popups
                 Surface.Player.Pause(true);
             }
 
+            // Over the editor rather than after it, so that backing out of it is going back to
+            // editing.
             var confirm = await _navigationService.ShowPopupAsync(_postOptions, requestedTheme: ElementTheme.Dark);
             _accepting = false;
 
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
-                Hide(ContentDialogResult.Primary);
+                Hide(ModalPopupResult.Primary);
             }
             else if (playing)
             {
@@ -267,13 +261,13 @@ namespace Telegram.Views.Stories.Popups
 
                 _confirming = false;
 
-                if (confirm != ContentDialogResult.Primary)
+                if (confirm != ModalPopupResult.Primary)
                 {
                     return;
                 }
             }
 
-            Hide(ContentDialogResult.Secondary);
+            Hide(ModalPopupResult.Secondary);
         }
 
         // The edit as Next writes it, from what the layers last saved.

@@ -40,7 +40,7 @@ namespace Telegram.Views.Host
 
             service.Frame.Navigating += OnNavigating;
             service.Frame.Navigated += OnNavigated;
-            service.FrameFacade.ShortcutInvoked += OnShortcutInvoked;
+            service.ShortcutInvoked += OnShortcutInvoked;
 
             _navigationService = service;
             Navigation.Child = _navigationService.Frame;
@@ -64,6 +64,11 @@ namespace Telegram.Views.Host
         // The root frame's own service, for the window to walk; NavigationService above is
         // where navigation should go instead.
         INavigationService INavigationHost.NavigationService => _navigationService;
+
+        protected override void OnWindowClosed()
+        {
+            Destroy(_navigationService);
+        }
 
         protected override void OnPopupOpened()
         {
@@ -137,10 +142,10 @@ namespace Telegram.Views.Host
                 Destroy(_navigationService);
             }
 
-            var service = BootStrapper.Current.NavigationServiceFactory(session, Window, BootStrapper.BackButton.Attach, new Frame { CacheSize = 0 }, $"{session.Id}", true) as NavigationService;
+            var service = BootStrapper.Current.NavigationServiceFactory(session, Window, BootStrapper.BackButton.Attach, new NavigationFrame { CacheSize = 0 }, $"{session.Id}", true) as NavigationService;
             service.Frame.Navigating += OnNavigating;
             service.Frame.Navigated += OnNavigated;
-            service.FrameFacade.ShortcutInvoked += OnShortcutInvoked;
+            service.ShortcutInvoked += OnShortcutInvoked;
 
             switch (session.ClientService.AuthorizationState)
             {
@@ -153,19 +158,19 @@ namespace Telegram.Views.Host
                     service.AddToBackStack(typeof(BlankPage));
                     break;
                 case AuthorizationStateWaitCode:
-                    service.Navigate(typeof(AuthorizationCodePage), navigationStackEnabled: false);
+                    service.Navigate(typeof(AuthorizationCodePage));
                     break;
                 case AuthorizationStateWaitEmailAddress:
-                    service.Navigate(typeof(AuthorizationEmailAddressPage), navigationStackEnabled: false);
+                    service.Navigate(typeof(AuthorizationEmailAddressPage));
                     break;
                 case AuthorizationStateWaitEmailCode:
-                    service.Navigate(typeof(AuthorizationEmailCodePage), navigationStackEnabled: false);
+                    service.Navigate(typeof(AuthorizationEmailCodePage));
                     break;
                 case AuthorizationStateWaitRegistration:
-                    service.Navigate(typeof(AuthorizationRegistrationPage), navigationStackEnabled: false);
+                    service.Navigate(typeof(AuthorizationRegistrationPage));
                     break;
                 case AuthorizationStateWaitPassword:
-                    service.Navigate(typeof(AuthorizationPasswordPage), navigationStackEnabled: false);
+                    service.Navigate(typeof(AuthorizationPasswordPage));
                     break;
             }
 
@@ -199,11 +204,14 @@ namespace Telegram.Views.Host
 
             master.Frame.Navigating -= OnNavigating;
             master.Frame.Navigated -= OnNavigated;
-            master.FrameFacade.ShortcutInvoked -= OnShortcutInvoked;
+            master.ShortcutInvoked -= OnShortcutInvoked;
             master.Suspend();
+
+            // After the suspend, which still reads the page: every page is released and leaves the tree.
+            master.Detach();
         }
 
-        private void OnNavigating(object sender, NavigatingCancelEventArgs e)
+        private void OnNavigating(object sender, NavigatingEventArgs e)
         {
             if (_navigationService?.Frame?.Content is IRootContentPage content)
             {
@@ -211,7 +219,7 @@ namespace Telegram.Views.Host
             }
         }
 
-        private void OnNavigated(object sender, NavigationEventArgs e)
+        private void OnNavigated(object sender, NavigatedEventArgs e)
         {
             if (e.Content is IRootContentPage content)
             {

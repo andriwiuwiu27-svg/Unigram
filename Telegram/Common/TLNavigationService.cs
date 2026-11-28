@@ -50,7 +50,7 @@ namespace Telegram.Common
         private readonly IPasscodeService _passcodeService;
         private readonly IViewService _viewService;
 
-        public TLNavigationService(ISession session, WindowContext window, Frame frame, string id)
+        public TLNavigationService(ISession session, WindowContext window, NavigationFrame frame, string id)
             : base(session, window, frame, id)
         {
             _clientService = session.Resolve<IClientService>();
@@ -188,7 +188,7 @@ namespace Telegram.Common
         {
             TabViewItem CreateTabViewItem(WindowContext window)
             {
-                var frame = new Frame();
+                var frame = new NavigationFrame();
                 var service = new TLNavigationService(Session, window, frame, "InstantView"); // BootStrapper.Current.NavigationServiceFactory(BootStrapper.BackButton.Ignore, frame, _clientService.SessionId, "ciccio", false);
 
                 service.Navigate(typeof(InstantPage), new InstantPageArgs(instantView, url, title));
@@ -332,7 +332,7 @@ namespace Telegram.Common
             var popup = new FeaturesPopup(ClientService, option?.PaymentOption, features, businessFeatures.Features, limits, animations, stickers, feature);
 
             var confirm = await ShowPopupAsync(popup);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 ShowPromo(source ?? premiumSource);
             }
@@ -413,15 +413,15 @@ namespace Telegram.Common
             await _viewService.OpenAsync(parameters);
         }
 
-        public void NavigateToSender(MessageSender sender, NavigationState state = null, NavigationTransitionInfo infoOverride = null)
+        public void NavigateToSender(MessageSender sender, NavigationState state = null, PageTransition transition = PageTransition.Default)
         {
             if (sender is MessageSenderUser user)
             {
-                NavigateToUser(user.UserId, false, state: state, infoOverride: infoOverride);
+                NavigateToUser(user.UserId, false, state: state, transition: transition);
             }
             else if (sender is MessageSenderChat chat)
             {
-                Navigate(typeof(ProfilePage), chat.ChatId, state: state, infoOverride: infoOverride);
+                Navigate(typeof(ProfilePage), chat.ChatId, state: state, transition: transition);
             }
         }
 
@@ -451,7 +451,7 @@ namespace Telegram.Common
 
                 if (user.Id == _clientService.Options.MyId && chat.ViewAsTopics && topic == null)
                 {
-                    Navigate(typeof(ProfilePage), new ChatMessageTopic(chat.Id, null), infoOverride: new SuppressNavigationTransitionInfo());
+                    Navigate(typeof(ProfilePage), new ChatMessageTopic(chat.Id, null), transition: PageTransition.None);
                     return;
                 }
 
@@ -532,7 +532,13 @@ namespace Telegram.Common
                     await page.ViewModel.HandlePackageAsync(package);
                 }
 
-                OverlayWindow.TryHide(XamlRoot, ContentDialogResult.None);
+                OverlayWindow.TryHide(XamlRoot, ModalPopupResult.None);
+
+                // Only once the gallery is down: the editor is an overlay too, and would be the one hidden.
+                if (state != null && state.TryGet("edit_media", out Message editMedia))
+                {
+                    page.ViewModel.EditAndReply(editMedia);
+                }
             }
             else
             {
@@ -589,28 +595,18 @@ namespace Telegram.Common
                             parameter = chat.Id;
                         }
 
-                        chatPage.ViewModel.NavigatedFrom(null, false);
-
-                        chatPage.Deactivate(false);
-                        chatPage.Activate(this);
-                        chatPage.ViewModel.NavigationService = this;
-                        chatPage.ViewModel.Dispatcher = Dispatcher;
-                        await chatPage.ViewModel.NavigatedToAsync(parameter, NavigationMode.New, state);
-
-                        FrameFacade.RaiseNavigated(parameter);
-                        Frame.ForwardStack.Clear();
-
-                        if (clearBackStack)
+                        // The chat takes the current one's place: switching chats is not a step to go
+                        // back through.
+                        var replaced = NavigateCore(new NavigationStackItem(typeof(ChatPage), parameter, state, PageTransition.None), PageTransition.None, NavigationMode.New, true);
+                        if (replaced && clearBackStack)
                         {
                             GoBackAt(0, false);
                         }
-
-                        OverlayWindow.TryHide(XamlRoot, ContentDialogResult.None);
                     }
                     else
                     {
                         Type target;
-                        NavigationTransitionInfo info = null;
+                        var transition = PageTransition.None;
                         object parameter;
 
                         if (scheduled)
@@ -628,35 +624,21 @@ namespace Telegram.Common
                             {
                                 if (CurrentPageType == typeof(ProfilePage) || CurrentPageType == typeof(ChatPinnedPage))
                                 {
-                                    var cacheKey = Guid.NewGuid().ToString();
-                                    var cacheParameter = parameter;
-
-                                    parameter = cacheKey;
-                                    CacheKeyToParameter[cacheKey] = cacheParameter;
-
-                                    GoBackAt(0, false);
-
-                                    Frame.BackStack.Add(new PageStackEntry(target, parameter, null));
-                                    GoBack(state, new SlideNavigationTransitionInfo { Effect = SlideNavigationTransitionEffect.FromRight });
-                                    Frame.ForwardStack.Clear();
+                                    GoBackTo(target, parameter, state);
                                     return;
                                 }
                                 else if (CurrentPageType == typeof(ChatPage))
                                 {
-                                    info = new SlideNavigationTransitionInfo { Effect = SlideNavigationTransitionEffect.FromRight };
+                                    transition = PageTransition.Forward;
                                 }
                             }
                             else if (currentChat.ChatId == chat.Id && currentChat.MessageTopic == null && topic != null)
                             {
-                                info = new SlideNavigationTransitionInfo { Effect = SlideNavigationTransitionEffect.FromRight };
-                            }
-                            else
-                            {
-                                info = new SuppressNavigationTransitionInfo();
+                                transition = PageTransition.Forward;
                             }
                         }
 
-                        if (Navigate(target, parameter, state, info))
+                        if (Navigate(target, parameter, state, transition))
                         {
                             if (clearBackStack)
                             {
@@ -735,7 +717,7 @@ namespace Telegram.Common
                 }
 
                 var confirm = await ShowPopupAsync(popup);
-                if (confirm == ContentDialogResult.Primary)
+                if (confirm == ModalPopupResult.Primary)
                 {
                     if (popup.IsChecked is true)
                     {
@@ -752,7 +734,7 @@ namespace Telegram.Common
                 var message = LocaleService.Current.GetString("AgeVerificationText" + ClientService.AgeVerificationParameters.Country);
 
                 var confirm = await ShowPopupAsync(message, Strings.AgeVerificationTitle, Strings.AgeVerificationButton, Strings.Cancel);
-                if (confirm == ContentDialogResult.Primary)
+                if (confirm == ModalPopupResult.Primary)
                 {
                     // We inline here instead of using MessageHelper.NavigateToMainWebApp to have more control over the process.
                     var response = await ClientService.SendAsync(new SearchPublicChat(ClientService.AgeVerificationParameters.VerificationBotUsername));
@@ -830,7 +812,7 @@ namespace Telegram.Common
             NavigateToChat(chat, message, topic, accessToken, state, scheduled, force, createNewWindow);
         }
 
-        public async void NavigateToUser(long userId, bool toChat = false, NavigationState state = null, NavigationTransitionInfo infoOverride = null)
+        public async void NavigateToUser(long userId, bool toChat = false, NavigationState state = null, PageTransition transition = PageTransition.Default)
         {
             if (_clientService.TryGetChatFromUser(userId, out Chat chat))
             {
@@ -841,7 +823,7 @@ namespace Telegram.Common
                 }
                 else
                 {
-                    Navigate(typeof(ProfilePage), chat.Id, state: state, infoOverride: infoOverride);
+                    Navigate(typeof(ProfilePage), chat.Id, state: state, transition: transition);
                 }
             }
             else
@@ -856,7 +838,7 @@ namespace Telegram.Common
                     }
                     else
                     {
-                        Navigate(typeof(ProfilePage), created.Id, state: state, infoOverride: infoOverride);
+                        Navigate(typeof(ProfilePage), created.Id, state: state, transition: transition);
                     }
                 }
             }
@@ -869,7 +851,7 @@ namespace Telegram.Common
                 var popup = new SettingsPasscodeConfirmPopup();
 
                 var confirm = await ShowPopupAsync(popup);
-                if (confirm == ContentDialogResult.Primary)
+                if (confirm == ModalPopupResult.Primary)
                 {
                     Navigate(typeof(SettingsPasscodePage));
                 }
@@ -879,7 +861,7 @@ namespace Telegram.Common
                 var popup = new SettingsPasscodePopup();
 
                 var confirm = await ShowPopupAsync(popup);
-                if (confirm == ContentDialogResult.Primary)
+                if (confirm == ModalPopupResult.Primary)
                 {
                     var viewModel = Session.Resolve<SettingsPasscodeViewModel>();
                     viewModel.NavigationService = this;
@@ -902,7 +884,7 @@ namespace Telegram.Common
                     var popup = new SettingsPasswordConfirmPopup(ClientService, passwordState);
 
                     var confirm = await ShowPopupAsync(popup);
-                    if (confirm == ContentDialogResult.Primary && !string.IsNullOrEmpty(popup.Password))
+                    if (confirm == ModalPopupResult.Primary && !string.IsNullOrEmpty(popup.Password))
                     {
                         Navigate(typeof(SettingsPasswordPage), popup.Password);
                     }
@@ -910,7 +892,7 @@ namespace Telegram.Common
                     {
                         var emailCode = new SettingsPasswordEmailCodePopup(ClientService, popup.RecoveryEmailAddressCodeInfo, SettingsPasswordEmailCodeType.Recovery);
 
-                        if (ContentDialogResult.Primary == await ShowPopupAsync(emailCode))
+                        if (ModalPopupResult.Primary == await ShowPopupAsync(emailCode))
                         {
                             ShowPopup(new SettingsPasswordDonePopup());
                         }
@@ -920,7 +902,7 @@ namespace Telegram.Common
                 {
                     var emailCode = new SettingsPasswordEmailCodePopup(ClientService, passwordState.RecoveryEmailAddressCodeInfo, SettingsPasswordEmailCodeType.Continue);
 
-                    if (ContentDialogResult.Primary == await ShowPopupAsync(emailCode))
+                    if (ModalPopupResult.Primary == await ShowPopupAsync(emailCode))
                     {
                         ShowPopup(new SettingsPasswordDonePopup());
                     }
@@ -936,32 +918,49 @@ namespace Telegram.Common
             return null;
         }
 
-        public async Task<PasswordState> NavigateToPasswordSetupAsync()
+        /// <param name="authorizationDelay">When above 0, leaving the intro first warns that without a
+        /// password the account can only log in once every that many days.</param>
+        public async Task<PasswordState> NavigateToPasswordSetupAsync(int authorizationDelay = 0)
         {
-            var intro = new SettingsPasswordIntroPopup();
-
-            if (ContentDialogResult.Primary != await ShowPopupAsync(intro))
+            while (true)
             {
-                return null;
+                var intro = new SettingsPasswordIntroPopup();
+
+                var start = await ShowPopupAsync(intro);
+                if (start == ModalPopupResult.Primary)
+                {
+                    break;
+                }
+
+                if (authorizationDelay <= 0)
+                {
+                    return null;
+                }
+
+                var leave = await ShowPopupAsync(Locale.Declension(Strings.R.ForceSetPasswordAlertMessageShort, authorizationDelay), Strings.Warning, Strings.ForceSetPasswordCancel, Strings.TwoStepVerificationSetPassword, destructive: true);
+                if (leave == ModalPopupResult.Primary)
+                {
+                    return null;
+                }
             }
 
             var password = new SettingsPasswordCreatePopup();
 
-            if (ContentDialogResult.Primary != await ShowPopupAsync(password))
+            if (ModalPopupResult.Primary != await ShowPopupAsync(password))
             {
                 return null;
             }
 
             var hint = new SettingsPasswordHintPopup(null, null, password.Password);
 
-            if (ContentDialogResult.Primary != await ShowPopupAsync(hint))
+            if (ModalPopupResult.Primary != await ShowPopupAsync(hint))
             {
                 return null;
             }
 
             var emailAddress = new SettingsPasswordEmailAddressPopup(ClientService, new SetPassword(string.Empty, password.Password, hint.Hint, true, string.Empty));
 
-            if (ContentDialogResult.Primary != await ShowPopupAsync(emailAddress))
+            if (ModalPopupResult.Primary != await ShowPopupAsync(emailAddress))
             {
                 return null;
             }
@@ -972,7 +971,7 @@ namespace Telegram.Common
             {
                 var emailCode = new SettingsPasswordEmailCodePopup(ClientService, emailAddress.PasswordState?.RecoveryEmailAddressCodeInfo, SettingsPasswordEmailCodeType.New);
 
-                if (ContentDialogResult.Primary != await ShowPopupAsync(emailCode))
+                if (ModalPopupResult.Primary != await ShowPopupAsync(emailCode))
                 {
                     return null;
                 }

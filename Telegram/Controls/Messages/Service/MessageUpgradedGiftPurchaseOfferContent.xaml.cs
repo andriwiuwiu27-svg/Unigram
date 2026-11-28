@@ -52,7 +52,7 @@ namespace Telegram.Controls.Messages.Service
             Message.ClientService.TryGetUser(Message.Chat, out User user);
 
             var confirm = await Message.Delegate.NavigationService.ShowPopupAsync(string.Format(Strings.GiftOfferRejectConfirmText, user.FullName(true)), Strings.GiftOfferRejectConfirmTitle, Strings.GiftOfferRejectConfirmConfirm, Strings.Cancel, destructive: true);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 Message.ClientService.Send(new ProcessGiftPurchaseOffer(Message.Id, false));
             }
@@ -79,7 +79,7 @@ namespace Telegram.Controls.Messages.Service
             }
 
             var confirm = await Message.Delegate.NavigationService.ShowPopupAsync(string.Format(message, user.FullName(true)), Strings.GiftOfferRejectConfirmTitle, Strings.GiftOfferSellFor, Strings.Cancel);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 Message.ClientService.Send(new ProcessGiftPurchaseOffer(Message.Id, true));
             }

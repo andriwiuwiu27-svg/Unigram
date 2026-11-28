@@ -6,6 +6,7 @@
                   xmlns:local="using:Telegram.Views"
                   xmlns:common="using:Telegram.Common"
                   xmlns:controls="using:Telegram.Controls"
+                  xmlns:navigation="using:Telegram.Navigation"
                   xmlns:chats="using:Telegram.Controls.Chats"
                   xmlns:messages="using:Telegram.Controls.Messages"
                   xmlns:primitives="using:Microsoft.UI.Xaml.Controls.Primitives"
@@ -13,14 +14,6 @@
                   mc:Ignorable="d"
                   ShowHeaderBackground="False"
                   NavigationMode="Root">
-
-    <Page.Transitions>
-        <TransitionCollection>
-            <NavigationThemeTransition>
-                <SlideNavigationTransitionInfo Effect="FromRight" />
-            </NavigationThemeTransition>
-        </TransitionCollection>
-    </Page.Transitions>
 
     <local:HostedPage.Action>
         <Button Content="{x:Bind ViewModel.SelectedTab.PrimaryButtonText, Mode=OneWay}"
@@ -68,9 +61,9 @@
                     </Grid>
                 </StackPanel>
 
-                <Frame x:Name="MediaFrame"
-                       Navigating="OnNavigating"
-                       Navigated="OnNavigated" />
+                <navigation:NavigationFrame x:Name="MediaFrame"
+                                            Navigating="OnNavigating"
+                                            Navigated="OnNavigated" />
             </Grid>
         </ScrollViewer>
     </Grid>

@@ -9,7 +9,7 @@ using Telegram.Controls;
 
 namespace Telegram.Views.Settings
 {
-    public sealed partial class ChangePhoneNumberPopup : ContentPopup
+    public sealed partial class ChangePhoneNumberPopup : ModalPopup
     {
         public ChangePhoneNumberPopup()
         {

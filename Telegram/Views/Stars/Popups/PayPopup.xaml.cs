@@ -19,7 +19,7 @@ using Windows.UI.Xaml.Media;
 
 namespace Telegram.Views.Stars.Popups
 {
-    public sealed partial class PayPopup : ContentPopup
+    public sealed partial class PayPopup : ModalPopup
     {
         public PayViewModel ViewModel => DataContext as PayViewModel;
 
@@ -139,8 +139,8 @@ namespace Telegram.Views.Stars.Popups
             var result = await ViewModel.SubmitAsync();
 
             Hide(result == PayResult.Succeeded
-                ? ContentDialogResult.Primary
-                : ContentDialogResult.Secondary);
+                ? ModalPopupResult.Primary
+                : ModalPopupResult.Secondary);
 
             if (result == PayResult.StarsNeeded && ViewModel.PaymentForm?.Type is PaymentFormTypeStars stars)
             {

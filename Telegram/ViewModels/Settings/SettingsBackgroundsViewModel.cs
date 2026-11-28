@@ -11,6 +11,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Telegram.Collections;
 using Telegram.Common;
+using Telegram.Controls;
 using Telegram.Navigation;
 using Telegram.Navigation.Services;
 using Telegram.Services;
@@ -119,7 +120,7 @@ namespace Telegram.ViewModels.Settings
             _ = ChangeToLocalAsync(true);
         }
 
-        public async Task<ContentDialogResult> ChangeToLocalAsync(bool refresh)
+        public async Task<ModalPopupResult> ChangeToLocalAsync(bool refresh)
         {
             try
             {
@@ -134,7 +135,7 @@ namespace Telegram.ViewModels.Settings
                     await file.CopyAsync(await AppPaths.GetTemporaryFolderAsync(), Constants.WallpaperLocalFileName, NameCollisionOption.ReplaceExisting);
 
                     var confirm = await ShowPopupAsync(new BackgroundPopup(NavigationService), new BackgroundParameters(Constants.WallpaperLocalFileName, _chatId));
-                    if (confirm == ContentDialogResult.Primary && refresh)
+                    if (confirm == ModalPopupResult.Primary && refresh)
                     {
                         await OnNavigatedToAsync(null, NavigationMode.Refresh, null);
                     }
@@ -144,7 +145,7 @@ namespace Telegram.ViewModels.Settings
             }
             catch { }
 
-            return ContentDialogResult.None;
+            return ModalPopupResult.None;
         }
 
         public void ChangeToColor()
@@ -152,10 +153,10 @@ namespace Telegram.ViewModels.Settings
             _ = ChangeToColorAsync(true);
         }
 
-        public async Task<ContentDialogResult> ChangeToColorAsync(bool refresh)
+        public async Task<ModalPopupResult> ChangeToColorAsync(bool refresh)
         {
             var confirm = await ShowPopupAsync(new BackgroundPopup(NavigationService), new BackgroundParameters(Constants.WallpaperColorFileName, _chatId));
-            if (confirm == ContentDialogResult.Primary && refresh)
+            if (confirm == ModalPopupResult.Primary && refresh)
             {
                 await OnNavigatedToAsync(null, NavigationMode.Refresh, null);
             }
@@ -168,10 +169,10 @@ namespace Telegram.ViewModels.Settings
             _ = ChangeAsync(background, true);
         }
 
-        public async Task<ContentDialogResult> ChangeAsync(Background background, bool refresh)
+        public async Task<ModalPopupResult> ChangeAsync(Background background, bool refresh)
         {
             var confirm = await ShowPopupAsync(new BackgroundPopup(NavigationService), new BackgroundParameters(background, _chatId));
-            if (confirm == ContentDialogResult.Primary && refresh)
+            if (confirm == ModalPopupResult.Primary && refresh)
             {
                 await OnNavigatedToAsync(null, NavigationMode.Refresh, null);
             }
@@ -182,7 +183,7 @@ namespace Telegram.ViewModels.Settings
         public async void Reset()
         {
             var confirm = await ShowPopupAsync(Strings.ResetChatBackgroundsAlert, Strings.ResetChatBackgroundsAlertTitle, Strings.Reset, Strings.Cancel);
-            if (confirm != ContentDialogResult.Primary)
+            if (confirm != ModalPopupResult.Primary)
             {
                 return;
             }
@@ -220,7 +221,7 @@ namespace Telegram.ViewModels.Settings
             }
 
             var confirm = await ShowPopupAsync(Strings.DeleteChatBackgroundsAlert, Locale.Declension(Strings.R.DeleteBackground, 1), Strings.Delete, Strings.Cancel, destructive: true);
-            if (confirm != ContentDialogResult.Primary)
+            if (confirm != ModalPopupResult.Primary)
             {
                 return;
             }

@@ -9,6 +9,7 @@ using Telegram.Common;
 using Telegram.Controls;
 using Telegram.Controls.Chats;
 using Telegram.Controls.Media;
+using Telegram.Navigation.Services;
 using Telegram.Navigation;
 using Telegram.Td.Api;
 using Telegram.ViewModels;
@@ -20,7 +21,7 @@ using Windows.UI.Xaml.Navigation;
 
 namespace Telegram.Views.Profile
 {
-    public partial class ProfileTabPage : PageEx, INavigablePage
+    public partial class ProfileTabPage : NavigationPage, INavigablePage
     {
         public MediaTabsViewModelBase ViewModel
         {
@@ -66,12 +67,12 @@ namespace Telegram.Views.Profile
             }
         }
 
-        protected override void OnNavigatedTo(NavigationEventArgs e)
+        protected override void OnNavigatedTo(NavigatedEventArgs e)
         {
             IsProfile = DataContext is ProfileViewModel;
         }
 
-        protected override void OnNavigatedFrom(NavigationEventArgs e)
+        protected override void OnNavigatedFrom(NavigatedEventArgs e)
         {
             ScrollingHost.ItemsSource = null;
         }

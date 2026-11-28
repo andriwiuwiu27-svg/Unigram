@@ -95,7 +95,7 @@ namespace Telegram.Views.Settings.Popups
         {
             if (_passcodeService.IsSimple && Field.Password.Length == 4)
             {
-                Hide(ContentDialogResult.Primary);
+                Hide(ModalPopupResult.Primary);
             }
         }
 
@@ -105,7 +105,7 @@ namespace Telegram.Views.Settings.Popups
             else if (e.Key is >= Windows.System.VirtualKey.NumberPad0 and <= Windows.System.VirtualKey.NumberPad9) { }
             else if (e.Key == Windows.System.VirtualKey.Enter)
             {
-                Hide(ContentDialogResult.Primary);
+                Hide(ModalPopupResult.Primary);
                 e.Handled = true;
             }
             else

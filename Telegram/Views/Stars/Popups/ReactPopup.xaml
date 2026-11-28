@@ -1,14 +1,14 @@
-﻿<controls:ContentPopup x:Class="Telegram.Views.Stars.Popups.ReactPopup"
-                       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-                       xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-                       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-                       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-                       xmlns:muxc="using:Microsoft.UI.Xaml.Controls"
-                       xmlns:controls="using:Telegram.Controls"
-                       xmlns:local="using:Telegram.Views.Stars.Popups"
-                       mc:Ignorable="d"
-                       Padding="0"
-                       IsDismissButtonVisible="True">
+﻿<controls:ModalPopup x:Class="Telegram.Views.Stars.Popups.ReactPopup"
+                     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+                     xmlns:muxc="using:Microsoft.UI.Xaml.Controls"
+                     xmlns:controls="using:Telegram.Controls"
+                     xmlns:local="using:Telegram.Views.Stars.Popups"
+                     mc:Ignorable="d"
+                     Padding="0"
+                     IsDismissButtonVisible="True">
 
     <Grid>
         <Grid.RowDefinitions>
@@ -147,4 +147,4 @@
                                  Margin="12,0,12,24"
                                  Grid.Row="3" />
     </Grid>
-</controls:ContentPopup>
+</controls:ModalPopup>

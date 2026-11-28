@@ -230,16 +230,23 @@ namespace Telegram.Controls.Gallery
 
         private void Remove_Click(object sender, RoutedEventArgs e)
         {
+            // Same as SponsoredMessage_Click: the keyboard still reaches it after the window drops its view model.
+            var viewModel = ViewModel;
+            if (viewModel == null || _advertisement == null)
+            {
+                return;
+            }
+
             if (_minDisplayDuration == 0)
             {
                 _maxDisplayTimer.Stop();
 
                 ShowHide(false);
-                ViewModel.AdvertisementDisplayed();
+                viewModel.AdvertisementDisplayed();
             }
             else
             {
-                ViewModel.HideAdvertisement();
+                viewModel.HideAdvertisement();
             }
         }
 

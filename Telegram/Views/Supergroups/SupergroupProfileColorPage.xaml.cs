@@ -11,6 +11,7 @@ using Telegram.Controls;
 using Telegram.Controls.Cells;
 using Telegram.Controls.Media;
 using Telegram.Controls.Messages;
+using Telegram.Navigation.Services;
 using Telegram.Streams;
 using Telegram.Td.Api;
 using Telegram.ViewModels.Drawers;
@@ -33,7 +34,7 @@ namespace Telegram.Views.Supergroups
             Title = Strings.ChannelColorTitle2;
         }
 
-        protected override void OnNavigatedTo(NavigationEventArgs e)
+        protected override void OnNavigatedTo(NavigatedEventArgs e)
         {
             ProfileView.Initialize(ViewModel.ClientService, new MessageSenderChat(ViewModel.Chat.Id));
 
@@ -144,7 +145,7 @@ namespace Telegram.Views.Supergroups
             var confirm = await ViewModel.NavigationService.ShowPopupAsync(new SupergroupEditStickerSetPopup(tsc), args);
             var set = await tsc.Task as StickerSetInfo;
 
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 ViewModel.SelectedCustomEmojiStickerSet = set?.Id ?? 0;
                 EmojiPackAnimated.Source = DelayedFileSource.FromStickerSetInfo(ViewModel.ClientService, set);
@@ -159,7 +160,7 @@ namespace Telegram.Views.Supergroups
             var confirm = await ViewModel.NavigationService.ShowPopupAsync(new SupergroupEditStickerSetPopup(tsc), args);
             var set = await tsc.Task as StickerSetInfo;
 
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 ViewModel.SelectedStickerSet = set?.Id ?? 0;
                 StickerPackAnimated.Source = DelayedFileSource.FromStickerSetInfo(ViewModel.ClientService, set);

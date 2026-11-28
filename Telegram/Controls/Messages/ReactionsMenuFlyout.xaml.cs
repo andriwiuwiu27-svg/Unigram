@@ -236,7 +236,7 @@ namespace Telegram.Controls.Messages
             pillShadow.BlurRadius = 16f;
             pillShadow.Opacity = 0.14f;
             pillShadow.Color = Colors.Black;
-            pillShadow.Mask = Pill.GetAlphaMask();
+            pillShadow.Mask = OutlineMask.FromPath(Pill, new Vector2(width, height + 20));
 
             var pillReceiver = compositor.CreateSpriteVisual();
             pillReceiver.Shadow = pillShadow;
@@ -532,7 +532,7 @@ namespace Telegram.Controls.Messages
             pillShadow.BlurRadius = 16f;
             pillShadow.Opacity = 0.14f;
             pillShadow.Color = Colors.Black;
-            pillShadow.Mask = Pill.GetAlphaMask();
+            pillShadow.Mask = OutlineMask.FromPath(Pill, new Vector2(width, height + 20));
 
             var pillReceiver = compositor.CreateSpriteVisual();
             pillReceiver.Shadow = pillShadow;
@@ -786,7 +786,7 @@ namespace Telegram.Controls.Messages
             pillShadow.BlurRadius = 16f;
             pillShadow.Opacity = 0.14f;
             pillShadow.Color = Colors.Black;
-            pillShadow.Mask = Pill.GetAlphaMask();
+            pillShadow.Mask = OutlineMask.FromPath(Pill, new Vector2(width, height + 20));
 
             var pillReceiver = compositor.CreateSpriteVisual();
             pillReceiver.Shadow = pillShadow;
@@ -1100,7 +1100,7 @@ namespace Telegram.Controls.Messages
                     var popup = new ReactPopup(message.ClientService, message);
 
                     var confirm = await popup.ShowQueuedAsync(XamlRoot);
-                    if (confirm != ContentDialogResult.Primary)
+                    if (confirm != ModalPopupResult.Primary)
                     {
                         return;
                     }

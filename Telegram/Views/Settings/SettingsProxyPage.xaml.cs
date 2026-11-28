@@ -112,7 +112,7 @@ namespace Telegram.Views.Settings
 
                 // Justified because Checked
                 content.Tag = proxy;
-                content.IsChecked = proxy.IsEnabled;
+                ToggleHelper.SetIsChecked(content, proxy.IsEnabled);
 
                 content.Checked += RadioButton_Checked;
             }

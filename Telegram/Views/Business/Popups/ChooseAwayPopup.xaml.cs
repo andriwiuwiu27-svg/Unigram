@@ -38,7 +38,7 @@ namespace Telegram.Views.Business.Popups
             PrimaryButtonText = Strings.OK;
             SecondaryButtonText = Strings.Cancel;
 
-            DefaultButton = ContentDialogButton.Primary;
+            DefaultButton = ModalPopupButton.Primary;
         }
 
         public DateTime Value
@@ -78,7 +78,7 @@ namespace Telegram.Views.Business.Popups
         private void Online_Click(object sender, RoutedEventArgs e)
         {
             IsUntilOnline = true;
-            Hide(ContentDialogResult.Primary);
+            Hide(ModalPopupResult.Primary);
         }
     }
 }

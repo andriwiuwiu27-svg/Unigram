@@ -1,12 +1,12 @@
-﻿<controls:ContentPopup x:Class="Telegram.Views.Stars.Popups.ReceiptPopup"
-                       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-                       xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-                       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-                       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-                       xmlns:controls="using:Telegram.Controls"
-                       mc:Ignorable="d"
-                       Padding="24,0,24,24"
-                       IsDismissButtonVisible="True">
+﻿<controls:ModalPopup x:Class="Telegram.Views.Stars.Popups.ReceiptPopup"
+                     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+                     xmlns:controls="using:Telegram.Controls"
+                     mc:Ignorable="d"
+                     Padding="24,0,24,24"
+                     IsDismissButtonVisible="True">
 
     <Grid>
         <Grid.RowDefinitions>
@@ -71,12 +71,8 @@
                             Grid.Row="2">
                     <TextBlock x:Name="StarCount"
                                Style="{StaticResource BaseTextBlockStyle}"
+                               FontFamily="{StaticResource EmojiThemeFontFamilyWithSymbols}"
                                VerticalAlignment="Center" />
-
-                    <controls:PremiumStarCount Width="24"
-                                               Height="24"
-                                               Grid.Column="4"
-                                               Grid.RowSpan="2" />
 
                     <controls:BadgeControl x:Name="Refund"
                                            Text="{CustomResource StarsRefunded}"
@@ -84,7 +80,7 @@
                                            Foreground="{ThemeResource SystemFillColorSuccessBrush}"
                                            CornerRadius="4"
                                            VerticalAlignment="Bottom"
-                                           Margin="0,0,0,3" />
+                                           Margin="4,0,0,3" />
                 </StackPanel>
                 <TextBlock x:Name="Subtitle"
                            Style="{StaticResource BodyTextBlockStyle}"
@@ -198,4 +194,4 @@
                 Margin="0,8,0,0"
                 Grid.Row="1" />
     </Grid>
-</controls:ContentPopup>
+</controls:ModalPopup>

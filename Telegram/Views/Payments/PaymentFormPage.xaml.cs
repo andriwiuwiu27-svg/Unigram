@@ -7,6 +7,7 @@
 
 using Telegram.Common;
 using Telegram.Converters;
+using Telegram.Navigation.Services;
 using Telegram.Navigation;
 using Telegram.Td.Api;
 using Telegram.ViewModels.Payments;
@@ -17,25 +18,26 @@ using Windows.UI.Xaml.Navigation;
 
 namespace Telegram.Views.Payments
 {
-    public sealed partial class PaymentFormPage : Page
+    public sealed partial class PaymentFormPage : NavigationPage
     {
         public PaymentFormViewModel ViewModel => DataContext as PaymentFormViewModel;
 
         public PaymentFormPage()
         {
             InitializeComponent();
+            Transition = PageTransition.Entrance;
 
             VisualUtilities.DropShadow(BuyShadow);
         }
 
-        protected override void OnNavigatedTo(NavigationEventArgs e)
+        protected override void OnNavigatedTo(NavigatedEventArgs e)
         {
             ViewModel.Window.SetTitleBar(TitleBar);
             ViewModel.Window.CaptionButtons = CaptionButtons.Close;
             ViewModel.Window.SetResizable(false);
         }
 
-        protected override void OnNavigatedFrom(NavigationEventArgs e)
+        protected override void OnNavigatedFrom(NavigatedEventArgs e)
         {
             ViewModel.Window.SetTitleBar(null);
         }

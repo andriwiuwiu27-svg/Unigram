@@ -12,7 +12,7 @@ using Telegram.Converters;
 
 namespace Telegram.Views.Monetization.Popups
 {
-    public sealed partial class TransferPopup : ContentPopup
+    public sealed partial class TransferPopup : ModalPopup
     {
         public TransferPopup(string address, CryptoAmount amount)
         {

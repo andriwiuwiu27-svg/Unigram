@@ -323,6 +323,9 @@ namespace Telegram.Generators
                     ApiEmitter.WriteFromPtr(builder, type);
                 }
             }
+
+            builder.AppendLine();
+            ApiEmitter.WriteSharedInstances(builder, classes);
         }
 
         /// <summary>

@@ -67,7 +67,7 @@ namespace Telegram.Views.Wallet.Popups
             var popup = new WalletEnrollPopup(current, reason);
 
             var confirm = await navigation.ShowPopupAsync(popup);
-            if (confirm != ContentDialogResult.Primary)
+            if (confirm != ModalPopupResult.Primary)
             {
                 return null;
             }

@@ -10,7 +10,7 @@ using Windows.UI.Xaml;
 
 namespace Telegram.Views.Popups
 {
-    public sealed partial class CallRatingPopup : ContentPopup
+    public sealed partial class CallRatingPopup : ModalPopup
     {
         public CallRatingPopup()
         {

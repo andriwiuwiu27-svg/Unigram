@@ -477,9 +477,16 @@ namespace Telegram.Controls.Chats
 
         private void OnContextRequested(UIElement sender, ContextRequestedEventArgs args)
         {
+            // ChatView hands this bar the next view model before that model has loaded its chat,
+            // and the bar keeps showing the previous chat's message meanwhile.
+            if (ViewModel?.Chat is not Chat chat)
+            {
+                return;
+            }
+
             var flyout = new MenuFlyout();
 
-            if (ViewModel.Chat.CanPinMessages(ViewModel.ClientService))
+            if (chat.CanPinMessages(ViewModel.ClientService))
             {
                 flyout.CreateFlyoutItem(ViewModel.UnpinMessages, ViewModel.PinnedMessages.Count == 1 ? Strings.UnpinMessage2 : Strings.UnpinAllMessages2, Icons.PinOff);
             }

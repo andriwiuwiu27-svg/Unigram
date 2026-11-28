@@ -5,6 +5,9 @@
 // file LICENSE or copy at https://www.gnu.org/licenses/gpl-3.0.txt)
 //
 
+// The shim BannedSymbols.WinUI.txt sends every other caller to.
+#pragma warning disable RS0030
+
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -53,9 +56,9 @@ namespace Telegram.Storage
             return (await Source.TryGetItemAsync(name)).ToFileSystemItem();
         }
 
-        public async Task<IReadOnlyList<FileItem>> GetFilesAsync()
+        public Task<IReadOnlyList<FileItem>> GetFilesAsync()
         {
-            return (await Source.GetFilesAsync()).ToFileItems();
+            return Source.GetFilesAsync().ToFileItemsAsync();
         }
 
         public async Task<FileItem> CreateFileAsync(string desiredName)

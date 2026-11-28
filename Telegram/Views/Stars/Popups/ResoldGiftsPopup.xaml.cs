@@ -348,35 +348,165 @@ namespace Telegram.Views.Stars.Popups
         }
     }
 
+    public enum GiftResaleCurrency
+    {
+        Stars,
+        Grams,
+        Fragment
+    }
+
+    /// <summary>
+    /// Which listings the market shows: those for Stars, for Grams, and those sold on Fragment.
+    /// The server decides which of the three can be offered and which start ticked.
+    /// </summary>
+    public sealed partial class GiftResaleCurrencies
+    {
+        private bool _forStars;
+        private bool _forGrams;
+        private bool _forFragment;
+
+        private GiftResaleCurrencies()
+        {
+            IsCrafting = true;
+        }
+
+        public GiftResaleCurrencies(IClientService clientService, MessageSender receiverId)
+        {
+            var options = clientService.Options;
+
+            IsStarsAvailable = options.ShowGiftResaleStarFilter;
+            IsGramsAvailable = options.ShowGiftResaleGramFilter;
+
+            // A Fragment listing is paid from the wallet and can only be bought for oneself.
+            IsFragmentAvailable = options.CanBuyOnChainGifts && options.CanUseTonWallet && (receiverId == null || receiverId.IsUser(options.MyId));
+
+            _forStars = IsStarsAvailable && options.SelectGiftResaleStarFilterByDefault;
+            _forGrams = IsGramsAvailable && options.SelectGiftResaleGramFilterByDefault;
+            _forFragment = IsFragmentAvailable;
+
+            if (!_forStars && !_forGrams && !_forFragment)
+            {
+                _forStars = IsStarsAvailable;
+                _forGrams = IsGramsAvailable;
+            }
+        }
+
+        /// <summary>
+        /// Listings that can be crafted with, whatever they are sold for.
+        /// </summary>
+        public static GiftResaleCurrencies ForCrafting()
+        {
+            return new GiftResaleCurrencies();
+        }
+
+        public bool IsCrafting { get; }
+
+        public bool IsStarsAvailable { get; }
+
+        public bool IsGramsAvailable { get; }
+
+        public bool IsFragmentAvailable { get; }
+
+        public bool ForStars => _forStars;
+
+        public bool ForGrams => _forGrams;
+
+        public bool ForFragment => _forFragment;
+
+        public bool IsStarsOnly => _forStars && !_forGrams && !_forFragment;
+
+        public bool CanShowStarsOnly => IsStarsAvailable && (IsGramsAvailable || IsFragmentAvailable);
+
+        public bool IsAvailable(GiftResaleCurrency currency)
+        {
+            return currency switch
+            {
+                GiftResaleCurrency.Stars => IsStarsAvailable,
+                GiftResaleCurrency.Grams => IsGramsAvailable,
+                _ => IsFragmentAvailable
+            };
+        }
+
+        public bool IsSelected(GiftResaleCurrency currency)
+        {
+            return currency switch
+            {
+                GiftResaleCurrency.Stars => _forStars,
+                GiftResaleCurrency.Grams => _forGrams,
+                _ => _forFragment
+            };
+        }
+
+        /// <summary>
+        /// False when nothing changed: the last ticked option stays ticked, as no listing is for
+        /// none of them.
+        /// </summary>
+        public bool Toggle(GiftResaleCurrency currency)
+        {
+            var selected = IsSelected(currency);
+            if (selected && (_forStars ? 1 : 0) + (_forGrams ? 1 : 0) + (_forFragment ? 1 : 0) == 1)
+            {
+                return false;
+            }
+
+            switch (currency)
+            {
+                case GiftResaleCurrency.Stars:
+                    _forStars = !selected;
+                    break;
+                case GiftResaleCurrency.Grams:
+                    _forGrams = !selected;
+                    break;
+                default:
+                    _forFragment = !selected;
+                    break;
+            }
+
+            return true;
+        }
+
+        public void SetStarsOnly(bool starsOnly)
+        {
+            _forStars = IsStarsAvailable;
+            _forGrams = !starsOnly && IsGramsAvailable;
+            _forFragment = !starsOnly && IsFragmentAvailable;
+        }
+    }
+
     public partial class ResoldGiftsCollection : IncrementalCollection<GiftForResale>
     {
         private readonly IClientService _clientService;
         private readonly IResoldGiftsPopup _popup;
         private readonly long _giftId;
 
-        private readonly GiftForResaleOrder _order = new GiftForResaleOrderPrice();
+        private readonly GiftForResaleOrder _order;
+        private readonly Vector<UpgradedGiftAttributeId> _attributes;
+
+        // Copied rather than read from the currencies, which change under the next collection.
         private readonly bool _forCrafting;
         private readonly bool _forStars;
-        private readonly Vector<UpgradedGiftAttributeId> _attributes = Array.Empty<UpgradedGiftAttributeId>();
+        private readonly bool _forGrams;
+        private readonly bool _forFragment;
 
         private string _nextOffset = string.Empty;
 
-        public ResoldGiftsCollection(IClientService clientService, IResoldGiftsPopup popup, long giftId, GiftForResaleOrder order, Vector<UpgradedGiftAttributeId> attributes)
+        public ResoldGiftsCollection(IClientService clientService, IResoldGiftsPopup popup, long giftId, GiftForResaleOrder order, Vector<UpgradedGiftAttributeId> attributes, GiftResaleCurrencies currencies)
         {
             _clientService = clientService;
             _popup = popup;
             _giftId = giftId;
             _order = order;
             _attributes = attributes;
+
+            _forCrafting = currencies.IsCrafting;
+            _forStars = currencies.ForStars;
+            _forGrams = currencies.ForGrams;
+            _forFragment = currencies.ForFragment;
         }
 
-        public ResoldGiftsCollection(IClientService clientService, IResoldGiftsPopup popup, long giftId)
+        public ResoldGiftsCollection(IClientService clientService, IResoldGiftsPopup popup, long giftId, GiftResaleCurrencies currencies)
+            : this(clientService, popup, giftId, new GiftForResaleOrderPrice(), Array.Empty<UpgradedGiftAttributeId>(), currencies)
         {
-            _clientService = clientService;
-            _popup = popup;
-            _giftId = giftId;
-            _order = new GiftForResaleOrderPrice();
-            _attributes = Array.Empty<UpgradedGiftAttributeId>();
         }
 
         protected override async Task<IncrementalLoadResult> OnLoadMoreItemsAsync(uint count)
@@ -384,7 +514,7 @@ namespace Telegram.Views.Stars.Popups
             var totalCount = 0u;
             var hasMoreItems = false;
 
-            var response = await _clientService.SendAsync(new SearchGiftsForResale(_giftId, _order, _forCrafting, _forStars, _attributes, _nextOffset, 24));
+            var response = await _clientService.SendAsync(new SearchGiftsForResale(_giftId, _order, _forCrafting, _forStars, _forGrams, _forFragment, _attributes, _nextOffset, 24));
             if (response is GiftsForResale gifts)
             {
                 foreach (var gift in gifts.Gifts)
@@ -419,6 +549,8 @@ namespace Telegram.Views.Stars.Popups
         private readonly int _resaleCount;
         private readonly MessageSender _receiverId;
 
+        private readonly GiftResaleCurrencies _currencies;
+
         private ResoldGiftsCollection _gifts;
 
         private ResoldGiftFilterManager _models;
@@ -439,8 +571,10 @@ namespace Telegram.Views.Stars.Popups
             Title = gift.Title;
             Subtitle.Text = Locale.Declension(Strings.R.Gift2ResaleCount, gift.ResaleCount);
 
-            _gifts = new ResoldGiftsCollection(clientService, this, gift.Gift.Id);
+            _currencies = new GiftResaleCurrencies(clientService, receiverId);
+            _gifts = new ResoldGiftsCollection(clientService, this, gift.Gift.Id, _currencies);
             ScrollingHost.ItemsSource = _gifts;
+            UpdateStarsOnly();
 
             if (_resaleCount >= 18)
             {
@@ -472,8 +606,10 @@ namespace Telegram.Views.Stars.Popups
             Title = gift.Title;
             Subtitle.Text = Locale.Declension(Strings.R.Gift2ResaleCount, valueInfo.TelegramListedGiftCount);
 
-            _gifts = new ResoldGiftsCollection(clientService, this, gift.RegularGiftId);
+            _currencies = new GiftResaleCurrencies(clientService, receiverId);
+            _gifts = new ResoldGiftsCollection(clientService, this, gift.RegularGiftId, _currencies);
             ScrollingHost.ItemsSource = _gifts;
+            UpdateStarsOnly();
 
             if (valueInfo.TelegramListedGiftCount >= 18)
             {
@@ -560,15 +696,23 @@ namespace Telegram.Views.Stars.Popups
         {
             if (e.ClickedItem is GiftForResale gift)
             {
-                Hide(ContentDialogResult.Primary);
-
                 var receivedGift = new ReceivedGift(gift.ReceivedGiftId, null, null, 0, false, false, false, false, false, false, false, 0, new SentGiftUpgraded(gift.Gift), Array.Empty<int>(), 0, 0, false, 0, 0, 0, 0, 0, string.Empty, 0);
 
                 var confirm = await _navigationService.ShowPopupAsync(new ReceivedGiftPopup(_clientService, _navigationService, receivedGift, gift.Gift.OwnerId, _receiverId));
-                if (confirm == ContentDialogResult.Primary && _receiverId == null)
+                if (confirm != ModalPopupResult.Primary)
+                {
+                    return;
+                }
+
+                // A gift bought for someone else is sent, and the list is done with; one bought
+                // for yourself only leaves the list.
+                if (_receiverId != null)
+                {
+                    Hide(ModalPopupResult.Primary);
+                }
+                else
                 {
                     _gifts.Remove(gift);
-                    await this.ShowQueuedAsync(XamlRoot);
                 }
             }
         }
@@ -594,7 +738,60 @@ namespace Telegram.Views.Stars.Popups
             flyout.CreateFlyoutItem(UpdateOrder, new GiftForResaleOrderPriceChangeDate(), Strings.ResellGiftFilterSortDate, Icons.CalendarArrowUp);
             flyout.CreateFlyoutItem(UpdateOrder, new GiftForResaleOrderNumber(), Strings.ResellGiftFilterSortNumber, Icons.NumberSymbolArrowUp);
 
+            if (_currencies.IsGramsAvailable || _currencies.IsStarsAvailable || _currencies.IsFragmentAvailable)
+            {
+                flyout.CreateFlyoutSeparator();
+
+                CreateCurrencyItem(flyout, GiftResaleCurrency.Grams, Strings.GiftResaleFilterForTon);
+                CreateCurrencyItem(flyout, GiftResaleCurrency.Stars, Strings.GiftResaleFilterForStars);
+                CreateCurrencyItem(flyout, GiftResaleCurrency.Fragment, Strings.GiftResaleFilterFromFragment);
+            }
+
             flyout.ShowAt(OrderButton, FlyoutPlacementMode.Bottom);
+        }
+
+        private void CreateCurrencyItem(MenuFlyout flyout, GiftResaleCurrency currency, string text)
+        {
+            if (!_currencies.IsAvailable(currency))
+            {
+                return;
+            }
+
+            var toggle = new ToggleMenuFlyoutItem();
+            toggle.Text = text;
+            toggle.IsChecked = _currencies.IsSelected(currency);
+            toggle.CommandParameter = currency;
+            toggle.Command = new RelayCommand<GiftResaleCurrency>(ToggleCurrency);
+
+            flyout.Items.Add(toggle);
+        }
+
+        private void ToggleCurrency(GiftResaleCurrency currency)
+        {
+            if (_currencies.Toggle(currency))
+            {
+                UpdateItems(_gifts.Order, GetAttributes());
+                UpdateStarsOnly();
+            }
+        }
+
+        private void UpdateStarsOnly()
+        {
+            if (_currencies.CanShowStarsOnly)
+            {
+                StarsOnly.IsChecked = _currencies.IsStarsOnly;
+                StarsOnlyRoot.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                StarsOnlyRoot.Visibility = Visibility.Collapsed;
+            }
+        }
+
+        private void StarsOnly_Click(object sender, RoutedEventArgs e)
+        {
+            _currencies.SetStarsOnly(StarsOnly.IsChecked == true);
+            UpdateItems(_gifts.Order, GetAttributes());
         }
 
         private void UpdateOrder(GiftForResaleOrder order)
@@ -638,7 +835,7 @@ namespace Telegram.Views.Stars.Popups
 
         public void UpdateItems(GiftForResaleOrder order, Vector<UpgradedGiftAttributeId> attributes)
         {
-            _gifts = new ResoldGiftsCollection(_clientService, this, _giftId, order, attributes);
+            _gifts = new ResoldGiftsCollection(_clientService, this, _giftId, order, attributes, _currencies);
             ScrollingHost.ItemsSource = _gifts;
             ShowHideSkeleton();
         }

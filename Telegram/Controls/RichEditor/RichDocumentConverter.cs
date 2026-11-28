@@ -265,8 +265,16 @@ namespace Telegram.Controls.RichEditor
                     result.Add(new RichTextQuote(ToLeaf(x.Text, RichLeafRole.Text, sources), ToLeaf(x.Credit, RichLeafRole.Credit, sources)));
                     break;
                 case PageBlockExpandableBlockQuote x:
-                    result.Add(new RichBlockQuote(new List<RichBlock> { Text(RichBlockKind.Paragraph, x.Text, sources) }, ToLeaf(x.Credit, RichLeafRole.Credit, sources)) { IsCollapsed = true });
-                    break;
+                    {
+                        var children = new List<RichBlock>();
+                        AddBlocks(x.Blocks, children, sources);
+                        EnsureText(children);
+
+                        // TODO: the editor collapses only a quote of one paragraph, so any other
+                        // expandable quote opens expanded and is sent back as a plain one.
+                        result.Add(new RichBlockQuote(children, ToLeaf(x.Credit, RichLeafRole.Credit, sources)) { IsCollapsed = children is [RichParagraphBlock] });
+                        break;
+                    }
                 case PageBlockDetails x:
                     {
                         var children = new List<RichBlock>();
@@ -704,12 +712,17 @@ namespace Telegram.Controls.RichEditor
                         _ => new InputPageBlockParagraph(ToRichText(x.Text))
                     };
                 // A credit is not content on its own, and a details header is not either.
-                case RichBlockQuote { IsCollapsed: true, Children: [RichParagraphBlock text] } x:
-                    return HasText(text.Text) ? new InputPageBlockExpandableBlockQuote(ToRichText(text.Text), ToRichTextOrNull(x.Credit)) : null;
                 case RichBlockQuote x:
                     {
                         var children = ToInputBlocks(x.Children, inputs);
-                        return children.Count == 0 ? null : new InputPageBlockBlockQuote(children, ToRichTextOrNull(x.Credit));
+                        if (children.Count == 0)
+                        {
+                            return null;
+                        }
+
+                        return x.IsCollapsed
+                            ? new InputPageBlockExpandableBlockQuote(children, ToRichTextOrNull(x.Credit))
+                            : new InputPageBlockBlockQuote(children, ToRichTextOrNull(x.Credit));
                     }
                 case RichTextQuote x when !HasText(x.Text):
                     return null;

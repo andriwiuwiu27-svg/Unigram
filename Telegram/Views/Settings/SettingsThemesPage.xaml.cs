@@ -12,6 +12,7 @@ using Telegram.Controls;
 using Telegram.Controls.Cells;
 using Telegram.Controls.Chats;
 using Telegram.Controls.Media;
+using Telegram.Navigation.Services;
 using Telegram.Navigation;
 using Telegram.Services;
 using Telegram.Services.Settings;
@@ -40,7 +41,7 @@ namespace Telegram.Views.Settings
             Title = Strings.ColorThemes;
         }
 
-        protected override void OnNavigatedTo(NavigationEventArgs e)
+        protected override void OnNavigatedTo(NavigatedEventArgs e)
         {
             if (ViewModel.Window.UpdateChatTheme(ActualTheme, null, null, null, null))
             {

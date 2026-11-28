@@ -53,4 +53,6 @@
     <CsWinRTInputs Include="@(TelegramProjectionWinMD)" />
   </ItemGroup>
 
+  <Import Project="Telegram.WinUI.Projection.targets" Condition="'$(TelegramCsWinRT)' == '3'" />
+
 </Project>

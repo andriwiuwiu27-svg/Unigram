@@ -11,6 +11,7 @@ using System.Linq;
 using System.Runtime.InteropServices.WindowsRuntime;
 using System.Threading.Tasks;
 using Telegram.Collections;
+using Telegram.Controls;
 using Telegram.Navigation;
 using Telegram.Navigation.Services;
 using Telegram.Services;
@@ -342,7 +343,7 @@ namespace Telegram.ViewModels.Settings
             if (stickerSet.Name.Equals("tg/recentlyUsed"))
             {
                 var confirm = await ShowPopupAsync(Strings.ClearRecentEmoji, Strings.AppName, Strings.OK, Strings.Cancel);
-                if (confirm != ContentDialogResult.Primary)
+                if (confirm != ModalPopupResult.Primary)
                 {
                     return;
                 }

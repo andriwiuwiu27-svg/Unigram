@@ -3,18 +3,100 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
                     xmlns:controls="using:Telegram.Controls"
+                    xmlns:messages="using:Telegram.Controls.Messages"
                     xmlns:local="using:Telegram.Controls.Messages.Content"
                     mc:Ignorable="d">
 
+    <Style x:Key="ContactContentButtonStyle"
+           TargetType="Button">
+        <Setter Property="Background"
+                Value="{ThemeResource MessageHeaderBorderBrush}" />
+        <Setter Property="Padding"
+                Value="8,0,8,0" />
+        <Setter Property="HorizontalAlignment"
+                Value="Stretch" />
+        <Setter Property="VerticalAlignment"
+                Value="Stretch" />
+        <Setter Property="HorizontalContentAlignment"
+                Value="Center" />
+        <Setter Property="VerticalContentAlignment"
+                Value="Center" />
+        <Setter Property="UseSystemFocusVisuals"
+                Value="True" />
+        <Setter Property="FocusVisualMargin"
+                Value="-3" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Grid Background="Transparent">
+                        <VisualStateManager.VisualStateGroups>
+                            <VisualStateGroup x:Name="CommonStates">
+                                <VisualState x:Name="Normal" />
+                                <VisualState x:Name="PointerOver">
+                                    <VisualState.Setters>
+                                        <Setter Target="Overlay.Opacity"
+                                                Value="0.1" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Pressed">
+                                    <VisualState.Setters>
+                                        <Setter Target="Overlay.Opacity"
+                                                Value="0.15" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Disabled" />
+                            </VisualStateGroup>
+                        </VisualStateManager.VisualStateGroups>
+                        <Border x:Name="Overlay"
+                                Background="{TemplateBinding Background}"
+                                Opacity="0" />
+                        <ContentPresenter Content="{TemplateBinding Content}"
+                                          ContentTemplate="{TemplateBinding ContentTemplate}"
+                                          Padding="{TemplateBinding Padding}"
+                                          HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                                          AutomationProperties.AccessibilityView="Raw" />
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <Style TargetType="local:ContactContent">
+        <Setter Property="HeaderBrush"
+                Value="{ThemeResource MessageHeaderForegroundBrush}" />
+        <Setter Property="BorderBrush"
+                Value="{ThemeResource MessageHeaderBorderBrush}" />
+        <Setter Property="Background"
+                Value="{ThemeResource MessageHeaderBorderBrush}" />
         <Setter Property="MinWidth"
                 Value="220" />
+        <Setter Property="Margin"
+                Value="0,0,0,4" />
         <Setter Property="IsTabStop"
-                Value="False" />
+                Value="True" />
+        <Setter Property="CornerRadius"
+                Value="4" />
+        <Setter Property="UseSystemFocusVisuals"
+                Value="True" />
+        <Setter Property="AutomationProperties.AutomationId"
+                Value="Button" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="local:ContactContent">
-                    <Grid>
+                    <Grid CornerRadius="4">
+                        <VisualStateManager.VisualStateGroups>
+                            <VisualStateGroup x:Name="CommonStates">
+                                <VisualState x:Name="Normal" />
+                                <VisualState x:Name="PointerOver" />
+                                <VisualState x:Name="Pressed">
+                                    <VisualState.Setters>
+                                        <Setter Target="BackgroundOverlay.Opacity"
+                                                Value="0.15" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                            </VisualStateGroup>
+                        </VisualStateManager.VisualStateGroups>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition />
@@ -23,39 +105,94 @@
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
-                        <HyperlinkButton x:Name="PhotoRoot"
-                                         Style="{StaticResource EmptyHyperlinkButtonStyle}"
-                                         Width="48"
-                                         Height="48">
+                        <Rectangle x:Name="BackgroundOverlay"
+                                   Fill="{TemplateBinding Background}"
+                                   Opacity="0.1"
+                                   Grid.ColumnSpan="2"
+                                   Grid.RowSpan="2" />
+                        <Rectangle Fill="{TemplateBinding BorderBrush}"
+                                   HorizontalAlignment="Left"
+                                   Width="3"
+                                   Grid.RowSpan="2" />
+                        <controls:DashPath x:Name="AccentDash"
+                                           Grid.RowSpan="2" />
+
+                        <messages:MessageReplyPattern x:Name="Pattern"
+                                                      x:Load="False"
+                                                      HorizontalAlignment="Right"
+                                                      VerticalAlignment="Stretch"
+                                                      BorderBrush="{TemplateBinding Background}"
+                                                      IsTabStop="False"
+                                                      Margin="0,-3,7,0"
+                                                      Grid.Column="1"
+                                                      Grid.RowSpan="2" />
+
+                        <Grid Padding="8,8,8,8"
+                              Grid.Column="1">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition />
+                            </Grid.ColumnDefinitions>
                             <controls:ProfilePicture x:Name="Photo"
-                                                     Size="48" />
-                        </HyperlinkButton>
+                                                     Size="44" />
 
-                        <StackPanel Margin="8,0,0,2"
-                                    VerticalAlignment="Center"
+                            <StackPanel Margin="8,0,0,0"
+                                        VerticalAlignment="Center"
+                                        Grid.Column="1">
+                                <TextBlock x:Name="Title"
+                                           Foreground="{TemplateBinding HeaderBrush}"
+                                           TextWrapping="NoWrap"
+                                           TextTrimming="CharacterEllipsis"
+                                           Style="{StaticResource BaseTextBlockStyle}" />
+                                <TextBlock x:Name="Subtitle"
+                                           Foreground="{ThemeResource MessageForegroundBrush}"
+                                           TextWrapping="NoWrap"
+                                           TextTrimming="CharacterEllipsis"
+                                           Style="{StaticResource CaptionTextBlockStyle}"
+                                           Typography.NumeralAlignment="Tabular" />
+                            </StackPanel>
+                        </Grid>
+
+                        <Grid x:Name="ButtonLine"
+                              Height="32"
+                              Grid.Column="1"
+                              Grid.Row="1">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition />
+                                <ColumnDefinition />
+                            </Grid.ColumnDefinitions>
+                            <Rectangle VerticalAlignment="Top"
+                                       Fill="{TemplateBinding Background}"
+                                       Height="1"
+                                       Opacity="0.2"
+                                       Margin="8,0,8,0"
+                                       Grid.ColumnSpan="2" />
+
+                            <Button x:Name="Primary"
+                                    Background="{TemplateBinding Background}"
+                                    Style="{StaticResource ContactContentButtonStyle}"
+                                    Grid.ColumnSpan="2">
+                                <TextBlock x:Name="PrimaryText"
+                                           Foreground="{TemplateBinding HeaderBrush}"
+                                           FontFamily="{StaticResource EmojiThemeFontFamilyWithSymbols}"
+                                           FontWeight="SemiBold"
+                                           FontSize="12"
+                                           TextTrimming="CharacterEllipsis" />
+                            </Button>
+
+                            <Button x:Name="Secondary"
+                                    Background="{TemplateBinding Background}"
+                                    Style="{StaticResource ContactContentButtonStyle}"
+                                    Visibility="Collapsed"
                                     Grid.Column="1">
-                            <TextBlock x:Name="Title"
-                                       Foreground="{ThemeResource MessageForegroundBrush}"
-                                       TextWrapping="NoWrap"
-                                       TextTrimming="CharacterEllipsis"
-                                       Style="{StaticResource BaseTextBlockStyle}" />
-                            <TextBlock x:Name="Subtitle"
-                                       Foreground="{ThemeResource MessageSubtleLabelBrush}"
-                                       TextWrapping="NoWrap"
-                                       TextTrimming="CharacterEllipsis"
-                                       Style="{StaticResource CaptionTextBlockStyle}"
-                                       Typography.NumeralAlignment="Tabular" />
-                        </StackPanel>
-
-                        <Button x:Name="Button"
-                                Margin="0,6,0,6"
-                                Style="{StaticResource InstantViewButtonStyle}"
-                                Grid.Row="1"
-                                Grid.ColumnSpan="2">
-                            <TextBlock Text="{CustomResource ViewDetails}"
-                                       FontWeight="SemiBold"
-                                       Style="{StaticResource CaptionTextBlockStyle}" />
-                        </Button>
+                                <TextBlock Text="{CustomResource SharedContactAdd}"
+                                           Foreground="{TemplateBinding HeaderBrush}"
+                                           FontFamily="{StaticResource EmojiThemeFontFamilyWithSymbols}"
+                                           FontWeight="SemiBold"
+                                           FontSize="12"
+                                           TextTrimming="CharacterEllipsis" />
+                            </Button>
+                        </Grid>
                     </Grid>
                 </ControlTemplate>
             </Setter.Value>

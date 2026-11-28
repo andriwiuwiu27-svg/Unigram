@@ -7,6 +7,7 @@
 
 using System.Threading.Tasks;
 using Telegram.Common;
+using Telegram.Controls;
 using Telegram.Navigation;
 using Telegram.Navigation.Services;
 using Telegram.Services;
@@ -113,7 +114,7 @@ namespace Telegram.ViewModels.Authorization
         public async void Reset()
         {
             var confirm = await ShowPopupAsync(Strings.ResetMyAccountWarningText, Strings.ResetMyAccountWarning, Strings.ResetMyAccountWarningReset, Strings.Cancel);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 IsLoading = true;
 

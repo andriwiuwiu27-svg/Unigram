@@ -25,6 +25,14 @@ namespace Telegram.Services.Settings
             set => AddOrUpdateValue(ref _messageDust, "MessageDust", (int)value);
         }
 
+        // Read when a call starts.
+        private int? _callIndicator;
+        public CallIndicatorStyle CallIndicator
+        {
+            get => (CallIndicatorStyle)(_callIndicator ??= GetValueOrDefault("CallIndicator", (int)CallIndicatorStyle.LayeredLens));
+            set => AddOrUpdateValue(ref _callIndicator, "CallIndicator", (int)value);
+        }
+
         private int? _nativeTextInput;
         public NativeTextInputMode NativeTextInput
         {
@@ -267,6 +275,13 @@ namespace Telegram.Services.Settings
         {
             get => _connectedAnimationsDebug ??= GetValueOrDefault("ConnectedAnimationsDebug", false);
             set => AddOrUpdateValue(ref _connectedAnimationsDebug, "ConnectedAnimationsDebug", value);
+        }
+
+        private bool? _parkChatPageDebug;
+        public bool ParkChatPageDebug
+        {
+            get => _parkChatPageDebug ??= GetValueOrDefault("ParkChatPageDebug", true);
+            set => AddOrUpdateValue(ref _parkChatPageDebug, "ParkChatPageDebug", value);
         }
 
         public bool IsLastErrorDiskFull { get; set; }

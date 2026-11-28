@@ -156,7 +156,7 @@ namespace Telegram.ViewModels.Users
             var parameters = new AffiliateProgramParameters(commission, monthCount);
 
             var confirm = await ShowPopupAsync(new UserAffiliatePopup(_cached == null, parameters));
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 var response = await ClientService.SendAsync(new SetChatAffiliateProgram(_userId, parameters));
                 if (response is Ok)
@@ -177,7 +177,7 @@ namespace Telegram.ViewModels.Users
             var message = Strings.AffiliateProgramStopText + "\n\n• " + Strings.AffiliateProgramStopText1 + "\n• " + Strings.AffiliateProgramStopText2 + "\n• " + Strings.AffiliateProgramStopText3;
 
             var confirm = await ShowPopupAsync(message, Strings.AffiliateProgramAlert, Strings.AffiliateProgramStopButton, Strings.Cancel, destructive: true);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 var response = await ClientService.SendAsync(new SetChatAffiliateProgram(_userId, null));
                 if (response is Ok)

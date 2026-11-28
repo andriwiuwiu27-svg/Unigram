@@ -143,7 +143,6 @@ namespace Telegram.Controls.Messages.Content
         protected override void OnApplyTemplate()
         {
             AccentDash = GetTemplateChild(nameof(AccentDash)) as DashPath;
-            Pattern = GetTemplateChild(nameof(Pattern)) as MessageReplyPattern;
             Label = GetTemplateChild(nameof(Label)) as Grid;
             OverflowArea = GetTemplateChild(nameof(OverflowArea)) as RichTextBlockOverflow;
             TitleLabel = GetTemplateChild(nameof(TitleLabel)) as TextBlock;
@@ -272,19 +271,27 @@ namespace Telegram.Controls.Messages.Content
 
             if (giftColors != null)
             {
-                Pattern.Source = new CustomEmojiFileSource(message.ClientService, giftColors.SymbolCustomEmojiId);
-                Pattern.Model = new CustomEmojiFileSource(message.ClientService, giftColors.ModelCustomEmojiId);
-            }
-            else if (customEmojiId != 0)
-            {
-                Pattern.Source = new CustomEmojiFileSource(message.ClientService, customEmojiId);
-                Pattern.Model = null;
+                SetPattern(message.ClientService, giftColors.SymbolCustomEmojiId, giftColors.ModelCustomEmojiId);
             }
             else
             {
-                Pattern.Source = null;
-                Pattern.Model = null;
+                SetPattern(message.ClientService, customEmojiId, 0);
             }
+        }
+
+        private void SetPattern(IClientService clientService, long source, long model)
+        {
+            if (Pattern == null)
+            {
+                if (!_templateApplied || (source == 0 && model == 0))
+                {
+                    return;
+                }
+
+                Pattern = GetTemplateChild(nameof(Pattern)) as MessageReplyPattern;
+            }
+
+            Pattern.Update(clientService, source, model);
         }
 
         private void UpdateContent(MessageViewModel message, LinkPreview linkPreview, bool small)
@@ -531,18 +538,13 @@ namespace Telegram.Controls.Messages.Content
 
         public void UpdateMockup(IClientService clientService, long customEmojiId, int color, UpgradedGiftColors upgradedGift)
         {
-            if (Pattern != null)
+            if (upgradedGift != null)
             {
-                if (upgradedGift != null)
-                {
-                    Pattern.Source = new CustomEmojiFileSource(clientService, upgradedGift.SymbolCustomEmojiId);
-                    Pattern.Model = new CustomEmojiFileSource(clientService, upgradedGift.ModelCustomEmojiId);
-                }
-                else
-                {
-                    Pattern.Source = new CustomEmojiFileSource(clientService, customEmojiId);
-                    Pattern.Model = null;
-                }
+                SetPattern(clientService, upgradedGift.SymbolCustomEmojiId, upgradedGift.ModelCustomEmojiId);
+            }
+            else
+            {
+                SetPattern(clientService, customEmojiId, 0);
             }
 
             if (upgradedGift != null)
@@ -705,6 +707,10 @@ namespace Telegram.Controls.Messages.Content
             else if (linkPreview.Type is LinkPreviewTypeChannelBoost or LinkPreviewTypeSupergroupBoost)
             {
                 ShowButton(Strings.BoostLinkButton);
+            }
+            else if (linkPreview.Type is LinkPreviewTypeBotInvite)
+            {
+                ShowButton(Strings.BotInviteToBot);
             }
             else if (linkPreview.Type is LinkPreviewTypeStickerSet stickerSet)
             {

@@ -19,7 +19,7 @@ using Windows.UI.Xaml.Controls;
 
 namespace Telegram.Views.Chats.Popups
 {
-    public sealed partial class ChatBoostFeaturesPopup : ContentPopup
+    public sealed partial class ChatBoostFeaturesPopup : ModalPopup
     {
         private readonly bool _channel;
         private readonly IClientService _clientService;
@@ -76,6 +76,7 @@ namespace Telegram.Views.Chats.Popups
                     ChatBoostFeature.BackgroundCustomEmoji => Strings.BoostingEnableLinkIcon,
                     ChatBoostFeature.ProfileBackgroundCustomEmoji => Strings.BoostingEnableProfileIcon,
                     ChatBoostFeature.AutoTranslate => Strings.UnlockBoostChannelAutotranslation,
+                    ChatBoostFeature.Stories => status.Level == 0 ? Strings.BoostingEnableStories : Strings.BoostingIncreaseLevel,
                     _ => _channel ? Strings.BoostChannel : Strings.BoostGroup
                 };
 
@@ -88,8 +89,11 @@ namespace Telegram.Views.Chats.Popups
                     ChatBoostFeature.CustomBackground => _channel ? Strings.ChannelNeedBoostsForCustomWallpaperDescription : Strings.GroupNeedBoostsForCustomWallpaperDescription,
                     ChatBoostFeature.BackgroundCustomEmoji => _channel ? Strings.ChannelNeedBoostsForReplyIconDescription : Strings.GroupNeedBoostsForReplyIconDescription,
                     ChatBoostFeature.ProfileBackgroundCustomEmoji => _channel ? Strings.ChannelNeedBoostsForProfileIconDescription : Strings.GroupNeedBoostsForProfileIconDescription,
+                    ChatBoostFeature.CustomEmojiStickerSet => Strings.GroupNeedBoostsForCustomEmojiPackDescription,
                     ChatBoostFeature.DisableSponsoredMessages => _channel ? Strings.ChannelNeedBoostsForSwitchOffAdsDescription : Strings.ChannelNeedBoostsForSwitchOffAdsDescription,
                     ChatBoostFeature.AutoTranslate => Strings.ChannelNeedBoostsForAutotranslationDescription,
+                    ChatBoostFeature.Stories when status.Level == 0 => _channel ? Strings.ChannelNeedBoostsDescription : Strings.GroupNeedBoostsDescription,
+                    ChatBoostFeature.Stories => _channel ? Strings.ChannelNeedBoostsDescriptionNextLevel : Strings.GroupNeedBoostsDescriptionNextLevel,
                     _ => _channel ? Strings.ChannelNeedBoostsDescriptionForNewFeatures : Strings.GroupNeedBoostsDescriptionForNewFeatures
                 };
 
@@ -101,6 +105,14 @@ namespace Telegram.Views.Chats.Popups
                     {
                         description = string.Format("{0} {1}", description, Strings.BoostingPremiumUserCanBoostGroupWithLink);
                     }
+                }
+                else if (feature == ChatBoostFeature.Stories)
+                {
+                    // Enabling stories counts every boost the first level needs; a later level
+                    // counts only the ones still missing.
+                    description = status.Level == 0
+                        ? string.Format(description, Locale.Declension(Strings.R.MoreBoosts, status.NextLevelBoostCount))
+                        : string.Format(description, Locale.Declension(Strings.R.MoreBoosts, status.NextLevelBoostCount - status.BoostCount), Locale.Declension(Strings.R.BoostStories, status.Level + 1));
                 }
                 else
                 {
@@ -144,7 +156,7 @@ namespace Telegram.Views.Chats.Popups
             Opened += OnOpened;
         }
 
-        private void OnOpened(ContentDialog sender, ContentDialogOpenedEventArgs args)
+        private void OnOpened(ModalPopup sender, ModalPopupOpenedEventArgs args)
         {
             Progress.Animate(_status.BoostCount);
         }
@@ -169,7 +181,7 @@ namespace Telegram.Views.Chats.Popups
         private bool _submitted;
         private bool _completed;
 
-        private async void ContentDialog_PrimaryButtonClick(ContentDialog sender, ContentDialogButtonClickEventArgs args)
+        private async void OnPrimaryButtonClick(ModalPopup sender, ModalPopupButtonClickEventArgs args)
         {
             args.Cancel = !_completed;
 
@@ -222,7 +234,7 @@ namespace Telegram.Views.Chats.Popups
                         : string.Format(Strings.BoostingGetMoreBoostByGifting, _chat.Title);
 
                     var confirm = await MessagePopup.ShowNestedAsync(XamlRoot, message, Strings.BoostingMoreBoostsNeeded, Strings.GiftPremium, Strings.Close);
-                    if (confirm == ContentDialogResult.Primary)
+                    if (confirm == ModalPopupResult.Primary)
                     {
                         _completed = true;
                         Hide();
@@ -232,7 +244,7 @@ namespace Telegram.Views.Chats.Popups
             else
             {
                 var confirm = await MessagePopup.ShowNestedAsync(XamlRoot, _channel ? Strings.PremiumNeededForBoosting : Strings.PremiumNeededForBoostingGroup, Strings.PremiumNeeded, Strings.CheckPhoneNumberYes, Strings.Cancel);
-                if (confirm == ContentDialogResult.Primary)
+                if (confirm == ModalPopupResult.Primary)
                 {
                     _completed = true;
                     Hide();

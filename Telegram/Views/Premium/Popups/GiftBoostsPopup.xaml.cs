@@ -20,7 +20,7 @@ using Windows.UI.Xaml.Media;
 
 namespace Telegram.Views.Premium.Popups
 {
-    public sealed partial class GiftBoostsPopup : ContentPopup
+    public sealed partial class GiftBoostsPopup : ModalPopup
     {
         private readonly IClientService _clientService;
         private readonly INavigationService _navigationService;

@@ -8,6 +8,7 @@
 using System;
 using System.Threading.Tasks;
 using Telegram.Common;
+using Telegram.Controls;
 using Telegram.Navigation.Services;
 using Telegram.Views.Settings.Popups;
 using Telegram.Views.Wallet.Popups;
@@ -93,7 +94,7 @@ namespace Telegram.Services.Wallet
             var popup = new SettingsPasscodeConfirmPopup();
 
             var confirm = await navigation.ShowPopupAsync(popup);
-            return confirm == ContentDialogResult.Primary ? popup.Passcode : null;
+            return confirm == ModalPopupResult.Primary ? popup.Passcode : null;
         }
 
         private async Task<string> SetPasscodeAsync(INavigationService navigation)
@@ -104,7 +105,7 @@ namespace Telegram.Services.Wallet
             };
 
             var confirm = await navigation.ShowPopupAsync(popup);
-            if (confirm != ContentDialogResult.Primary)
+            if (confirm != ModalPopupResult.Primary)
             {
                 return null;
             }

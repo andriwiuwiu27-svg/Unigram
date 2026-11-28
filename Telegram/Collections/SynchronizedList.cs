@@ -17,6 +17,8 @@ namespace Telegram.Collections
 {
     public interface ISynchronizedList
     {
+        bool IsResetting { get; }
+
         void Disconnect();
     }
 
@@ -51,6 +53,12 @@ namespace Telegram.Collections
         /// Raised when what was captured will never be used.
         /// </summary>
         void Discard();
+
+        /// <summary>
+        /// Raised once a reset has returned from the panel, for whatever the recycling it caused
+        /// held back while <see cref="RangeObservableCollection{T}.IsResetting"/> was true.
+        /// </summary>
+        void ResetCompleted();
     }
 
     /// <summary>
@@ -92,6 +100,15 @@ namespace Telegram.Collections
         private bool _reverse;
         private bool _armed;
         private bool _flushing;
+
+        // This is what the chat history is bound to, so a reset raised here is dispatched into the
+        // panel rather than into another collection.
+        protected override bool TracksResetReentrancy => true;
+
+        protected override void OnResetCompleted()
+        {
+            _delegate?.ResetCompleted();
+        }
 
         /// <summary>
         /// Without one, or with <see cref="ISynchronizedListDelegate{T}.Capturing"/> refusing every

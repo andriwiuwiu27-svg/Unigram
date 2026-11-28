@@ -14,7 +14,7 @@ using Windows.UI.Xaml.Controls;
 
 namespace Telegram.Views.Popups
 {
-    public sealed partial class ChooseSoundPopup : ContentPopup
+    public sealed partial class ChooseSoundPopup : ModalPopup
     {
         public ChooseSoundViewModel ViewModel => DataContext as ChooseSoundViewModel;
 
@@ -32,7 +32,7 @@ namespace Telegram.Views.Popups
 
         private readonly TaskCompletionSource<object> _completion;
 
-        private void ContentDialog_PrimaryButtonClick(ContentDialog sender, ContentDialogButtonClickEventArgs args)
+        private void OnPrimaryButtonClick(ModalPopup sender, ModalPopupButtonClickEventArgs args)
         {
             if (SoundDefault.IsChecked == true)
             {

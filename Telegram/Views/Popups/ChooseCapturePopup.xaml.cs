@@ -19,7 +19,7 @@ using Windows.UI.Xaml.Controls.Primitives;
 
 namespace Telegram.Views.Popups
 {
-    public sealed partial class ChooseCapturePopup : ContentPopup
+    public sealed partial class ChooseCapturePopup : ModalPopup
     {
         private readonly DiffObservableCollection<CaptureSessionItem> _items;
         private readonly ThumbnailQueue _thumbnails = new();
@@ -46,7 +46,7 @@ namespace Telegram.Views.Popups
         }
 
         // The stills are released with the popup rather than whenever it is collected.
-        private void OnClosed(ContentDialog sender, ContentDialogClosedEventArgs args)
+        private void OnClosed(ModalPopup sender, ModalPopupClosedEventArgs args)
         {
             Loaded -= OnLoaded;
             Closed -= OnClosed;
@@ -171,12 +171,12 @@ namespace Telegram.Views.Popups
             SelectedItem = ScrollingHost.SelectedItem as CaptureSessionItem;
             IsAudioCaptureEnabled = ShareSystemAudio.IsChecked == true;
 
-            Hide(ContentDialogResult.Primary);
+            Hide(ModalPopupResult.Primary);
         }
 
         private void Cancel_Click(object sender, RoutedEventArgs e)
         {
-            Hide(ContentDialogResult.Secondary);
+            Hide(ModalPopupResult.Secondary);
         }
     }
 }

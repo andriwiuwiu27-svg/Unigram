@@ -399,14 +399,82 @@ namespace Telegram.Collections
         //}
 
         /// <summary>
+        /// True where an items host is bound to this collection, so a reset it raises is dispatched
+        /// straight into a virtualizing panel.
+        /// </summary>
+        protected virtual bool TracksResetReentrancy => false;
+
+        private int _resetDepth;
+
+        /// <summary>
+        /// True while a reset this collection raised has not yet returned from the panel bound to it.
+        /// </summary>
+        /// <remarks>
+        /// ModernCollectionBasePanel handles a reset inside a cache session (CacheStrongRefs) that
+        /// carries no nesting count, so a re-entrant call into any of the fourteen entry points that
+        /// open one - a synchronous measure, ScrollIntoView, another collection change - closes the
+        /// session the reset is still inside. The pinned container walk that follows the recycling
+        /// then dereferences the host that was just released, which is a fail-fast rather than an
+        /// exception, because the AV escapes a P/Invoke. A contended managed lock on the UI thread
+        /// is enough to get there: it waits through CoWaitForMultipleHandles, which runs a whole XAML
+        /// tick. Whatever the recycling would do that can wait goes to <see cref="OnResetCompleted"/>
+        /// instead.
+        ///
+        /// Counted per collection, not per thread: on WinUI every window shares one thread, and a
+        /// reset in one chat says nothing about the panel of another.
+        /// </remarks>
+        public bool IsResetting => _resetDepth > 0;
+
+        /// <summary>
+        /// Called once the outermost reset has returned from the panel.
+        /// </summary>
+        protected virtual void OnResetCompleted()
+        {
+        }
+
+        /// <summary>
         /// Raises the CollectionChanged event with the provided event data.
         /// </summary>
         /// <param name="e">The event data to report in the event.</param>
         protected override void OnCollectionChanged(NotifyCollectionChangedEventArgs e)
         {
-            if (!EventsAreSuppressed)
+            if (EventsAreSuppressed)
+            {
+                return;
+            }
+
+            if (e.Action != NotifyCollectionChangedAction.Reset || !TracksResetReentrancy)
             {
                 base.OnCollectionChanged(e);
+                return;
+            }
+
+            if (_resetDepth > 0)
+            {
+                Logger.Error($"Nested reset, depth {_resetDepth + 1}");
+            }
+
+            _resetDepth++;
+
+            try
+            {
+                base.OnCollectionChanged(e);
+            }
+            finally
+            {
+                if (--_resetDepth == 0)
+                {
+                    // This runs in the reset's finally, where a throw would replace whatever the
+                    // reset itself was unwinding with.
+                    try
+                    {
+                        OnResetCompleted();
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Error(ex.ToString());
+                    }
+                }
             }
         }
 

@@ -1045,6 +1045,10 @@ static class _UniFFILib {
     
     
     
+    
+    
+    
+    
 
     static _UniFFILib() {
         _UniFFILib.uniffiCheckContractApiVersion();
@@ -2207,6 +2211,17 @@ static class _UniFFILib {
     [DllImport("wallet_engine", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
+     RustBuffer uniffi_wallet_engine_fn_func_decode_ton_connect_sign_data_cell(RustBuffer @schema,RustBuffer @cell,sbyte @testnet,ref UniffiRustCallStatus _uniffi_out_err
+    );
+
+    #if NET8_0_OR_GREATER
+    [LibraryImport("wallet_engine")]
+    [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
+    public static partial
+#else
+    [DllImport("wallet_engine", CallingConvention = CallingConvention.Cdecl)]
+    public static extern
+#endif
      RustBuffer uniffi_wallet_engine_fn_func_convert_ton_address(RustBuffer @value,RustBuffer @format,ref UniffiRustCallStatus _uniffi_out_err
     );
 
@@ -2263,6 +2278,17 @@ static class _UniFFILib {
     public static extern
 #endif
      RustBuffer uniffi_wallet_engine_fn_func_rotation_mnemonic_public_key(RustBuffer @phrase,ref UniffiRustCallStatus _uniffi_out_err
+    );
+
+    #if NET8_0_OR_GREATER
+    [LibraryImport("wallet_engine")]
+    [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
+    public static partial
+#else
+    [DllImport("wallet_engine", CallingConvention = CallingConvention.Cdecl)]
+    public static extern
+#endif
+     RustBuffer uniffi_wallet_engine_fn_func_build_contract_state_init(RustBuffer @code,RustBuffer @data,ref UniffiRustCallStatus _uniffi_out_err
     );
 
     #if NET8_0_OR_GREATER
@@ -2889,6 +2915,17 @@ static class _UniFFILib {
     [DllImport("wallet_engine", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
+     ushort uniffi_wallet_engine_checksum_func_decode_ton_connect_sign_data_cell(
+    );
+
+    #if NET8_0_OR_GREATER
+    [LibraryImport("wallet_engine")]
+    [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
+    public static partial
+#else
+    [DllImport("wallet_engine", CallingConvention = CallingConvention.Cdecl)]
+    public static extern
+#endif
      ushort uniffi_wallet_engine_checksum_func_convert_ton_address(
     );
 
@@ -2945,6 +2982,17 @@ static class _UniFFILib {
     public static extern
 #endif
      ushort uniffi_wallet_engine_checksum_func_rotation_mnemonic_public_key(
+    );
+
+    #if NET8_0_OR_GREATER
+    [LibraryImport("wallet_engine")]
+    [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
+    public static partial
+#else
+    [DllImport("wallet_engine", CallingConvention = CallingConvention.Cdecl)]
+    public static extern
+#endif
+     ushort uniffi_wallet_engine_checksum_func_build_contract_state_init(
     );
 
     #if NET8_0_OR_GREATER
@@ -3817,6 +3865,12 @@ static class _UniFFILib {
             }
         }
         {
+            var checksum = _UniFFILib.uniffi_wallet_engine_checksum_func_decode_ton_connect_sign_data_cell();
+            if (checksum != 37375) {
+                throw new UniffiContractChecksumException($"WalletEngine: uniffi bindings expected function `uniffi_wallet_engine_checksum_func_decode_ton_connect_sign_data_cell` checksum `37375`, library returned `{checksum}`");
+            }
+        }
+        {
             var checksum = _UniFFILib.uniffi_wallet_engine_checksum_func_convert_ton_address();
             if (checksum != 28540) {
                 throw new UniffiContractChecksumException($"WalletEngine: uniffi bindings expected function `uniffi_wallet_engine_checksum_func_convert_ton_address` checksum `28540`, library returned `{checksum}`");
@@ -3850,6 +3904,12 @@ static class _UniFFILib {
             var checksum = _UniFFILib.uniffi_wallet_engine_checksum_func_rotation_mnemonic_public_key();
             if (checksum != 40177) {
                 throw new UniffiContractChecksumException($"WalletEngine: uniffi bindings expected function `uniffi_wallet_engine_checksum_func_rotation_mnemonic_public_key` checksum `40177`, library returned `{checksum}`");
+            }
+        }
+        {
+            var checksum = _UniFFILib.uniffi_wallet_engine_checksum_func_build_contract_state_init();
+            if (checksum != 10988) {
+                throw new UniffiContractChecksumException($"WalletEngine: uniffi bindings expected function `uniffi_wallet_engine_checksum_func_build_contract_state_init` checksum `10988`, library returned `{checksum}`");
             }
         }
         {
@@ -3950,8 +4010,8 @@ static class _UniFFILib {
         }
         {
             var checksum = _UniFFILib.uniffi_wallet_engine_checksum_method_walletclient_prepare_transfer();
-            if (checksum != 35005) {
-                throw new UniffiContractChecksumException($"WalletEngine: uniffi bindings expected function `uniffi_wallet_engine_checksum_method_walletclient_prepare_transfer` checksum `35005`, library returned `{checksum}`");
+            if (checksum != 26193) {
+                throw new UniffiContractChecksumException($"WalletEngine: uniffi bindings expected function `uniffi_wallet_engine_checksum_method_walletclient_prepare_transfer` checksum `26193`, library returned `{checksum}`");
             }
         }
         {
@@ -4309,6 +4369,32 @@ static class _UniFFILib {
 
 #pragma warning disable 8625
 
+
+
+
+class FfiConverterUInt8: FfiConverter<byte, byte> {
+    public static FfiConverterUInt8 INSTANCE = new FfiConverterUInt8();
+
+    public override byte Lift(byte value) {
+        return value;
+    }
+
+    public override byte Read(BigEndianStream stream) {
+        return stream.ReadByte();
+    }
+
+    public override byte Lower(byte value) {
+        return value;
+    }
+
+    public override int AllocationSize(byte value) {
+        return 1;
+    }
+
+    public override void Write(byte value, BigEndianStream stream) {
+        stream.WriteByte(value);
+    }
+}
 
 
 
@@ -5477,8 +5563,7 @@ internal interface IWalletClient {
     ///
     /// The client fetches account state and `seqno` once, resolves one
     /// `valid_until`, and unlocks the protected phrase once. Both returned BOCs
-    /// therefore authorize the same transfer and are mutually exclusive
-    /// delivery alternatives. This method does not read or write the send
+    /// share a sequence number and are mutually exclusive delivery alternatives. This method does not read or write the send
     /// journal and does not submit either message.
     /// </summary>
     /// <exception cref="WalletClientException"></exception>
@@ -6178,8 +6263,7 @@ internal class WalletClient : IWalletClient, IDisposable {
     ///
     /// The client fetches account state and `seqno` once, resolves one
     /// `valid_until`, and unlocks the protected phrase once. Both returned BOCs
-    /// therefore authorize the same transfer and are mutually exclusive
-    /// delivery alternatives. This method does not read or write the send
+    /// share a sequence number and are mutually exclusive delivery alternatives. This method does not read or write the send
     /// journal and does not submit either message.
     /// </summary>
     /// <exception cref="WalletClientException"></exception>
@@ -10448,7 +10532,10 @@ class FfiConverterTypePrepareKeyRotationRequest: FfiConverterRustBuffer<PrepareK
 /// A unique identifier chosen by the application for the prepared transfer.
 /// </param>
 /// <param name="Intent">
-/// The immutable messages and expiration policy covered by both signatures.
+/// The normal messages and the expiration policy shared by both forms.
+/// </param>
+/// <param name="GaslessMessages">
+/// Optional alternate messages for internal delivery through the relayer.
 /// </param>
 internal record PrepareTransferRequest (
     /// <summary>
@@ -10456,9 +10543,13 @@ internal record PrepareTransferRequest (
     /// </summary>
     NonEmptyString OperationId, 
     /// <summary>
-    /// The immutable messages and expiration policy covered by both signatures.
+    /// The normal messages and the expiration policy shared by both forms.
     /// </summary>
-    SendIntent Intent
+    SendIntent Intent, 
+    /// <summary>
+    /// Optional alternate messages for internal delivery through the relayer.
+    /// </summary>
+    SendMessage[]? GaslessMessages
 ) {
 }
 
@@ -10468,19 +10559,22 @@ class FfiConverterTypePrepareTransferRequest: FfiConverterRustBuffer<PrepareTran
     public override PrepareTransferRequest Read(BigEndianStream stream) {
         return new PrepareTransferRequest(
             OperationId: FfiConverterTypeNonEmptyString.INSTANCE.Read(stream),
-            Intent: FfiConverterTypeSendIntent.INSTANCE.Read(stream)
+            Intent: FfiConverterTypeSendIntent.INSTANCE.Read(stream),
+            GaslessMessages: FfiConverterOptionalSequenceTypeSendMessage.INSTANCE.Read(stream)
         );
     }
 
     public override int AllocationSize(PrepareTransferRequest value) {
         return 0
             + FfiConverterTypeNonEmptyString.INSTANCE.AllocationSize(value.OperationId)
-            + FfiConverterTypeSendIntent.INSTANCE.AllocationSize(value.Intent);
+            + FfiConverterTypeSendIntent.INSTANCE.AllocationSize(value.Intent)
+            + FfiConverterOptionalSequenceTypeSendMessage.INSTANCE.AllocationSize(value.GaslessMessages);
     }
 
     public override void Write(PrepareTransferRequest value, BigEndianStream stream) {
             FfiConverterTypeNonEmptyString.INSTANCE.Write(value.OperationId, stream);
             FfiConverterTypeSendIntent.INSTANCE.Write(value.Intent, stream);
+            FfiConverterOptionalSequenceTypeSendMessage.INSTANCE.Write(value.GaslessMessages, stream);
     }
 }
 
@@ -12733,6 +12827,63 @@ class FfiConverterTypeTonConnectSessionConfig: FfiConverterRustBuffer<TonConnect
 
 
 /// <summary>
+/// One decoded field of a `signData` cell.
+/// </summary>
+/// <param name="Depth">
+/// Nesting level: 0 for the root's fields; entries after a structure entry
+/// with a greater depth are its sub-fields.
+/// </param>
+/// <param name="Name">
+/// The field name exactly as the schema names it (`_` when unnamed).
+/// </param>
+/// <param name="Value">
+/// The display value; for a structure, its constructor name (empty for `_`).
+/// </param>
+internal record TonConnectSignDataCellField (
+    /// <summary>
+    /// Nesting level: 0 for the root's fields; entries after a structure entry
+    /// with a greater depth are its sub-fields.
+    /// </summary>
+    uint Depth, 
+    /// <summary>
+    /// The field name exactly as the schema names it (`_` when unnamed).
+    /// </summary>
+    string Name, 
+    /// <summary>
+    /// The display value; for a structure, its constructor name (empty for `_`).
+    /// </summary>
+    string Value
+) {
+}
+
+class FfiConverterTypeTonConnectSignDataCellField: FfiConverterRustBuffer<TonConnectSignDataCellField> {
+    public static FfiConverterTypeTonConnectSignDataCellField INSTANCE = new FfiConverterTypeTonConnectSignDataCellField();
+
+    public override TonConnectSignDataCellField Read(BigEndianStream stream) {
+        return new TonConnectSignDataCellField(
+            Depth: FfiConverterUInt32.INSTANCE.Read(stream),
+            Name: FfiConverterString.INSTANCE.Read(stream),
+            Value: FfiConverterString.INSTANCE.Read(stream)
+        );
+    }
+
+    public override int AllocationSize(TonConnectSignDataCellField value) {
+        return 0
+            + FfiConverterUInt32.INSTANCE.AllocationSize(value.Depth)
+            + FfiConverterString.INSTANCE.AllocationSize(value.Name)
+            + FfiConverterString.INSTANCE.AllocationSize(value.Value);
+    }
+
+    public override void Write(TonConnectSignDataCellField value, BigEndianStream stream) {
+            FfiConverterUInt32.INSTANCE.Write(value.Depth, stream);
+            FfiConverterString.INSTANCE.Write(value.Name, stream);
+            FfiConverterString.INSTANCE.Write(value.Value, stream);
+    }
+}
+
+
+
+/// <summary>
 /// A `signData` request already validated against the session's wallet.
 /// </summary>
 /// <param name="Payload">
@@ -14720,6 +14871,11 @@ internal record SendAmount {
     public record All: SendAmount {}
     
     
+    public record ExactWithMode (
+        UnsignedDecimalString Nanograms,
+        byte Mode
+    ) : SendAmount {}
+    
 
     
 }
@@ -14737,6 +14893,11 @@ class FfiConverterTypeSendAmount : FfiConverterRustBuffer<SendAmount>{
             case 2:
                 return new SendAmount.All(
                 );
+            case 3:
+                return new SendAmount.ExactWithMode(
+                    FfiConverterTypeUnsignedDecimalString.INSTANCE.Read(stream),
+                    FfiConverterUInt8.INSTANCE.Read(stream)
+                );
             default:
                 throw new InternalException(String.Format("invalid enum value '{0}' in FfiConverterTypeSendAmount.Read()", value));
         }
@@ -14749,6 +14910,10 @@ class FfiConverterTypeSendAmount : FfiConverterRustBuffer<SendAmount>{
                     + FfiConverterTypeUnsignedDecimalString.INSTANCE.AllocationSize(variant_value.Nanograms);
             case SendAmount.All variant_value:
                 return 4;
+            case SendAmount.ExactWithMode variant_value:
+                return 4
+                    + FfiConverterTypeUnsignedDecimalString.INSTANCE.AllocationSize(variant_value.Nanograms)
+                    + FfiConverterUInt8.INSTANCE.AllocationSize(variant_value.Mode);
             default:
                 throw new InternalException(String.Format("invalid enum value '{0}' in FfiConverterTypeSendAmount.AllocationSize()", value));
         }
@@ -14762,6 +14927,11 @@ class FfiConverterTypeSendAmount : FfiConverterRustBuffer<SendAmount>{
                 break;
             case SendAmount.All variant_value:
                 stream.WriteInt(2);
+                break;
+            case SendAmount.ExactWithMode variant_value:
+                stream.WriteInt(3);
+                FfiConverterTypeUnsignedDecimalString.INSTANCE.Write(variant_value.Nanograms, stream);
+                FfiConverterUInt8.INSTANCE.Write(variant_value.Mode, stream);
                 break;
             default:
                 throw new InternalException(String.Format("invalid enum value '{0}' in FfiConverterTypeSendAmount.Write()", value));
@@ -15878,6 +16048,168 @@ class FfiConverterTypeTonConnectSessionPhase: FfiConverterRustBuffer<TonConnectS
             case TonConnectSessionPhase.Connected: stream.WriteInt(2); break;
             case TonConnectSessionPhase.Disconnected: stream.WriteInt(3); break;
             default: throw new InternalException(String.Format("invalid enum value '{0}' in FfiConverterTypeTonConnectSessionPhase.Write()", value));
+        }
+    }
+}
+
+
+
+
+
+
+
+/// <summary>
+/// The result of decoding a `signData` cell by its TL-B schema.
+/// </summary>
+internal record TonConnectSignDataCellDecoding {
+    
+    /// <summary>
+    /// The cell matches the schema exactly.
+    /// </summary>
+    public record Decoded (
+        TonConnectSignDataCellField[] Fields
+    ) : TonConnectSignDataCellDecoding {}
+    
+    /// <summary>
+    /// The cell cannot be shown by its schema; no field is reported.
+    /// </summary>
+    public record NotDecodable (
+        TonConnectSignDataCellFailure Failure,
+        string Detail
+    ) : TonConnectSignDataCellDecoding {}
+    
+
+    
+}
+
+class FfiConverterTypeTonConnectSignDataCellDecoding : FfiConverterRustBuffer<TonConnectSignDataCellDecoding>{
+    public static FfiConverterRustBuffer<TonConnectSignDataCellDecoding> INSTANCE = new FfiConverterTypeTonConnectSignDataCellDecoding();
+
+    public override TonConnectSignDataCellDecoding Read(BigEndianStream stream) {
+        var value = stream.ReadInt();
+        switch (value) {
+            case 1:
+                return new TonConnectSignDataCellDecoding.Decoded(
+                    FfiConverterSequenceTypeTonConnectSignDataCellField.INSTANCE.Read(stream)
+                );
+            case 2:
+                return new TonConnectSignDataCellDecoding.NotDecodable(
+                    FfiConverterTypeTonConnectSignDataCellFailure.INSTANCE.Read(stream),
+                    FfiConverterString.INSTANCE.Read(stream)
+                );
+            default:
+                throw new InternalException(String.Format("invalid enum value '{0}' in FfiConverterTypeTonConnectSignDataCellDecoding.Read()", value));
+        }
+    }
+
+    public override int AllocationSize(TonConnectSignDataCellDecoding value) {
+        switch (value) {
+            case TonConnectSignDataCellDecoding.Decoded variant_value:
+                return 4
+                    + FfiConverterSequenceTypeTonConnectSignDataCellField.INSTANCE.AllocationSize(variant_value.Fields);
+            case TonConnectSignDataCellDecoding.NotDecodable variant_value:
+                return 4
+                    + FfiConverterTypeTonConnectSignDataCellFailure.INSTANCE.AllocationSize(variant_value.Failure)
+                    + FfiConverterString.INSTANCE.AllocationSize(variant_value.Detail);
+            default:
+                throw new InternalException(String.Format("invalid enum value '{0}' in FfiConverterTypeTonConnectSignDataCellDecoding.AllocationSize()", value));
+        }
+    }
+
+    public override void Write(TonConnectSignDataCellDecoding value, BigEndianStream stream) {
+        switch (value) {
+            case TonConnectSignDataCellDecoding.Decoded variant_value:
+                stream.WriteInt(1);
+                FfiConverterSequenceTypeTonConnectSignDataCellField.INSTANCE.Write(variant_value.Fields, stream);
+                break;
+            case TonConnectSignDataCellDecoding.NotDecodable variant_value:
+                stream.WriteInt(2);
+                FfiConverterTypeTonConnectSignDataCellFailure.INSTANCE.Write(variant_value.Failure, stream);
+                FfiConverterString.INSTANCE.Write(variant_value.Detail, stream);
+                break;
+            default:
+                throw new InternalException(String.Format("invalid enum value '{0}' in FfiConverterTypeTonConnectSignDataCellDecoding.Write()", value));
+        }
+    }
+}
+
+
+
+
+
+
+
+/// <summary>
+/// Why a `signData` cell could not be decoded by its schema.
+/// </summary>
+internal enum TonConnectSignDataCellFailure: int {
+    /// <summary>
+    /// The schema is not valid TL-B text.
+    /// </summary>
+    InvalidSchema,
+    /// <summary>
+    /// The schema uses a construct the decoder does not support.
+    /// </summary>
+    UnsupportedSchema,
+    /// <summary>
+    /// The cell is not a valid one-root `BoC` or contains an exotic cell.
+    /// </summary>
+    InvalidCell,
+    /// <summary>
+    /// No constructor tag of a type matches the cell.
+    /// </summary>
+    TagMismatch,
+    /// <summary>
+    /// A `{ … }` constraint or a `#<`/`#<=` bound does not hold.
+    /// </summary>
+    ConstraintViolated,
+    /// <summary>
+    /// Bits or references remain after the schema is fully read.
+    /// </summary>
+    TrailingData,
+    /// <summary>
+    /// The cell ends before the schema is fully read.
+    /// </summary>
+    TruncatedCell,
+    /// <summary>
+    /// A size, nesting, work, or output bound was exceeded.
+    /// </summary>
+    LimitExceeded
+}
+
+class FfiConverterTypeTonConnectSignDataCellFailure: FfiConverterRustBuffer<TonConnectSignDataCellFailure> {
+    public static FfiConverterTypeTonConnectSignDataCellFailure INSTANCE = new FfiConverterTypeTonConnectSignDataCellFailure();
+
+    public override TonConnectSignDataCellFailure Read(BigEndianStream stream) {
+        var value = stream.ReadInt();
+        switch (value) {
+            case 1: return TonConnectSignDataCellFailure.InvalidSchema;
+            case 2: return TonConnectSignDataCellFailure.UnsupportedSchema;
+            case 3: return TonConnectSignDataCellFailure.InvalidCell;
+            case 4: return TonConnectSignDataCellFailure.TagMismatch;
+            case 5: return TonConnectSignDataCellFailure.ConstraintViolated;
+            case 6: return TonConnectSignDataCellFailure.TrailingData;
+            case 7: return TonConnectSignDataCellFailure.TruncatedCell;
+            case 8: return TonConnectSignDataCellFailure.LimitExceeded;
+            default: throw new InternalException(String.Format("invalid enum value '{0}' in FfiConverterTypeTonConnectSignDataCellFailure.Read()", value));
+        }
+    }
+
+    public override int AllocationSize(TonConnectSignDataCellFailure value) {
+        return 4;
+    }
+
+    public override void Write(TonConnectSignDataCellFailure value, BigEndianStream stream) {
+        switch (value) {
+            case TonConnectSignDataCellFailure.InvalidSchema: stream.WriteInt(1); break;
+            case TonConnectSignDataCellFailure.UnsupportedSchema: stream.WriteInt(2); break;
+            case TonConnectSignDataCellFailure.InvalidCell: stream.WriteInt(3); break;
+            case TonConnectSignDataCellFailure.TagMismatch: stream.WriteInt(4); break;
+            case TonConnectSignDataCellFailure.ConstraintViolated: stream.WriteInt(5); break;
+            case TonConnectSignDataCellFailure.TrailingData: stream.WriteInt(6); break;
+            case TonConnectSignDataCellFailure.TruncatedCell: stream.WriteInt(7); break;
+            case TonConnectSignDataCellFailure.LimitExceeded: stream.WriteInt(8); break;
+            default: throw new InternalException(String.Format("invalid enum value '{0}' in FfiConverterTypeTonConnectSignDataCellFailure.Write()", value));
         }
     }
 }
@@ -18020,6 +18352,37 @@ class FfiConverterOptionalTypePendingReason: FfiConverterRustBuffer<PendingReaso
 
 
 
+class FfiConverterOptionalSequenceTypeSendMessage: FfiConverterRustBuffer<SendMessage[]?> {
+    public static FfiConverterOptionalSequenceTypeSendMessage INSTANCE = new FfiConverterOptionalSequenceTypeSendMessage();
+
+    public override SendMessage[]? Read(BigEndianStream stream) {
+        if (stream.ReadByte() == 0) {
+            return null;
+        }
+        return FfiConverterSequenceTypeSendMessage.INSTANCE.Read(stream);
+    }
+
+    public override int AllocationSize(SendMessage[]? value) {
+        if (value == null) {
+            return 1;
+        } else {
+            return 1 + FfiConverterSequenceTypeSendMessage.INSTANCE.AllocationSize((SendMessage[])value);
+        }
+    }
+
+    public override void Write(SendMessage[]? value, BigEndianStream stream) {
+        if (value == null) {
+            stream.WriteByte(0);
+        } else {
+            stream.WriteByte(1);
+            FfiConverterSequenceTypeSendMessage.INSTANCE.Write((SendMessage[])value, stream);
+        }
+    }
+}
+
+
+
+
 class FfiConverterOptionalTypeBase64Hash: FfiConverterRustBuffer<Base64Hash?> {
     public static FfiConverterOptionalTypeBase64Hash INSTANCE = new FfiConverterOptionalTypeBase64Hash();
 
@@ -18497,6 +18860,52 @@ class FfiConverterSequenceTypeSendMessage: FfiConverterRustBuffer<SendMessage[]>
 
 
 
+class FfiConverterSequenceTypeTonConnectSignDataCellField: FfiConverterRustBuffer<TonConnectSignDataCellField[]> {
+    public static FfiConverterSequenceTypeTonConnectSignDataCellField INSTANCE = new FfiConverterSequenceTypeTonConnectSignDataCellField();
+
+    public override TonConnectSignDataCellField[]  Read(BigEndianStream stream) {
+        var length = stream.ReadInt();
+        if (length == 0) {
+            return [];
+        }
+
+        var result = new TonConnectSignDataCellField[length];
+        var readFn = FfiConverterTypeTonConnectSignDataCellField.INSTANCE.Read;
+        for (int i = 0; i < length; i++) {
+            result[i] = readFn(stream);
+        }
+        return result;
+    }
+
+    public override int AllocationSize(TonConnectSignDataCellField[]  value) {
+        var sizeForLength = 4;
+
+        // details/1-empty-list-as-default-method-parameter.md
+        if (value == null) {
+            return sizeForLength;
+        }
+
+        var allocationSizeFn = FfiConverterTypeTonConnectSignDataCellField.INSTANCE.AllocationSize;
+        var sizeForItems = value.Sum(item => allocationSizeFn(item));
+        return sizeForLength + sizeForItems;
+    }
+
+    public override void Write(TonConnectSignDataCellField[] value, BigEndianStream stream) {
+        // details/1-empty-list-as-default-method-parameter.md
+        if (value == null) {
+            stream.WriteInt(0);
+            return;
+        }
+
+        stream.WriteInt(value.Length);
+        var writerFn = FfiConverterTypeTonConnectSignDataCellField.INSTANCE.Write;
+        value.ForEach(item => writerFn(item, stream));
+    }
+}
+
+
+
+
 class FfiConverterSequenceTypeMnemonicScheme: FfiConverterRustBuffer<MnemonicScheme[]> {
     public static FfiConverterSequenceTypeMnemonicScheme INSTANCE = new FfiConverterSequenceTypeMnemonicScheme();
 
@@ -18961,6 +19370,20 @@ internal static class WalletEngineMethods {
 
 
     /// <summary>
+    /// Decodes a `signData` cell by the last declaration of its TL-B schema.
+    ///
+    /// The cell is the decoded `BoC` from the request. `testnet` selects the
+    /// test-only flag of friendly addresses. No fields are returned on failure.
+    /// </summary>
+    public static TonConnectSignDataCellDecoding DecodeTonConnectSignDataCell(string @schema, byte[] @cell, bool @testnet) {
+        return FfiConverterTypeTonConnectSignDataCellDecoding.INSTANCE.Lift(
+    _UniffiHelpers.RustCall( (ref UniffiRustCallStatus _status) =>
+    _UniFFILib.uniffi_wallet_engine_fn_func_decode_ton_connect_sign_data_cell(FfiConverterString.INSTANCE.Lower(@schema), FfiConverterByteArray.INSTANCE.Lower(@cell), FfiConverterBoolean.INSTANCE.Lower(@testnet), ref _status)
+));
+    }
+
+
+    /// <summary>
     /// Converts a TON address to the requested canonical representation.
     ///
     /// Raw output is lowercase `workchain:64-hex`. User-friendly output is
@@ -19056,6 +19479,14 @@ internal static class WalletEngineMethods {
         return FfiConverterByteArray.INSTANCE.Lift(
     _UniffiHelpers.RustCallWithError(FfiConverterTypeWalletLifecycleError.INSTANCE, (ref UniffiRustCallStatus _status) =>
     _UniFFILib.uniffi_wallet_engine_fn_func_rotation_mnemonic_public_key(FfiConverterString.INSTANCE.Lower(@phrase), ref _status)
+));
+    }
+
+
+    public static Boc? BuildContractStateInit(byte[] @code, byte[] @data) {
+        return FfiConverterOptionalTypeBoc.INSTANCE.Lift(
+    _UniffiHelpers.RustCall( (ref UniffiRustCallStatus _status) =>
+    _UniFFILib.uniffi_wallet_engine_fn_func_build_contract_state_init(FfiConverterByteArray.INSTANCE.Lower(@code), FfiConverterByteArray.INSTANCE.Lower(@data), ref _status)
 ));
     }
 

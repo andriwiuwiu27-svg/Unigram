@@ -5,6 +5,7 @@
 // file LICENSE or copy at https://www.gnu.org/licenses/gpl-3.0.txt)
 //
 
+using System;
 using Telegram.Common;
 using Telegram.Controls;
 using Telegram.Td.Api;
@@ -43,6 +44,22 @@ namespace Telegram.Views.Stars.Popups
         /// yet, so there is no chat to name through ChatId or to record as the purpose.
         /// </summary>
         public string SubscriptionTitle { get; set; }
+
+        /// <summary>
+        /// The names of the chats whose subscriptions run out unless stars are bought. StarCount
+        /// is their whole price, of which the title asks only for what the balance lacks.
+        /// </summary>
+        public string KeptSubscriptionNames { get; set; }
+
+        public static BuyStarsArgs ForKeepSubscription(long starCount, string keptSubscriptionNames, long purposeChatId)
+        {
+            return new BuyStarsArgs
+            {
+                StarCount = starCount,
+                KeptSubscriptionNames = keptSubscriptionNames,
+                PurposeChatId = purposeChatId
+            };
+        }
 
         public static BuyStarsArgs ForSubscription(long starCount, string subscriptionTitle)
         {
@@ -91,7 +108,7 @@ namespace Telegram.Views.Stars.Popups
         }
     }
 
-    public sealed partial class BuyPopup : ContentPopup
+    public sealed partial class BuyPopup : ModalPopup
     {
         public BuyViewModel ViewModel => DataContext as BuyViewModel;
 
@@ -104,7 +121,12 @@ namespace Telegram.Views.Stars.Popups
         {
             if (parameter is BuyStarsArgs args)
             {
-                if (args.SubscriptionTitle != null)
+                if (args.KeptSubscriptionNames != null)
+                {
+                    TitleLabel.Text = Locale.Declension(Strings.R.StarsNeededTitle, Math.Max(args.StarCount - ViewModel.ClientService.OwnedStarCount.StarCount, 0));
+                    TextBlockHelper.SetMarkdown(SubtitleLabel, string.Format(Strings.StarsNeededTextKeepSubscription, args.KeptSubscriptionNames));
+                }
+                else if (args.SubscriptionTitle != null)
                 {
                     TitleLabel.Text = Locale.Declension(Strings.R.StarsNeededTitle, args.StarCount);
                     TextBlockHelper.SetMarkdown(SubtitleLabel, string.Format(Strings.StarsNeededTextBuySubscription, args.SubscriptionTitle));

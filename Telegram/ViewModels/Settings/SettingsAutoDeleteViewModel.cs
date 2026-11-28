@@ -9,6 +9,7 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
 using Telegram.Common;
+using Telegram.Controls;
 using Telegram.Navigation;
 using Telegram.Navigation.Services;
 using Telegram.Services;
@@ -49,7 +50,7 @@ namespace Telegram.ViewModels.Settings
             var popup = new ChatTtlPopup(ChatTtlType.Auto);
             var confirm = await ShowPopupAsync(popup);
 
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 UpdateSelection(popup.Value, true);
             }
@@ -66,7 +67,7 @@ namespace Telegram.ViewModels.Settings
             if (sync && value != 0 && selected?.Value == 0)
             {
                 var confirm = await ShowPopupAsync(string.Format(Strings.AutoDeleteConfirmMessage, Locale.FormatTtl(value)), Strings.MessageLifetime, Strings.AutoDeleteConfirm, Strings.Cancel);
-                if (confirm != ContentDialogResult.Primary)
+                if (confirm != ModalPopupResult.Primary)
                 {
                     return;
                 }

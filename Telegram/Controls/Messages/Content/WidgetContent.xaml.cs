@@ -845,7 +845,7 @@ namespace Telegram.Controls.Messages.Content
             {
                 var navigation = message.Delegate.NavigationService;
                 var confirm = await navigation.ShowPopupAsync(string.Format(Strings.OpenUrlAlert, string.Format("[{0}]({0})", url)), Strings.OpenUrlTitle, Strings.Open, Strings.Cancel);
-                if (confirm == ContentDialogResult.Primary)
+                if (confirm == ModalPopupResult.Primary)
                 {
                     MessageHelper.OpenUrl(message.ClientService, navigation, url);
                 }

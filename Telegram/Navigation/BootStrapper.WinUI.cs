@@ -91,6 +91,8 @@ namespace Telegram.Navigation
             {
                 StartUnpackaged();
             }
+
+            ToastActivator.Ready();
         }
 
         /// <summary>
@@ -121,8 +123,6 @@ namespace Telegram.Navigation
                 Logger.Info("No identity; starting as a plain launch");
                 CallInternalActivated(new PlainActivatedEventArgs(ApplicationExecutionState.NotRunning));
             }
-
-            ToastActivator.Ready();
         }
 
         /// <summary>
@@ -156,11 +156,11 @@ namespace Telegram.Navigation
         protected abstract void OnStartInBackground();
 
         /// <summary>
-        /// A link opened while the app runs, redirected here by the process the shell started for
-        /// it. The same pipeline as a cold start, which copes with the window having been closed
-        /// to the notification area icon.
+        /// A link or a share opened while the app runs, redirected here by the process the shell
+        /// started for it. The same pipeline as a cold start, which copes with the window having
+        /// been closed to the notification area icon.
         /// </summary>
-        public void ActivateFromLink(IProtocolActivatedEventArgs args)
+        public void ActivateRedirected(IActivatedEventArgs args)
         {
             Logger.Info();
             CallInternalActivated(args);
@@ -232,13 +232,26 @@ namespace Telegram.Navigation
 
         private partial WindowContext ResolveWindowContext(IActivatedEventArgs e)
         {
+            // The UWP half does this in OnWindowCreated, which this framework does not have.
+            // Without it every {CustomResource} in the app's markup is a XamlParseException: "No
+            // custom resource loader set", which surfaces as a Frame that reports a successful
+            // navigation and shows nothing - or, for a share that started the process, a fail-fast.
+            //
+            // Ahead of every window kind, since any of them can be the first. Once per process,
+            // not once per window: the second one fails inside the factory, and a failed HR thrown
+            // out of the notification icon's WndProc - which is where a reopen comes from - is a
+            // fail-fast rather than an exception.
+            CustomXamlResourceLoader.Current ??= new XamlResourceLoader();
+
             // A share gets a window of its own, every time. UWP had the system make a separate
             // view for it - handing a share to the main window would replace the user's chat list
             // with the share UI - and two shares are two independent operations, so the second
             // must not land on top of the first.
             if (e is ShareTargetActivatedEventArgs)
             {
-                return CreateWindow("Share");
+                var share = CreateWindow("Share");
+                Program.TrackShare(share);
+                return share;
             }
 
             // Everything else belongs to the main window: a launch, a tg: link, a toast, a file.
@@ -249,16 +262,6 @@ namespace Telegram.Navigation
             {
                 return context;
             }
-
-            // The UWP half does this in OnWindowCreated, which this framework does not have.
-            // Without it every {CustomResource} in the app's markup is a XamlParseException: "No
-            // custom resource loader set", which surfaces as a Frame that reports a successful
-            // navigation and shows nothing.
-            //
-            // Once per process, not once per window. The second one fails inside the factory, and
-            // a failed HR thrown out of the notification icon's WndProc - which is where a reopen
-            // comes from - is a fail-fast rather than an exception.
-            CustomXamlResourceLoader.Current ??= new XamlResourceLoader();
 
             return CreateWindow("Main");
         }

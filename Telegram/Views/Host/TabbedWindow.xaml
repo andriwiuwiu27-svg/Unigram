@@ -11,6 +11,22 @@
                         d:DesignWidth="400">
 
     <Grid>
+        <Grid.Resources>
+            <ResourceDictionary>
+                <ResourceDictionary.ThemeDictionaries>
+                    <ResourceDictionary x:Key="Default">
+                        <!-- LayerFillColorDefault -->
+                        <SolidColorBrush x:Key="TabViewItemHeaderBackgroundSelected"
+                                         Color="#4C3A3A3A" />
+                    </ResourceDictionary>
+                    <ResourceDictionary x:Key="Light">
+                        <!-- LayerFillColorDefault -->
+                        <SolidColorBrush x:Key="TabViewItemHeaderBackgroundSelected"
+                                         Color="#80FFFFFF" />
+                    </ResourceDictionary>
+                </ResourceDictionary.ThemeDictionaries>
+            </ResourceDictionary>
+        </Grid.Resources>
         <!-- On WinUI the style's Hidden placement arrives after TabView's own accelerators enter the tree, which leaves a "Ctrl+F4" tooltip over the whole window. -->
         <muxc:TabView x:Name="Navigation"
                       IsAddTabButtonVisible="False"
@@ -18,20 +34,6 @@
                       HorizontalAlignment="Stretch"
                       VerticalAlignment="Stretch"
                       TabCloseRequested="OnTabCloseRequested">
-            <muxc:TabView.Resources>
-                <ResourceDictionary>
-                    <ResourceDictionary.ThemeDictionaries>
-                        <ResourceDictionary x:Key="Default">
-                            <StaticResource x:Key="TabViewItemHeaderBackgroundSelected"
-                                            ResourceKey="LayerFillColorDefaultBrush" />
-                        </ResourceDictionary>
-                        <ResourceDictionary x:Key="Light">
-                            <StaticResource x:Key="TabViewItemHeaderBackgroundSelected"
-                                            ResourceKey="LayerFillColorDefaultBrush" />
-                        </ResourceDictionary>
-                    </ResourceDictionary.ThemeDictionaries>
-                </ResourceDictionary>
-            </muxc:TabView.Resources>
             <muxc:TabView.TabStripHeader>
                 <Border x:Name="Header"
                         Background="Transparent">

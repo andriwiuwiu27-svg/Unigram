@@ -20,6 +20,7 @@ using Telegram.Services;
 using Windows.Foundation;
 using Windows.UI;
 using Windows.UI.Text;
+using Windows.UI.Xaml.Hosting;
 
 namespace Telegram.Common
 {
@@ -363,7 +364,7 @@ namespace Telegram.Common
         {
             byte[] pixels;
 
-            using (var target = new CanvasRenderTarget(CanvasDevice.GetSharedDevice(), size, size, 96))
+            using (var target = new CanvasRenderTarget(ElementComposition.GetSharedDevice(), size, size, 96))
             {
                 using (var session = target.CreateDrawingSession())
                 using (var format = new CanvasTextFormat())
@@ -547,7 +548,7 @@ namespace Telegram.Common
 
             byte[] pixels;
 
-            using (var target = new CanvasRenderTarget(CanvasDevice.GetSharedDevice(), size, size, 96))
+            using (var target = new CanvasRenderTarget(ElementComposition.GetSharedDevice(), size, size, 96))
             {
                 using (var session = target.CreateDrawingSession())
                 using (var format = new CanvasTextFormat())

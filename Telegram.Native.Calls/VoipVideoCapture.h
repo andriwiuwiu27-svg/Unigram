@@ -3,7 +3,6 @@
 #include "VoipVideoCapture.g.h"
 #include "VoipVideoOutput.h"
 #include "Instance.h"
-#include "InstanceImpl.h"
 #include "VideoCaptureInterface.h"
 
 #include <winrt/Windows.Graphics.Capture.h>

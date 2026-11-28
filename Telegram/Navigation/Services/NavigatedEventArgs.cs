@@ -6,30 +6,21 @@
 //
 
 using System;
-using Windows.UI.Xaml.Controls;
-using Windows.UI.Xaml.Media.Animation;
 using Windows.UI.Xaml.Navigation;
 
 namespace Telegram.Navigation.Services
 {
-    // DOCS: https://github.com/Windows-XAML/Template10/wiki/Docs-%7C-NavigationService
     public partial class NavigatedEventArgs : EventArgs
     {
-        public NavigatedEventArgs() { }
-        public NavigatedEventArgs(NavigationEventArgs e, Page page)
-        {
-            Content = page;
-            SourcePageType = e.SourcePageType;
-            Parameter = e.Parameter;
-            NavigationMode = e.NavigationMode;
-            NavigationTransitionInfo = e.NavigationTransitionInfo;
-        }
-
         public NavigationMode NavigationMode { get; set; }
-        public NavigationTransitionInfo NavigationTransitionInfo { get; set; }
+
+        public PageTransition Transition { get; set; }
+
         public Type SourcePageType { get; set; }
+
         public object Parameter { get; set; }
-        public Page Content { get; set; }
+
+        public NavigationPage Content { get; set; }
 
         public double VerticalOffset { get; set; }
     }

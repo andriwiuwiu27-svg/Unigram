@@ -7,6 +7,7 @@
 
 using Telegram.Common;
 using Telegram.Controls.Media;
+using Telegram.Navigation;
 using Telegram.Views;
 using Windows.ApplicationModel;
 using Windows.UI.Xaml;
@@ -45,8 +46,8 @@ namespace Telegram.Controls
                 }
                 else
                 {
-                    var frame = this.GetParent<Frame>();
-                    frame?.Navigate(typeof(DiagnosticsPage));
+                    var frame = this.GetParent<NavigationFrame>();
+                    frame?.NavigationService?.Navigate(typeof(DiagnosticsPage));
                 }
             }
         }

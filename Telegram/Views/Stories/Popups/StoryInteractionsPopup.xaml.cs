@@ -8,6 +8,7 @@
 using Microsoft.Graphics.Canvas.Geometry;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using Telegram.Common;
 using Telegram.Controls;
 using Telegram.Controls.Cells;
@@ -44,12 +45,18 @@ namespace Telegram.Views.Stories.Popups
         public override void OnNavigatedTo(object parameter)
         {
             var story = ViewModel.Story;
-            if (story?.InteractionInfo != null && story.CanGetInteractions && (story.ClientService.IsPremium || story.InteractionInfo.ReactionCount > 0 || story.InteractionInfo.ViewCount > 0))
+            var premium = story.ClientService.IsPremium;
+
+            // Without Premium, an expired story keeps its reactions and nothing else: with none,
+            // there is no list to show.
+            var limited = story.HasExpiredViewers && !premium;
+
+            if (story.InteractionInfo != null && story.CanGetInteractions && !(limited && story.InteractionInfo.ReactionCount == 0))
             {
                 ViewModel.Items.CollectionChanged += OnCollectionChanged;
+                ViewModel.PropertyChanged += OnPropertyChanged;
 
-                var premium = story.ClientService.IsPremium;
-                var count = story.HasExpiredViewers && !premium
+                var count = limited
                     ? story.InteractionInfo.ReactionCount
                     : story.InteractionInfo.ViewCount;
 
@@ -66,25 +73,29 @@ namespace Telegram.Views.Stories.Popups
 
                 PrimaryButtonText = string.Empty;
 
-                SearchField.Visibility = premium && story.InteractionInfo.ViewCount >= 15
+                var channel = story.Chat?.Type is ChatTypeSupergroup;
+
+                SearchField.Visibility = !limited && !channel && story.InteractionInfo.ViewCount >= 15
                     ? Visibility.Visible
                     : Visibility.Collapsed;
 
-                SortBy.Visibility = premium && story.InteractionInfo.ReactionCount >= 10
+                SortBy.Visibility = !limited && story.InteractionInfo.ReactionCount >= 10
                     ? Visibility.Visible
                     : Visibility.Collapsed;
 
-                if (story.PrivacySettings is not StoryPrivacySettingsEveryone || story.InteractionInfo.ViewCount < 20 || !premium)
+                // Filtering to contacts says nothing when only contacts, close friends or chosen
+                // users can see the story.
+                if (limited || channel || story.PrivacySettings is not StoryPrivacySettingsEveryone || story.InteractionInfo.ViewCount < 20)
                 {
                     Navigation.Visibility = Visibility.Collapsed;
-                    Title = premium
-                        ? Locale.Declension(Strings.R.Views, story.InteractionInfo.ViewCount)
-                        : Locale.Declension(Strings.R.Likes, story.InteractionInfo.ReactionCount);
+                    Title = limited
+                        ? Locale.Declension(Strings.R.Likes, story.InteractionInfo.ReactionCount)
+                        : Locale.Declension(Strings.R.Views, story.InteractionInfo.ViewCount);
 
                     Padding = new Thickness(0, 24, 0, 0);
                     SortBy.Margin = new Thickness(0, -36, 24, 12);
 
-                    ExpiredFooter.Visibility = count < story.InteractionInfo.ViewCount
+                    ExpiredFooter.Visibility = limited && count < story.InteractionInfo.ViewCount
                         ? Visibility.Visible
                         : Visibility.Collapsed;
                 }
@@ -127,6 +138,22 @@ namespace Telegram.Views.Stories.Popups
             }
         }
 
+        public override void OnNavigatedFrom()
+        {
+            ViewModel.Items.CollectionChanged -= OnCollectionChanged;
+            ViewModel.PropertyChanged -= OnPropertyChanged;
+
+            base.OnNavigatedFrom();
+        }
+
+        private void OnPropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(ViewModel.EmptyState))
+            {
+                ShowHideSkeleton();
+            }
+        }
+
         private void OnCollectionChanged(object sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
         {
             ShowHideSkeleton();
@@ -160,11 +187,11 @@ namespace Telegram.Views.Stories.Popups
 
             if (interaction.BlockList is null)
             {
-                flyout.CreateFlyoutItem(ViewModel.HideStories, interaction, string.Format(Strings.StoryHideFrom, user.FirstName), Icons.StoriesOff);
+                flyout.CreateFlyoutItem(HideStories, interaction, string.Format(Strings.StoryHideFrom, user.FirstName), Icons.StoriesOff);
             }
             else if (interaction.BlockList is BlockListStories)
             {
-                flyout.CreateFlyoutItem(ViewModel.ShowStories, interaction, string.Format(Strings.StoryShowTo, user.FirstName), Icons.Stories);
+                flyout.CreateFlyoutItem(ShowStories, interaction, string.Format(Strings.StoryShowTo, user.FirstName), Icons.Stories);
             }
 
             if (user.IsContact)
@@ -177,7 +204,7 @@ namespace Telegram.Views.Stories.Popups
             }
             else if (interaction.BlockList is BlockListMain)
             {
-                flyout.CreateFlyoutItem(ViewModel.UnblockUser, interaction, Strings.Unblock, Icons.HandRight);
+                flyout.CreateFlyoutItem(UnblockUser, interaction, Strings.Unblock, Icons.HandRight);
             }
 
             flyout.ShowAt(sender, args);
@@ -197,6 +224,7 @@ namespace Telegram.Views.Stories.Popups
                 if (args.Item is StoryInteraction interaction)
                 {
                     cell.UpdateStoryViewer(ViewModel.ClientService, args, OnContainerContentChanging);
+                    content.Opacity = IsStoryShownTo(interaction) ? 1 : 0.5;
 
                     var reactionType = interaction.Type is StoryInteractionTypeView view
                         ? view.ChosenReactionType
@@ -234,14 +262,65 @@ namespace Telegram.Views.Stories.Popups
             ViewModel.OpenChat(e.ClickedItem);
         }
 
+        // Whether the viewer can see the story now: one it has since been hidden from, who was
+        // blocked, or who no longer falls within its privacy is dimmed.
+        private bool IsStoryShownTo(StoryInteraction interaction)
+        {
+            if (interaction.BlockList != null)
+            {
+                return false;
+            }
+
+            if (!ViewModel.ClientService.TryGetUser(interaction.ActorId, out User user))
+            {
+                return true;
+            }
+
+            return ViewModel.Story.PrivacySettings switch
+            {
+                StoryPrivacySettingsEveryone everyone => !everyone.ExceptUserIds.Contains(user.Id),
+                StoryPrivacySettingsContacts contacts => user.IsContact && !contacts.ExceptUserIds.Contains(user.Id),
+                StoryPrivacySettingsCloseFriends => user.IsCloseFriend,
+                StoryPrivacySettingsSelectedUsers selected => selected.UserIds.Contains(user.Id),
+                _ => true
+            };
+        }
+
+        private void UpdateShownTo(StoryInteraction interaction)
+        {
+            if (ScrollingHost.ContainerFromItem(interaction) is SelectorItem { ContentTemplateRoot: Grid content })
+            {
+                content.Opacity = IsStoryShownTo(interaction) ? 1 : 0.5;
+            }
+        }
+
+        private void HideStories(StoryInteraction interaction)
+        {
+            ViewModel.HideStories(interaction);
+            UpdateShownTo(interaction);
+        }
+
+        private void ShowStories(StoryInteraction interaction)
+        {
+            ViewModel.ShowStories(interaction);
+            UpdateShownTo(interaction);
+        }
+
+        private void UnblockUser(StoryInteraction interaction)
+        {
+            ViewModel.UnblockUser(interaction);
+            UpdateShownTo(interaction);
+        }
+
         private void DeleteContact(StoryInteraction interaction)
         {
             ViewModel.DeleteContact(interaction, ScrollingHost.ContainerFromItem(interaction));
         }
 
-        private void BlockUser(StoryInteraction interaction)
+        private async void BlockUser(StoryInteraction interaction)
         {
-            ViewModel.BlockUser(interaction, ScrollingHost.ContainerFromItem(interaction));
+            await ViewModel.BlockUser(interaction, ScrollingHost.ContainerFromItem(interaction));
+            UpdateShownTo(interaction);
         }
 
         private void SortBy_ContextRequested(object sender, RoutedEventArgs e)
@@ -266,12 +345,14 @@ namespace Telegram.Views.Stories.Popups
 
         private void ShowHideSkeleton()
         {
-            if (_skeletonCollapsed && ViewModel.Items.Count == 0 && ViewModel.Story != null && ScrollingHost.ItemsPanelRoot != null)
+            var loading = ViewModel.Items.Count == 0 && ViewModel.EmptyState == StoryInteractionsEmptyState.None;
+
+            if (_skeletonCollapsed && loading && ViewModel.Story != null && ScrollingHost.ItemsPanelRoot != null)
             {
                 _skeletonCollapsed = false;
                 ShowSkeleton();
             }
-            else if (_skeletonCollapsed is false && ViewModel.Items.Count > 0 && ScrollingHost.ItemsPanelRoot != null)
+            else if (_skeletonCollapsed is false && !loading && ScrollingHost.ItemsPanelRoot != null)
             {
                 _skeletonCollapsed = true;
                 VisualUtilities.HideSkeleton(ScrollingHost.ItemsPanelRoot);
@@ -304,6 +385,44 @@ namespace Telegram.Views.Stories.Popups
             }
 
             VisualUtilities.SetSkeleton(ScrollingHost.ItemsPanelRoot, size, shapes.ToArray());
+        }
+
+        private Visibility ConvertEmptyVisibility(StoryInteractionsEmptyState state)
+        {
+            return state == StoryInteractionsEmptyState.None
+                ? Visibility.Collapsed
+                : Visibility.Visible;
+        }
+
+        private Visibility ConvertEmptyTitleVisibility(StoryInteractionsEmptyState state)
+        {
+            return state is StoryInteractionsEmptyState.NoViews or StoryInteractionsEmptyState.NoReactions or StoryInteractionsEmptyState.ServerError
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        }
+
+        private string ConvertEmptyTitle(StoryInteractionsEmptyState state)
+        {
+            return state switch
+            {
+                StoryInteractionsEmptyState.NoViews => Strings.NoViews,
+                StoryInteractionsEmptyState.NoReactions => Strings.NoReactions,
+                StoryInteractionsEmptyState.ServerError => Strings.ServerErrorViewersTitle,
+                _ => string.Empty
+            };
+        }
+
+        private string ConvertEmptySubtitle(StoryInteractionsEmptyState state)
+        {
+            return state switch
+            {
+                StoryInteractionsEmptyState.NoViews => Strings.NoViewsStub,
+                StoryInteractionsEmptyState.NoReactions => Strings.NoReactionsStub,
+                StoryInteractionsEmptyState.NoResult => Strings.NoResult,
+                StoryInteractionsEmptyState.NoContacts => Strings.NoContactsViewed,
+                StoryInteractionsEmptyState.ServerError => Strings.ServerErrorViewers,
+                _ => string.Empty
+            };
         }
 
         private string ConvertSortBy(StoryInteractionsSortBy sortBy)

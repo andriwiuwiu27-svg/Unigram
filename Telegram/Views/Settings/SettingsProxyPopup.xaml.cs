@@ -15,7 +15,7 @@ using Windows.UI.Xaml.Input;
 
 namespace Telegram.Views.Settings
 {
-    public sealed partial class SettingsProxyPopup : ContentPopup
+    public sealed partial class SettingsProxyPopup : ModalPopup
     {
         public SettingsProxyViewModel ViewModel => DataContext as SettingsProxyViewModel;
 
@@ -28,19 +28,9 @@ namespace Telegram.Views.Settings
             SecondaryButtonText = Strings.Close;
         }
 
-        private void ContentDialog_PrimaryButtonClick(ContentDialog sender, ContentDialogButtonClickEventArgs args)
+        private void OnPrimaryButtonClick(ModalPopup sender, ModalPopupButtonClickEventArgs args)
         {
             ViewModel.Add();
-        }
-
-        public override void OnNavigatedTo(object parameter)
-        {
-            ViewModel.Popup = this;
-        }
-
-        public override void OnNavigatedFrom()
-        {
-            ViewModel.Popup = null;
         }
 
         private void List_ItemClick(object sender, ItemClickEventArgs e)

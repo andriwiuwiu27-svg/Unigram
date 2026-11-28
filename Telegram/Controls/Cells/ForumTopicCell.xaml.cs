@@ -39,12 +39,13 @@ using Windows.UI.Xaml.Shapes;
 
 namespace Telegram.Controls.Cells
 {
-    public sealed partial class ForumTopicCell : ControlEx2, IForumTopicDelegate, ISavedMessagesTopicDelegate
+    public sealed partial class ForumTopicCell : ControlEx2, IForumTopicDelegate, ISavedMessagesTopicDelegate, IDirectMessagesTopicDelegate
     {
         private bool _selected;
 
         private ForumTopic _topic;
         private SavedMessagesTopic _savedMessagesTopic;
+        private DirectMessagesChatTopic _directMessagesChatTopic;
         private Chat _chat;
 
         private int _thumbnailId;
@@ -136,6 +137,10 @@ namespace Telegram.Controls.Cells
             {
                 UpdateSavedMessagesTopic(_viewModel, _savedMessagesTopic);
             }
+            else if (_directMessagesChatTopic != null)
+            {
+                UpdateDirectMessagesChatTopic(_viewModel, _directMessagesChatTopic);
+            }
         }
 
         #endregion
@@ -154,6 +159,10 @@ namespace Telegram.Controls.Cells
             else if (_savedMessagesTopic != null)
             {
                 return GetName(_savedMessagesTopic);
+            }
+            else if (_directMessagesChatTopic != null)
+            {
+                return GetName(_directMessagesChatTopic);
             }
 
             return null;
@@ -499,6 +508,11 @@ namespace Telegram.Controls.Cells
 
         public void UpdateForumTopicActions(ForumTopic topic, IDictionary<MessageSender, ChatAction> actions)
         {
+            UpdateActions(actions);
+        }
+
+        private void UpdateActions(IDictionary<MessageSender, ChatAction> actions)
+        {
             if (_viewModel == null || !_templateApplied)
             {
                 return;
@@ -526,6 +540,7 @@ namespace Telegram.Controls.Cells
             _viewModel = viewModel;
             _topic = topic;
             _savedMessagesTopic = null;
+            _directMessagesChatTopic = null;
             _chat = viewModel.ClientService.GetChat(topic.Info.ChatId);
 
             if (!_templateApplied)
@@ -559,6 +574,7 @@ namespace Telegram.Controls.Cells
             _viewModel = viewModel;
             _topic = null;
             _savedMessagesTopic = topic;
+            _directMessagesChatTopic = null;
             _chat = viewModel.Chat;
 
             if (!_templateApplied)
@@ -657,6 +673,169 @@ namespace Telegram.Controls.Cells
                 : string.Empty;
 
             UpdateMinithumbnail(thumbnail);
+        }
+
+        #endregion
+
+        #region DirectMessagesChatTopic
+
+        // Topic 0 is the "All Messages" row, which stands for the whole chat like the forum one.
+        private string GetName(DirectMessagesChatTopic topic)
+        {
+            return topic.Id == 0
+                ? Strings.TopicsPanelAllMessages
+                : _viewModel.ClientService.GetTitle(topic.SenderId);
+        }
+
+        public void UpdateDirectMessagesChatTopic(TopicListViewModel viewModel, DirectMessagesChatTopic topic)
+        {
+            _viewModel = viewModel;
+            _topic = null;
+            _savedMessagesTopic = null;
+            _directMessagesChatTopic = topic;
+            _chat = viewModel.ClientService.GetChat(topic.ChatId);
+
+            if (!_templateApplied)
+            {
+                return;
+            }
+
+            TitleLabel.Text = GetName(topic);
+
+            TypeIcon.ClearStatus();
+            IconRoot.Visibility = Visibility.Collapsed;
+
+            if (topic.Id == 0)
+            {
+                LoadTemplateChild(ref AllTopics);
+                AllTopics.Visibility = Visibility.Visible;
+                Photo?.Visibility = Visibility.Collapsed;
+            }
+            else
+            {
+                AllTopics?.Visibility = Visibility.Collapsed;
+
+                LoadTemplateChild(ref Photo);
+                Photo.Visibility = Visibility.Visible;
+                Photo.Source = ProfilePictureSource.MessageSender(viewModel.ClientService, topic.SenderId);
+            }
+
+            // These topics have no pinning or notification settings of their own.
+            PinnedIcon.Visibility = Visibility.Collapsed;
+            MutedIcon.Visibility = Visibility.Collapsed;
+            UnreadBadge.IsUnmuted = true;
+
+            UpdateDirectMessagesChatTopicLastMessage(topic);
+            UpdateDirectMessagesChatTopicUnreadMentionCount(topic);
+            UpdateDirectMessagesChatTopicActions(topic, topic.Id == 0
+                ? null
+                : viewModel.ClientService.GetChatActions(topic.ChatId, new MessageTopicDirectMessages(topic.Id)));
+        }
+
+        public void UpdateDirectMessagesChatTopicActions(DirectMessagesChatTopic topic, IDictionary<MessageSender, ChatAction> actions)
+        {
+            UpdateActions(actions);
+        }
+
+        public void UpdateDirectMessagesChatTopicLastMessage(DirectMessagesChatTopic topic)
+        {
+            if (_viewModel == null || !_templateApplied)
+            {
+                return;
+            }
+
+            var message = topic.Id == 0 ? _chat?.LastMessage : topic.LastMessage;
+            var draft = topic.DraftMessage;
+
+            MinithumbnailId thumbnail = null;
+
+            if (draft != null)
+            {
+                DraftLabel.Text = FormatDraft();
+                FromLabel.Text = string.Empty;
+
+                UpdateBriefLabel(GetDraftText(draft));
+            }
+            else
+            {
+                DraftLabel.Text = string.Empty;
+
+                if (message != null)
+                {
+                    // Every message in a topic is between the channel and the topic's sender, who
+                    // is already the title, so only service messages need a label of their own.
+                    FromLabel.Text = message.Content.IsService()
+                        ? ChatCell.UpdateFromLabel(_viewModel.ClientService, _chat, message)
+                        : string.Empty;
+
+                    UpdateBriefLabel(ChatCell.UpdateBriefLabel(message.Content, message.IsOutgoing, false, out thumbnail));
+                }
+                else
+                {
+                    FromLabel.Text = string.Empty;
+                    UpdateBriefLabel(string.Empty.AsFormattedText());
+                }
+            }
+
+            _draft = draft != null;
+            UpdateDirectMessagesChatTopicReadOutbox(topic);
+
+            TimeLabel.Text = message != null
+                ? Formatter.DateExtended(message.Date)
+                : string.Empty;
+
+            UpdateMinithumbnail(thumbnail);
+        }
+
+        public void UpdateDirectMessagesChatTopicReadInbox(DirectMessagesChatTopic topic)
+        {
+            if (_viewModel == null || !_templateApplied)
+            {
+                return;
+            }
+
+            if (topic.UnreadCount > 0 || topic.IsMarkedAsUnread)
+            {
+                UnreadBadge.Visibility = Visibility.Visible;
+                UnreadBadge.Text = topic.UnreadCount > 0 ? topic.UnreadCount.ToString() : string.Empty;
+            }
+            else
+            {
+                UnreadBadge.Visibility = Visibility.Collapsed;
+            }
+        }
+
+        public void UpdateDirectMessagesChatTopicReadOutbox(DirectMessagesChatTopic topic)
+        {
+            if (_viewModel == null || !_templateApplied)
+            {
+                return;
+            }
+
+            var message = topic.Id == 0 ? _chat?.LastMessage : topic.LastMessage;
+            var maxId = topic.Id == 0 ? _chat?.LastReadOutboxMessageId ?? 0 : topic.LastReadOutboxMessageId;
+
+            UpdateMessageState(maxId, null, topic.DraftMessage, message, message?.SendingState);
+        }
+
+        public void UpdateDirectMessagesChatTopicUnreadMentionCount(DirectMessagesChatTopic topic)
+        {
+            if (_viewModel == null || !_templateApplied)
+            {
+                return;
+            }
+
+            UpdateDirectMessagesChatTopicReadInbox(topic);
+
+            if (topic.UnreadReactionCount > 0)
+            {
+                UnreadMentionsBadge.Visibility = Visibility.Visible;
+                UnreadMentionsLabel.Text = Icons.HeartFilled12;
+            }
+            else
+            {
+                UnreadMentionsBadge.Visibility = Visibility.Collapsed;
+            }
         }
 
         #endregion
@@ -912,6 +1091,10 @@ namespace Telegram.Controls.Cells
             {
                 _ = viewModel.NavigatedToAsync(new ChatMessageTopic(chat.Id, _savedMessagesTopic.ToId()), NavigationMode.New, new NavigationState());
             }
+            else if (_directMessagesChatTopic?.Id is > 0)
+            {
+                _ = viewModel.NavigatedToAsync(new ChatMessageTopic(chat.Id, new MessageTopicDirectMessages(_directMessagesChatTopic.Id)), NavigationMode.New, new NavigationState());
+            }
             else
             {
                 _ = viewModel.NavigatedToAsync(chat.Id, NavigationMode.New, new NavigationState());
@@ -1025,7 +1208,9 @@ namespace Telegram.Controls.Cells
                 return;
             }
 
-            var topic = _topic?.ToId() ?? (_savedMessagesTopic?.Id is > 0 ? _savedMessagesTopic.ToId() : null);
+            var topic = _topic?.ToId()
+                ?? (_savedMessagesTopic?.Id is > 0 ? _savedMessagesTopic.ToId() : null)
+                ?? (_directMessagesChatTopic?.Id is > 0 ? new MessageTopicDirectMessages(_directMessagesChatTopic.Id) : null);
 
             // As in OnDragEnter.
             var deferral = e.GetDeferral();
@@ -1132,14 +1317,21 @@ namespace Telegram.Controls.Cells
                 CanvasGeometry result;
                 using (var builder = new CanvasPathBuilder(null))
                 {
-                    builder.AddGeometry(CanvasGeometry.CreateEllipse(null, 13, 5, radius, radius));
+                    using (var part = CanvasGeometry.CreateEllipse(null, 13, 5, radius, radius))
+                    {
+                        builder.AddGeometry(part);
+                    }
                     builder.BeginFigure(new Vector2(12.5f, 3f));
                     builder.AddLine(new Vector2(12.5f, 5.5f));
                     builder.AddLine(new Vector2(15f, 5.5f));
                     builder.EndFigure(CanvasFigureLoop.Open);
                     result = CanvasGeometry.CreatePath(builder);
                 }
-                return new CompositionPath(result);
+
+                using (result)
+                {
+                    return new CompositionPath(result);
+                }
             }
 
             var shape11 = BootStrapper.Current.Compositor.CreateSpriteShape(BootStrapper.Current.Compositor.CreatePathGeometry(GetPending()));
@@ -1171,7 +1363,10 @@ namespace Telegram.Controls.Cells
                 CanvasGeometry result;
                 using (var builder = new CanvasPathBuilder(null))
                 {
-                    builder.AddGeometry(CanvasGeometry.CreateRoundedRectangle(null, 4 + center, center, 11 - stroke, 11 - stroke, 2, 2));
+                    using (var part = CanvasGeometry.CreateRoundedRectangle(null, 4 + center, center, 11 - stroke, 11 - stroke, 2, 2))
+                    {
+                        builder.AddGeometry(part);
+                    }
                     builder.BeginFigure(new Vector2(9.5f, 3f));
                     builder.AddLine(new Vector2(9.5f, 5.5f + center));
                     builder.EndFigure(CanvasFigureLoop.Open);
@@ -1180,7 +1375,11 @@ namespace Telegram.Controls.Cells
                     builder.EndFigure(CanvasFigureLoop.Open);
                     result = CanvasGeometry.CreatePath(builder);
                 }
-                return new CompositionPath(result);
+
+                using (result)
+                {
+                    return new CompositionPath(result);
+                }
             }
 
             var shape11 = BootStrapper.Current.Compositor.CreateSpriteShape(BootStrapper.Current.Compositor.CreatePathGeometry(GetFailed()));
@@ -1228,7 +1427,11 @@ namespace Telegram.Controls.Cells
                     builder.EndFigure(CanvasFigureLoop.Open);
                     result = CanvasGeometry.CreatePath(builder);
                 }
-                return new CompositionPath(result);
+
+                using (result)
+                {
+                    return new CompositionPath(result);
+                }
             }
 
             var geometry = GetLine();

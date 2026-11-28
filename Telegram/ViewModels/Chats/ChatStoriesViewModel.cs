@@ -14,6 +14,7 @@ using Telegram.Collections;
 using Telegram.Common;
 using Telegram.Controls;
 using Telegram.Controls.Stories;
+using Telegram.Converters;
 using Telegram.Navigation;
 using Telegram.Navigation.Services;
 using Telegram.Services;
@@ -233,7 +234,7 @@ namespace Telegram.ViewModels.Chats
             var result = await popup.ShowQueuedAsync(XamlRoot);
 
             var confirm = new InputPopupResult(result, popup.Text, popup.Value);
-            if (confirm.Result == ContentDialogResult.Primary)
+            if (confirm.Result == ModalPopupResult.Primary)
             {
                 album.Name = confirm.Text;
                 ClientService.Send(new SetStoryAlbumName(Chat.Id, album.Id, confirm.Text));
@@ -243,7 +244,7 @@ namespace Telegram.ViewModels.Chats
         public async void DeleteAlbum(StoryAlbumViewModel album)
         {
             var confirm = await ShowPopupAsync(string.Format(Strings.StoriesAlbumMenuDeleteAlbumAsk, album.Name), Strings.StoriesAlbumMenuDeleteAlbum, Strings.Delete, Strings.Cancel, destructive: true);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 ClientService.Send(new DeleteStoryAlbum(Chat.Id, album.Id));
 
@@ -269,7 +270,7 @@ namespace Telegram.ViewModels.Chats
             var result = await popup.ShowQueuedAsync(XamlRoot);
 
             var confirm = new InputPopupResult(result, popup.Text, popup.Value);
-            if (confirm.Result == ContentDialogResult.Primary)
+            if (confirm.Result == ModalPopupResult.Primary)
             {
                 var storyIds = new MutableVector<int>();
                 if (story != null)
@@ -295,7 +296,7 @@ namespace Telegram.ViewModels.Chats
             var popup = new ChooseStoriesPopup(this);
 
             var confirm = await ShowPopupAsync(popup);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 var storyIds = new MutableVector<int>();
 
@@ -418,7 +419,7 @@ namespace Telegram.ViewModels.Chats
             var title = Strings.DeleteStoryTitle;
 
             var confirm = await ShowPopupAsync(message, title, Strings.Delete, Strings.Cancel, destructive: true);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 ClientService.Send(new DeleteStory(story.PosterChatId, story.Id));
                 RemoveStory(story.Id);
@@ -431,7 +432,7 @@ namespace Telegram.ViewModels.Chats
             var title = SelectedItems.Count == 1 ? Strings.DeleteStoryTitle : Strings.DeleteStoriesTitle;
 
             var confirm = await ShowPopupAsync(message, title, Strings.Delete, Strings.Cancel, destructive: true);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 var selection = SelectedItems.ToArray();
 
@@ -457,7 +458,13 @@ namespace Telegram.ViewModels.Chats
 
         public void OpenStory(StoryViewModel story, Rect origin, Func<ActiveStoriesViewModel, Rect> closing)
         {
-            var activeStories = new ActiveStoriesViewModel(ClientService, Settings, Aggregator, story, ItemsView);
+            var activeStories = new ActiveStoriesViewModel(ClientService, Settings, Aggregator, story, ItemsView)
+            {
+                IsPinned = IsPinned,
+                TotalCount = GetTotalCount,
+                SegmentGroup = GetSegmentGroup
+            };
+
             var viewModel = StoryListViewModel.Create(NavigationService, activeStories);
 
             var window = new StoriesWindow(XamlRoot);
@@ -547,6 +554,33 @@ namespace Telegram.ViewModels.Chats
         public bool ShowHint => !IsEmpty && _type == ChatStoriesType.Archive;
 
         private MutableVector<int> _pinnedStoryIds = Array.Empty<int>();
+
+        // Only the whole list is told its total: an album's is not loaded, so it counts what it has.
+        private int GetTotalCount()
+        {
+            return Math.Max(_selectedAlbum?.Items.TotalCount ?? 0, ItemsView.Count);
+        }
+
+        // A profile can hold thousands of stories, too many for a segment each: the pinned ones
+        // are one group, the rest one per local day, an album one in all and a bot preview its own.
+        private long GetSegmentGroup(StoryViewModel story)
+        {
+            if (_selectedAlbum?.Id > 0)
+            {
+                return 0;
+            }
+            else if (story.IsBotPreview)
+            {
+                return story.Id;
+            }
+            else if (IsPinned(story))
+            {
+                return -1;
+            }
+
+            var date = Formatter.ToLocalTime(story.Date);
+            return date.Year * 10000L + date.Month * 100L + date.Day;
+        }
 
         public bool IsPinned(StoryViewModel story)
         {

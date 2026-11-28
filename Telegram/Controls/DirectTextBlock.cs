@@ -1151,14 +1151,16 @@ namespace Telegram.Controls
                 for (int j = 0; j < rects?.Length; j++)
                 {
                     var rect = rects[j];
-                    builder.AddGeometry(CanvasGeometry.CreateRectangle(null, new Rect(rect.X - _spoilerBounds.X, rect.Y - _spoilerBounds.Y, rect.Width, rect.Height)));
+                    builder.AddRectangle(new Rect(rect.X - _spoilerBounds.X, rect.Y - _spoilerBounds.Y, rect.Width, rect.Height));
                 }
             }
 
             _spoilerPresenter.Arrange(_spoilerBounds);
 
+            using var path = CanvasGeometry.CreatePath(builder);
+
             var visual = ElementCompositionPreview.GetElementVisual(_spoilerPresenter);
-            visual.Clip = visual.Compositor.CreateGeometricClip(visual.Compositor.CreatePathGeometry(new CompositionPath(CanvasGeometry.CreatePath(builder))));
+            visual.Clip = visual.Compositor.CreateGeometricClip(visual.Compositor.CreatePathGeometry(new CompositionPath(path)));
         }
 
 
@@ -1636,10 +1638,11 @@ namespace Telegram.Controls
 
             for (int i = 0; i < rects?.Length; i++)
             {
-                builder.AddGeometry(CanvasGeometry.CreateRectangle(null, rects[i]));
+                builder.AddRectangle(rects[i]);
             }
 
-            _selectionGeometry.Path = new CompositionPath(CanvasGeometry.CreatePath(builder));
+            using var path = CanvasGeometry.CreatePath(builder);
+            _selectionGeometry.Path = new CompositionPath(path);
             _selectionVisual.IsVisible = true;
         }
 
@@ -2009,10 +2012,11 @@ namespace Telegram.Controls
 
             for (int i = 0; i < rects?.Length; i++)
             {
-                builder.AddGeometry(CanvasGeometry.CreateRectangle(null, rects[i]));
+                builder.AddRectangle(rects[i]);
             }
 
-            _queryGeometry.Path = new CompositionPath(CanvasGeometry.CreatePath(builder));
+            using var path = CanvasGeometry.CreatePath(builder);
+            _queryGeometry.Path = new CompositionPath(path);
             _queryVisual.IsVisible = true;
         }
 
@@ -2065,11 +2069,12 @@ namespace Telegram.Controls
 
                 for (int j = 0; j < rects?.Length; j++)
                 {
-                    builder.AddGeometry(CanvasGeometry.CreateRectangle(null, rects[j]));
+                    builder.AddRectangle(rects[j]);
                 }
             }
 
-            _markedGeometry.Path = new CompositionPath(CanvasGeometry.CreatePath(builder));
+            using var path = CanvasGeometry.CreatePath(builder);
+            _markedGeometry.Path = new CompositionPath(path);
             _markedVisual.IsVisible = true;
         }
 

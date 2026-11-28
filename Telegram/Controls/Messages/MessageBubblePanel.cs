@@ -122,6 +122,20 @@ namespace Telegram.Controls.Messages
                     _textInset = _margin.Width;
                 }
             }
+            else if (_media is Border { Child: IContentWithWrap wrap } && (_textRow < _mediaRow || (_factCheck == null && _text.DesiredSize.Height == 0)))
+            {
+                // Nothing is laid out between the content and the footer, so the footer can share
+                // its last line. Placeholder is not asked: it speaks for the text, which is empty or
+                // above, and the content answers for itself.
+                footerTarget = _media.DesiredSize.Width;
+
+                // A line of its own goes inside the content's bottom padding: the padding is there to
+                // keep the last line off the bubble's edge, and the footer is that edge now.
+                var inset = wrap is Control control ? control.Padding.Bottom : 0;
+                var lineHeight = Math.Max(0, _footer.DesiredSize.Height - inset);
+
+                _margin = Margins(availableSize.Width, LeftInset(wrap as FrameworkElement, _media), footerTarget, wrap.ContentEnd(), false, _footer, lineHeight);
+            }
             else if (_mediaRow == _footerRow)
             {
                 _margin = new Size(0, 0);
@@ -294,48 +308,61 @@ namespace Telegram.Controls.Messages
         /// </remarks>
         private Size Margins(double availableWidth, double left, double width, ITextPresenter text, MessageFooter footer, bool canInset)
         {
-            var marginLeft = 0d;
-            var marginBottom = 0d;
+            var lineHeight = AppSettings.Appearance.MessageFontSize * 1.33;
 
             if (text is null)
             {
-                return new Size(0, (float)(AppSettings.Appearance.MessageFontSize * 1.33));
+                return new Size(0, (float)lineHeight);
             }
-            else if (Placeholder)
+            else if (!Placeholder)
             {
-                var maxWidth = availableWidth;
-                var footerWidth = footer.DesiredSize.Width + footer.Margin.Left + footer.Margin.Right;
-
-                var fontSize = AppSettings.Appearance.MessageFontSize;
-
-                if (ForceNewLine)
-                {
-                    return new Size((float)Math.Max(0, footerWidth - 16), 0);
-                }
-
-                var contentEnd = text.ContentEnd();
-                if (contentEnd == -1 || (text.ContentAgainstFlow && !canInset))
-                {
-                    return new Size(0, (float)(fontSize * 1.33));
-                }
-
-                var bounds = left + contentEnd;
-
-                var diff = width - bounds;
-                if (diff < footerWidth /*|| _placeholderVertical*/)
-                {
-                    if (bounds + footerWidth < maxWidth /*&& !_placeholderVertical*/)
-                    {
-                        marginLeft = footerWidth - diff;
-                    }
-                    else
-                    {
-                        marginBottom = fontSize * 1.33; //18.62;
-                    }
-                }
+                return new Size(0, 0);
+            }
+            else if (ForceNewLine)
+            {
+                return new Size((float)Math.Max(0, FooterWidth(footer) - 16), 0);
+            }
+            else if (text.ContentAgainstFlow && !canInset)
+            {
+                return new Size(0, (float)lineHeight);
             }
 
-            return new Size((float)marginLeft, (float)marginBottom);
+            return Margins(availableWidth, left, width, text.ContentEnd(), true, footer, lineHeight);
+        }
+
+        /// <param name="contentEnd">Where the last line ends, in the space <paramref name="left"/> offsets.</param>
+        /// <param name="canWiden">
+        /// Whether the bubble may grow to make room beside the last line before the footer wraps
+        /// under it. Text may; content keeps the width it measured to, so a subtitle that grows,
+        /// as a download's does, never makes the bubble grow with it.
+        /// </param>
+        /// <param name="lineHeight">The height to add when the footer has to take a line of its own.</param>
+        private static Size Margins(double availableWidth, double left, double width, float contentEnd, bool canWiden, MessageFooter footer, double lineHeight)
+        {
+            if (contentEnd == -1)
+            {
+                return new Size(0, (float)lineHeight);
+            }
+
+            var footerWidth = FooterWidth(footer);
+            var bounds = left + contentEnd;
+
+            var diff = width - bounds;
+            if (diff >= footerWidth)
+            {
+                return new Size(0, 0);
+            }
+            else if (canWiden && bounds + footerWidth < availableWidth)
+            {
+                return new Size((float)(footerWidth - diff), 0);
+            }
+
+            return new Size(0, (float)lineHeight);
+        }
+
+        private static double FooterWidth(MessageFooter footer)
+        {
+            return footer.DesiredSize.Width + footer.Margin.Left + footer.Margin.Right;
         }
     }
 }

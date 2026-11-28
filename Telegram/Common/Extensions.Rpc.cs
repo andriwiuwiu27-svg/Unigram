@@ -9,6 +9,7 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
+using Telegram.Navigation;
 using Windows.ApplicationModel.Calls;
 using Windows.ApplicationModel.DataTransfer.ShareTarget;
 using Windows.System.Display;
@@ -30,6 +31,18 @@ namespace Telegram.Common
             {
                 // All the remote procedure calls must be wrapped in a try-catch block
             }
+        }
+
+        /// <summary>
+        /// On WinUI the share is a window of the app's own and stays open until the app closes it;
+        /// on UWP the system takes down the view it hosted the share in.
+        /// </summary>
+        public static void TryReportCompleted(this ShareOperation operation, WindowContext window)
+        {
+            operation.TryReportCompleted();
+#if WINUI3
+            window?.Close();
+#endif
         }
 
         public static void TryReportDataRetrieved(this ShareOperation operation)

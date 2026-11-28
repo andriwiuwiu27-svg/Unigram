@@ -93,35 +93,16 @@ namespace Telegram.Td.Api
                 return Vector<T>.Empty;
             }
 
-            T[] items = null;
-            var count = 0;
+            var items = new VectorBuilder<T>();
 
             do
             {
-                if (items == null)
-                {
-                    items = new T[4];
-                }
-                else if (count == items.Length)
-                {
-                    Array.Resize(ref items, count * 2);
-                }
-
-                items[count++] = reader.TokenType == JsonTokenType.Null ? null : parser(ref reader, handler);
+                items.Add(reader.TokenType == JsonTokenType.Null ? null : parser(ref reader, handler));
                 reader.Read();
             }
             while (reader.TokenType == JsonTokenType.StartObject || reader.TokenType == JsonTokenType.Null);
 
-            // Trimmed rather than handed over with slack: the parsed object goes into the ClientService
-            // cache and keeps whatever it holds for the session, so up to 2x wasted is worth one copy here.
-            if (count != items.Length)
-            {
-                Array.Resize(ref items, count);
-            }
-
-            // The conversion wraps without copying, which is only safe because the parser built this array
-            // and nothing else holds it.
-            return items;
+            return items.ToVector();
         }
 
         public static Vector<Vector<T>> GetObjectArrayArrayPtr<T>(ref TdJsonReader reader, ClientResultHandler handler, PtrParser<T> parser) where T : Object
@@ -133,32 +114,17 @@ namespace Telegram.Td.Api
                 return Vector<Vector<T>>.Empty;
             }
 
-            Vector<T>[] items = null;
-            var count = 0;
+            var items = new VectorBuilder<Vector<T>>();
 
             do
             {
-                if (items == null)
-                {
-                    items = new Vector<T>[4];
-                }
-                else if (count == items.Length)
-                {
-                    Array.Resize(ref items, count * 2);
-                }
-
                 // Leaves the reader on the inner array's EndArray, which the Read below steps past.
-                items[count++] = GetObjectArrayPtr(ref reader, handler, parser);
+                items.Add(GetObjectArrayPtr(ref reader, handler, parser));
                 reader.Read();
             }
             while (reader.TokenType == JsonTokenType.StartArray);
 
-            if (count != items.Length)
-            {
-                Array.Resize(ref items, count);
-            }
-
-            return items;
+            return items.ToVector();
         }
 
         public static Vector<bool> GetBooleanArrayPtr(ref TdJsonReader reader)
@@ -170,31 +136,16 @@ namespace Telegram.Td.Api
                 return Vector<bool>.Empty;
             }
 
-            bool[] items = null;
-            var count = 0;
+            var items = new VectorBuilder<bool>();
 
             do
             {
-                if (items == null)
-                {
-                    items = new bool[4];
-                }
-                else if (count == items.Length)
-                {
-                    Array.Resize(ref items, count * 2);
-                }
-
-                items[count++] = reader.GetBoolean();
+                items.Add(reader.GetBoolean());
                 reader.Read();
             }
             while (reader.TokenType == JsonTokenType.True || reader.TokenType == JsonTokenType.False);
 
-            if (count != items.Length)
-            {
-                Array.Resize(ref items, count);
-            }
-
-            return items;
+            return items.ToVector();
         }
 
         public static Vector<int> GetInt32ArrayPtr(ref TdJsonReader reader)
@@ -206,31 +157,16 @@ namespace Telegram.Td.Api
                 return Vector<int>.Empty;
             }
 
-            int[] items = null;
-            var count = 0;
+            var items = new VectorBuilder<int>();
 
             do
             {
-                if (items == null)
-                {
-                    items = new int[4];
-                }
-                else if (count == items.Length)
-                {
-                    Array.Resize(ref items, count * 2);
-                }
-
-                items[count++] = reader.GetInt32();
+                items.Add(reader.GetInt32());
                 reader.Read();
             }
             while (reader.TokenType == JsonTokenType.Number);
 
-            if (count != items.Length)
-            {
-                Array.Resize(ref items, count);
-            }
-
-            return items;
+            return items.ToVector();
         }
 
         public static Vector<long> GetInt64ArrayPtr(ref TdJsonReader reader)
@@ -242,31 +178,16 @@ namespace Telegram.Td.Api
                 return Vector<long>.Empty;
             }
 
-            long[] items = null;
-            var count = 0;
+            var items = new VectorBuilder<long>();
 
             do
             {
-                if (items == null)
-                {
-                    items = new long[4];
-                }
-                else if (count == items.Length)
-                {
-                    Array.Resize(ref items, count * 2);
-                }
-
-                items[count++] = reader.GetInt64();
+                items.Add(reader.GetInt64());
                 reader.Read();
             }
             while (reader.TokenType == JsonTokenType.Number);
 
-            if (count != items.Length)
-            {
-                Array.Resize(ref items, count);
-            }
-
-            return items;
+            return items.ToVector();
         }
 
         /// <summary>int64 arrives quoted, so the elements are strings rather than numbers.</summary>
@@ -279,31 +200,16 @@ namespace Telegram.Td.Api
                 return Vector<long>.Empty;
             }
 
-            long[] items = null;
-            var count = 0;
+            var items = new VectorBuilder<long>();
 
             do
             {
-                if (items == null)
-                {
-                    items = new long[4];
-                }
-                else if (count == items.Length)
-                {
-                    Array.Resize(ref items, count * 2);
-                }
-
-                items[count++] = reader.GetInt64String();
+                items.Add(reader.GetInt64String());
                 reader.Read();
             }
             while (reader.TokenType == JsonTokenType.Number || reader.TokenType == JsonTokenType.String);
 
-            if (count != items.Length)
-            {
-                Array.Resize(ref items, count);
-            }
-
-            return items;
+            return items.ToVector();
         }
 
         public static Vector<double> GetDoubleArrayPtr(ref TdJsonReader reader)
@@ -315,31 +221,16 @@ namespace Telegram.Td.Api
                 return Vector<double>.Empty;
             }
 
-            double[] items = null;
-            var count = 0;
+            var items = new VectorBuilder<double>();
 
             do
             {
-                if (items == null)
-                {
-                    items = new double[4];
-                }
-                else if (count == items.Length)
-                {
-                    Array.Resize(ref items, count * 2);
-                }
-
-                items[count++] = reader.GetDouble();
+                items.Add(reader.GetDouble());
                 reader.Read();
             }
             while (reader.TokenType == JsonTokenType.Number);
 
-            if (count != items.Length)
-            {
-                Array.Resize(ref items, count);
-            }
-
-            return items;
+            return items.ToVector();
         }
 
         public static Vector<string> GetStringArrayPtr(ref TdJsonReader reader)
@@ -351,31 +242,16 @@ namespace Telegram.Td.Api
                 return Vector<string>.Empty;
             }
 
-            string[] items = null;
-            var count = 0;
+            var items = new VectorBuilder<string>();
 
             do
             {
-                if (items == null)
-                {
-                    items = new string[4];
-                }
-                else if (count == items.Length)
-                {
-                    Array.Resize(ref items, count * 2);
-                }
-
-                items[count++] = reader.GetString();
+                items.Add(reader.GetString());
                 reader.Read();
             }
             while (reader.TokenType == JsonTokenType.String);
 
-            if (count != items.Length)
-            {
-                Array.Resize(ref items, count);
-            }
-
-            return items;
+            return items.ToVector();
         }
 
         public static Vector<byte[]> GetBase64StringArrayPtr(ref TdJsonReader reader)
@@ -387,31 +263,16 @@ namespace Telegram.Td.Api
                 return Vector<byte[]>.Empty;
             }
 
-            byte[][] items = null;
-            var count = 0;
+            var items = new VectorBuilder<byte[]>();
 
             do
             {
-                if (items == null)
-                {
-                    items = new byte[4][];
-                }
-                else if (count == items.Length)
-                {
-                    Array.Resize(ref items, count * 2);
-                }
-
-                items[count++] = reader.GetBytesFromBase64();
+                items.Add(reader.GetBytesFromBase64());
                 reader.Read();
             }
             while (reader.TokenType == JsonTokenType.String);
 
-            if (count != items.Length)
-            {
-                Array.Resize(ref items, count);
-            }
-
-            return items;
+            return items.ToVector();
         }
     }
 }

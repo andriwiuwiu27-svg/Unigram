@@ -310,6 +310,7 @@ namespace Telegram.Services
             }
 
             viewModel.Update(update.Story);
+            Aggregator.Publish(new UpdateStoryChanged(viewModel));
         }
 
         private void Handle(UpdateStoryDeleted update)

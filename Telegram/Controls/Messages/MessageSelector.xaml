@@ -67,16 +67,6 @@
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Stretch" />
 
-                        <Border x:Name="Icon"
-                                Canvas.ZIndex="1"
-                                AutomationProperties.AccessibilityView="Raw"
-                                HorizontalAlignment="Left"
-                                VerticalAlignment="Center"
-                                Margin="12,0,0,3"
-                                Width="24"
-                                Height="24"
-                                Grid.Row="1" />
-
                         <ContentPresenter x:Name="Presenter"
                                           Control.IsTemplateFocusTarget="True"
                                           Content="{TemplateBinding Content}"

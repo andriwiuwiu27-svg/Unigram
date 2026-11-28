@@ -14,14 +14,6 @@
                   NavigationMode="RootWhenParameterless"
                   Title="{x:Bind ViewModel.Title}">
 
-    <Page.Transitions>
-        <TransitionCollection>
-            <NavigationThemeTransition>
-                <SlideNavigationTransitionInfo Effect="FromRight" />
-            </NavigationThemeTransition>
-        </TransitionCollection>
-    </Page.Transitions>
-
     <Grid Background="{ThemeResource SettingsPageBackground}">
         <GridView x:Name="ScrollingHost"
                   ItemsSource="{x:Bind ViewModel.Items}"

@@ -74,6 +74,8 @@ namespace Telegram.ViewModels.Chats
             Initialize(selected.ChatId, selected.Id);
         }
 
+        protected override MessageTopic Topic => _topic;
+
         #region Paging
 
         private async void Initialize(long chatId, long fromMessageId)

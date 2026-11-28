@@ -26,7 +26,7 @@ using Windows.UI.Xaml.Media;
 namespace Telegram.Controls.Messages.Content
 {
     // TODO: turn the whole control into a Button
-    public sealed partial class VoiceNoteContent : FileButton, IContentWithFile
+    public sealed partial class VoiceNoteContent : FileButton, IContentWithFile, IContentWithWrap
     {
         private MessageViewModel _message;
         public MessageViewModel Message => _message;
@@ -79,6 +79,8 @@ namespace Telegram.Controls.Messages.Content
         private AutomaticDragHelper ButtonDrag;
 
         private FileButton Button => this;
+        private Grid Icon;
+        private StackPanel Details;
         private ProgressVoice Scrubber;
         private TextBlock Subtitle;
         private ToggleButton Recognize;
@@ -94,6 +96,8 @@ namespace Telegram.Controls.Messages.Content
         {
             base.OnApplyTemplate();
 
+            Icon = GetTemplateChild(nameof(Icon)) as Grid;
+            Details = GetTemplateChild(nameof(Details)) as StackPanel;
             Scrubber = GetTemplateChild(nameof(Scrubber)) as ProgressVoice;
             Subtitle = GetTemplateChild(nameof(Subtitle)) as TextBlock;
             Recognize = GetTemplateChild(nameof(Recognize)) as ToggleButton;
@@ -485,6 +489,17 @@ namespace Telegram.Controls.Messages.Content
 
             UpdateManager.Unsubscribe(this, ref _fileToken);
             UnloadPending();
+        }
+
+        public float ContentEnd()
+        {
+            // The transcript is a plain RichTextBlock, which cannot say where its last line ends.
+            if (!_templateApplied || RecognizedText is { Visibility: Visibility.Visible })
+            {
+                return -1;
+            }
+
+            return (float)(Icon.DesiredSize.Width + Details.Margin.Left + Subtitle.DesiredSize.Width);
         }
 
         public bool IsValid(MessageContent content, bool primary)

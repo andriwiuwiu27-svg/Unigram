@@ -12,6 +12,7 @@ using System.ComponentModel;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using Telegram.Common;
+using Telegram.Composition;
 using Telegram.Controls.Media;
 using Telegram.Converters;
 using Telegram.Native;
@@ -943,6 +944,7 @@ namespace Telegram.Controls
 
             Below.Children.Remove(_spoilerPresenter);
             _spoilerPresenter = null;
+            _spoilerGeometry?.Dispose();
             _spoilerGeometry = null;
             _spoilerAdded = false;
         }
@@ -1038,6 +1040,7 @@ namespace Telegram.Controls
             {
                 Below.Children.Remove(_spoilerPresenter);
                 _spoilerPresenter = null;
+                _spoilerGeometry?.Dispose();
                 _spoilerGeometry = null;
                 _spoilerAdded = false;
             }
@@ -2093,7 +2096,7 @@ namespace Telegram.Controls
                                     OpenInline(parentLink);
                                 }
 
-                                GetOrCreateRun(direct, parentInlines, mathematicalExpression.Expression, entity.Offset, entity.Length, direction, entity.Flags, null, partFontSize);
+                                GetOrCreateRun(direct, parentInlines, text, entity.Offset, entity.Length, direction, entity.Flags, null, partFontSize);
                                 Map(part.Offset + entity.Offset, entity.Length, entity.Length);
                                 offset += entity.Length;
                             }
@@ -2487,6 +2490,7 @@ namespace Telegram.Controls
                 {
                     Below.Children.Remove(_spoilerPresenter);
                     _spoilerPresenter = null;
+                    _spoilerGeometry?.Dispose();
                     _spoilerGeometry = null;
                     _spoilerAdded = false;
                 }
@@ -2653,6 +2657,7 @@ namespace Telegram.Controls
                 {
                     Below.Children.Remove(_spoilerPresenter);
                     _spoilerPresenter = null;
+                    _spoilerGeometry?.Dispose();
                     _spoilerGeometry = null;
                     _spoilerAdded = false;
                 }
@@ -2672,10 +2677,11 @@ namespace Telegram.Controls
                         rectangle.X = (float)(rectangle.X - minX);
                         rectangle.Y = (float)(rectangle.Y - minY);
 
-                        builder.AddGeometry(CanvasGeometry.CreateRectangle(null, rectangle));
+                        builder.AddRectangle(rectangle);
                     }
                 }
 
+                _spoilerGeometry?.Dispose();
                 _spoilerGeometry = CanvasGeometry.CreatePath(builder);
             }
 

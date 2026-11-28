@@ -212,7 +212,7 @@ namespace Telegram.Views.Popups
                 return;
             }
 
-            Hide(ContentDialogResult.Primary);
+            Hide(ModalPopupResult.Primary);
         }
 
         private void Label_TextChanged(object sender, TextChangedEventArgs e)
@@ -263,7 +263,7 @@ namespace Telegram.Views.Popups
             };
 
             var confirm = await popup.ShowAsync(XamlRoot);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 SuggestedPostInfo = new InputSuggestedPostInfo(SuggestedPostInfo?.Price, (int)popup.Value.ToUnixTimeSeconds());
                 SendDate.Content = Telegram.Converters.Formatter.DateAt(popup.Value);

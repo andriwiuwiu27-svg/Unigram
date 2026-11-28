@@ -13,6 +13,7 @@ using System.Threading.Tasks;
 using Telegram.Collections;
 using Telegram.Common;
 using Telegram.Composition;
+using Telegram.Controls;
 using Telegram.Navigation;
 using Telegram.Navigation.Services;
 using Telegram.Services;
@@ -327,6 +328,31 @@ namespace Telegram.ViewModels
             MessageDustEffect.Disabled,
             MessageDustEffect.Particles,
             MessageDustEffect.Layers,
+        };
+
+        public int CallIndicator
+        {
+            get => Array.IndexOf(_callIndicatorIndexer, AppSettings.Diagnostics.CallIndicator);
+            set
+            {
+                if (value >= 0 && value < _callIndicatorIndexer.Length && AppSettings.Diagnostics.CallIndicator != _callIndicatorIndexer[value])
+                {
+                    AppSettings.Diagnostics.CallIndicator = _callIndicatorIndexer[value];
+                    RaisePropertyChanged();
+                }
+            }
+        }
+
+        private readonly CallIndicatorStyle[] _callIndicatorIndexer = new[]
+        {
+            CallIndicatorStyle.Lens,
+            CallIndicatorStyle.LayeredLens,
+        };
+
+        public List<SettingsOptionItem<CallIndicatorStyle>> CallIndicatorOptions { get; } = new()
+        {
+            new SettingsOptionItem<CallIndicatorStyle>(CallIndicatorStyle.Lens, "Lens"),
+            new SettingsOptionItem<CallIndicatorStyle>(CallIndicatorStyle.LayeredLens, "Lens, layered"),
         };
 
         public int NativeTextInput
@@ -739,7 +765,7 @@ namespace Telegram.ViewModels
             else
             {
                 var confirm = await ShowPopupAsync("If you disable the messages database some **features** might **stop to work** as expected, **secret chats** will become **inaccessible** and app won't recognize downloaded files after download.\r\n\r\nAre you sure you want to proceed? You can re-enable messages database anytime from here.", Strings.Warning, Strings.OK, Strings.Cancel);
-                if (confirm == ContentDialogResult.Primary)
+                if (confirm == ModalPopupResult.Primary)
                 {
                     AppSettings.Diagnostics.DisableDatabase = true;
                 }

@@ -96,7 +96,7 @@ namespace Telegram.Views.Wallet.Popups
                 await _unlock();
 
                 _failure = null;
-                Hide(ContentDialogResult.Primary);
+                Hide(ModalPopupResult.Primary);
             }
             catch (WalletVaultException ex)
             {

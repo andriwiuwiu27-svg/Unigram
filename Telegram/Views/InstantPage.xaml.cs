@@ -61,6 +61,7 @@ namespace Telegram.Views
             _renderer = new PageBlockRenderer(this);
 
             InitializeComponent();
+            Transition = PageTransition.None;
         }
 
         private void OnLoaded(object sender, RoutedEventArgs e)
@@ -117,7 +118,7 @@ namespace Telegram.Views
         {
         }
 
-        protected override void OnNavigatedTo(NavigationEventArgs e)
+        protected override void OnNavigatedTo(NavigatedEventArgs e)
         {
             foreach (var item in ScrollingHost.Items)
             {
@@ -148,8 +149,8 @@ namespace Telegram.Views
 
             UpdateView(args.InstantView);
 
-            Header.CanGoBack = Frame.CanGoBack;
-            Header.CanGoForward = Frame.CanGoForward;
+            Header.CanGoBack = Frame?.NavigationService?.CanGoBack is true;
+            Header.CanGoForward = Frame?.NavigationService?.CanGoForward is true;
         }
 
         private WebPageInstantView _instantView;
@@ -495,12 +496,12 @@ namespace Telegram.Views
 
         private void Header_GoBackClicked(object sender, RoutedEventArgs e)
         {
-            Frame.GoBack();
+            Frame?.NavigationService?.GoBack();
         }
 
         private void Header_GoForwardClicked(object sender, RoutedEventArgs e)
         {
-            Frame.GoForward();
+            Frame?.NavigationService?.GoForward();
         }
 
         private void Feedback_Click(object sender, RoutedEventArgs e)

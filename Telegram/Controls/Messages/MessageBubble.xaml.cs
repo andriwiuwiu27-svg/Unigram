@@ -2715,7 +2715,7 @@ namespace Telegram.Controls.Messages
 
             var owner = ItemsControl.ItemsControlFromItemContainer(selector) as ChatHistoryView;
 
-            var panel = owner?.ItemsPanelRoot as ItemsStackPanel;
+            var panel = owner?.ItemsStackPanel;
             if (panel == null)
             {
                 return 1;

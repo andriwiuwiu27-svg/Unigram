@@ -102,8 +102,10 @@ namespace Telegram.Views.Wallet.Popups
             var nftTransfer = transaction.Type as TonWalletTransactionTypeNftTransfer;
             var giftTransfer = transaction.Type as TonWalletTransactionTypeTelegramGiftTransfer;
 
-            var outgoing = (transfer != null && transfer.Amount < 0) || (nftTransfer != null && nftTransfer.IsOutgoing);
-            var amountValue = transfer?.Amount ?? onRampDeposit?.Amount ?? 0;
+            var market = WalletHelper.GiftMarketActivity.TryGet(transaction.Type, out var activity);
+
+            var outgoing = (transfer != null && transfer.Amount < 0) || (nftTransfer != null && nftTransfer.IsOutgoing) || activity.Amount < 0;
+            var amountValue = transfer?.Amount ?? onRampDeposit?.Amount ?? activity.Amount;
 
             if (amountValue != 0)
             {
@@ -122,6 +124,11 @@ namespace Telegram.Views.Wallet.Popups
                 Amount.Text = giftTransfer.Nft.Name;
                 Converted.Text = string.Empty;
             }
+            else if (market)
+            {
+                Amount.Text = activity.Nft?.Name ?? Strings.WalletOnchainGiftTitle;
+                Converted.Text = string.Empty;
+            }
             else
             {
                 // A key rotation moves nothing; what it cost is in the fee row below.
@@ -129,16 +136,11 @@ namespace Telegram.Views.Wallet.Popups
                 Converted.Text = string.Empty;
             }
 
-            if (nftTransfer?.Nft.Image != null)
-            {
-                HeaderPhoto.Source = new ProfilePictureSourcePhoto(_clientService, nftTransfer.Nft.Image.Photo.Id, nftTransfer.Nft.Image.Photo, null, Shape: ProfilePictureShape.Superellipse);
-                HeaderPhoto.Visibility = Visibility.Visible;
+            var nft = nftTransfer?.Nft ?? giftTransfer?.Nft ?? activity.Nft;
 
-                HeaderAnimated.Visibility = Visibility.Collapsed;
-            }
-            else if (giftTransfer?.Nft.Image != null)
+            if (nft?.Image != null)
             {
-                HeaderPhoto.Source = new ProfilePictureSourcePhoto(_clientService, giftTransfer.Nft.Image.Photo.Id, giftTransfer.Nft.Image.Photo, null, Shape: ProfilePictureShape.Superellipse);
+                HeaderPhoto.Source = new ProfilePictureSourcePhoto(_clientService, nft.Image.Photo.Id, nft.Image.Photo, null, Shape: ProfilePictureShape.Superellipse);
                 HeaderPhoto.Visibility = Visibility.Visible;
 
                 HeaderAnimated.Visibility = Visibility.Collapsed;
@@ -158,8 +160,16 @@ namespace Telegram.Views.Wallet.Popups
                 HeaderAnimated.Visibility = Visibility.Visible;
             }
 
-            UpdatePeer(transaction, transfer, nftTransfer, giftTransfer, outgoing);
-            UpdateAddress(transaction.PeerAddress);
+            if (market)
+            {
+                UpdateGiftMarket(transaction, activity);
+            }
+            else
+            {
+                UpdatePeer(transaction, transfer, nftTransfer, giftTransfer, outgoing);
+                UpdateAddress(transaction.PeerAddress);
+            }
+
             UpdateComment(transfer);
 
             UpdateFee(state, transaction.FeeAmount, transfer is { IsGasless: true });
@@ -207,6 +217,46 @@ namespace Telegram.Views.Wallet.Popups
             FeeConverted.Text = WalletHelper.TryToCurrency(_clientService, state, fees, out var converted) && converted > BigInteger.Zero
                 ? string.Format(" ~ {0}", Formatter.FormatAmountExact(converted, WalletHelper.CurrencyDecimals, state?.Currency ?? "USD"))
                 : string.Empty;
+        }
+
+        private void UpdateGiftMarket(TonWalletTransaction transaction, WalletHelper.GiftMarketActivity activity)
+        {
+            StatusRow.Content = activity.Status;
+            StatusRow.Visibility = Visibility.Visible;
+
+            if (activity.Price > 0)
+            {
+                PriceRow.Header = activity.OldPrice > 0 ? Strings.GiftOnchainRowNewPrice : Strings.GiftOnchainRowPrice;
+                PriceRow.Content = Formatter.Grams(activity.Price);
+                PriceRow.Visibility = Visibility.Visible;
+            }
+
+            if (activity.OldPrice > 0)
+            {
+                OldPrice.Text = Formatter.Grams(activity.OldPrice);
+                OldPriceRow.Visibility = Visibility.Visible;
+            }
+
+            if (activity.ExpirationDate > 0)
+            {
+                ExpirationRow.Content = Formatter.DateAt(activity.ExpirationDate);
+                ExpirationRow.Visibility = Visibility.Visible;
+            }
+
+            if (activity.CancellationFee > 0)
+            {
+                CancellationFeeRow.Content = Formatter.Grams(activity.CancellationFee);
+                CancellationFeeRow.Visibility = Visibility.Visible;
+            }
+
+            PeerRow.Visibility = Visibility.Collapsed;
+
+            if (activity.Counterparty != null)
+            {
+                AddressRow.Header = activity.Counterparty;
+            }
+
+            UpdateAddress(activity.CounterpartyAddress.Length > 0 ? activity.CounterpartyAddress : transaction.PeerAddress);
         }
 
         private void UpdatePeer(TonWalletTransaction transaction, TonWalletTransactionTypeTransfer transfer, TonWalletTransactionTypeNftTransfer nftTransfer, TonWalletTransactionTypeTelegramGiftTransfer giftTransfer, bool sent)

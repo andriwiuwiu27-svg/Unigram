@@ -632,8 +632,13 @@ namespace Telegram.Controls.Messages
             var height = 0d;
             var first = true;
 
-            foreach (var child in Children)
+            // Indexed: foreach over UIElementCollection allocates an enumerator per pass.
+            var children = Children;
+            var count = children.Count;
+
+            for (int i = 0; i < count; i++)
             {
+                var child = children[i];
                 child.Measure(new Size(availableSize.Width, float.PositiveInfinity));
 
                 var desired = child.DesiredSize;
@@ -663,8 +668,13 @@ namespace Telegram.Controls.Messages
             var y = 0d;
             var first = true;
 
-            foreach (var child in Children)
+            var children = Children;
+            var count = children.Count;
+
+            for (int i = 0; i < count; i++)
             {
+                var child = children[i];
+
                 if (!first)
                 {
                     y += BlockSpacing;

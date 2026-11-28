@@ -9,11 +9,11 @@
                   xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
                   mc:Ignorable="d">
 
-    <Page.Resources>
+    <UserControl.Resources>
         <CollectionViewSource x:Name="ItemsSource"
                               Source="{x:Bind ViewModel.Items}"
                               IsSourceGrouped="True" />
-    </Page.Resources>
+    </UserControl.Resources>
 
     <Grid Background="{ThemeResource SettingsPageBackground}">
         <controls:TableListView x:Name="ScrollingHost"

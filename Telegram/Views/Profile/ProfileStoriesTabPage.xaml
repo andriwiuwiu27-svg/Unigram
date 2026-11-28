@@ -10,14 +10,6 @@
                       mc:Ignorable="d"
                       ItemsSource="{x:Bind ViewModel.ItemsView, Mode=OneWay}">
 
-    <Page.Transitions>
-        <TransitionCollection>
-            <NavigationThemeTransition>
-                <SlideNavigationTransitionInfo Effect="FromRight" />
-            </NavigationThemeTransition>
-        </TransitionCollection>
-    </Page.Transitions>
-
     <Grid Background="{ThemeResource SettingsPageBackground}">
         <GridView x:Name="ScrollingHost"
                   ItemClick="List_ItemClick"

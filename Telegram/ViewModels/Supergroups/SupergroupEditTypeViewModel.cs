@@ -7,6 +7,7 @@
 
 using System.Threading.Tasks;
 using Telegram.Common;
+using Telegram.Controls;
 using Telegram.Navigation.Services;
 using Telegram.Services;
 using Telegram.Td.Api;
@@ -130,7 +131,7 @@ namespace Telegram.ViewModels.Supergroups
 
                         var confirm = await ShowPopupAsync(message, Strings.ApproveNewMembersApplyToLinksTitle, Strings.ApproveNewMembersApplyToLinksApply, Strings.ApproveNewMembersApplyToLinksDontApply);
 
-                        var joinByRequest = await ClientService.SendAsync(new ToggleSupergroupJoinByRequest(item.Id, _joinByRequest, cache.GuardBotUserId, confirm == ContentDialogResult.Primary));
+                        var joinByRequest = await ClientService.SendAsync(new ToggleSupergroupJoinByRequest(item.Id, _joinByRequest, cache.GuardBotUserId, confirm == ModalPopupResult.Primary));
                         if (joinByRequest is Error error)
                         {
                             ShowToast(error);

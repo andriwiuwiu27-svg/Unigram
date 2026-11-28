@@ -9,14 +9,6 @@
                   xmlns:cells="using:Telegram.Controls.Cells"
                   mc:Ignorable="d">
 
-    <Page.Transitions>
-        <TransitionCollection>
-            <NavigationThemeTransition>
-                <SlideNavigationTransitionInfo Effect="FromRight" />
-            </NavigationThemeTransition>
-        </TransitionCollection>
-    </Page.Transitions>
-
     <Grid Background="{ThemeResource SettingsPageBackground}">
         <controls:TableListView x:Name="ScrollingHost"
                                 ItemsSource="{x:Bind ViewModel.Members, Mode=OneWay}"

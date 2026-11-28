@@ -4,6 +4,7 @@
                   xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                   xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
                   xmlns:controls="using:Telegram.Controls"
+                  xmlns:navigation="using:Telegram.Navigation"
                   xmlns:messages="using:Telegram.Controls.Messages"
                   xmlns:local="using:Telegram.Views"
                   xmlns:viewModels="using:Telegram.ViewModels"
@@ -11,18 +12,10 @@
                   ShowHeader="False"
                   NavigationMode="Root">
 
-    <Page.Transitions>
-        <TransitionCollection>
-            <NavigationThemeTransition>
-                <EntranceNavigationTransitionInfo />
-            </NavigationThemeTransition>
-        </TransitionCollection>
-    </Page.Transitions>
-
     <Grid Background="{ThemeResource SettingsPageBackground}">
-        <Frame x:Name="MediaFrame"
-               Navigating="OnNavigating"
-               Navigated="OnNavigated" />
+        <navigation:NavigationFrame x:Name="MediaFrame"
+                                    Navigating="OnNavigating"
+                                    Navigated="OnNavigated" />
 
         <Grid VerticalAlignment="Bottom"
               HorizontalAlignment="Center"

@@ -8,14 +8,6 @@
                   xmlns:local="using:Telegram.Views"
                   mc:Ignorable="d">
 
-    <Page.Transitions>
-        <TransitionCollection>
-            <NavigationThemeTransition>
-                <SlideNavigationTransitionInfo Effect="FromRight" />
-            </NavigationThemeTransition>
-        </TransitionCollection>
-    </Page.Transitions>
-
     <Grid Background="{ThemeResource SettingsPageBackground}">
         <!-- Revoked links > Other admins > Own links -->
 

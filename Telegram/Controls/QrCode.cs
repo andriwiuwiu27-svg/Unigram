@@ -116,7 +116,8 @@ namespace Telegram.Controls
 
         public static QrCodeGeometry CreateGeometry(string text, int minVersion = 1, int maxVersion = 40, bool combine = false, float size = 222)
         {
-            var data = Build(null, QrBuffer.FromString(text), combine, size, out CanvasGeometry position);
+            using var data = Build(null, QrBuffer.FromString(text), combine, size, out CanvasGeometry position);
+            using var finders = position;
 
             return position == null
                 ? new QrCodeGeometry(new CompositionPath(data))
@@ -180,14 +181,16 @@ namespace Telegram.Controls
 
             void large(float x, float y)
             {
-                var rect1 = CanvasGeometry.CreateRoundedRectangle(resourceCreator, x, y, pixel * 7 + 2, pixel * 7 + 2, 15 / 222f * size, 15 / 222f * size);
-                var rect2 = CanvasGeometry.CreateRoundedRectangle(resourceCreator, x + pixel, y + pixel, pixel * 5 + 2, pixel * 5 + 2, 9 / 222f * size, 9 / 222f * size);
+                using var rect1 = CanvasGeometry.CreateRoundedRectangle(resourceCreator, x, y, pixel * 7 + 2, pixel * 7 + 2, 15 / 222f * size, 15 / 222f * size);
+                using var rect2 = CanvasGeometry.CreateRoundedRectangle(resourceCreator, x + pixel, y + pixel, pixel * 5 + 2, pixel * 5 + 2, 9 / 222f * size, 9 / 222f * size);
                 var rect3 = CanvasGeometry.CreateRoundedRectangle(resourceCreator, x + pixel * 2, y + pixel * 2, pixel * 3 + 2, pixel * 3 + 2, pixel, pixel);
 
                 if (combine)
                 {
-                    builder.AddGeometry(rect1.CombineWith(rect2, Matrix3x2.Identity, CanvasGeometryCombine.Exclude));
+                    using var ring = rect1.CombineWith(rect2, Matrix3x2.Identity, CanvasGeometryCombine.Exclude);
+                    builder.AddGeometry(ring);
                     builder.AddGeometry(rect3);
+                    rect3.Dispose();
                 }
                 else
                 {
@@ -197,7 +200,8 @@ namespace Telegram.Controls
             }
             void brect(float x, float y, float width, float height)
             {
-                builder.AddGeometry(CanvasGeometry.CreateRectangle(resourceCreator, x, y, width, height));
+                using var rect = CanvasGeometry.CreateRectangle(resourceCreator, x, y, width, height);
+                builder.AddGeometry(rect);
             }
             void barch(float x, float y, bool topLeft, bool topRight, bool bottomRight, bool bottomLeft)
             {
@@ -338,7 +342,8 @@ namespace Telegram.Controls
                 if (size == 222)
                 {
                     // If combined we add the inner circle
-                    builder.AddGeometry(CanvasGeometry.CreateCircle(resourceCreator, 111, 111, 16));
+                    using var circle = CanvasGeometry.CreateCircle(resourceCreator, 111, 111, 16);
+                    builder.AddGeometry(circle);
                 }
 
                 position = null;
@@ -346,6 +351,12 @@ namespace Telegram.Controls
             }
 
             position = CanvasGeometry.CreateGroup(resourceCreator, geometries, CanvasFilledRegionDetermination.Winding);
+
+            foreach (var part in geometries)
+            {
+                part?.Dispose();
+            }
+
             return CanvasGeometry.CreatePath(builder);
         }
 

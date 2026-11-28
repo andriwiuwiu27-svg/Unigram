@@ -53,11 +53,12 @@ namespace Telegram.Views
         private bool _dateHeaderCollapsed = true;
 
         private readonly ThemeShadowEx _toolTipShadow;
-        private readonly ThemeShadowEx _manageShadow;
+        private ThemeShadowEx _manageShadow;
 
         public ProfilePage()
         {
             InitializeComponent();
+            Transition = PageTransition.Entrance;
 
             _loader = new ScrollViewerIncrementalLoader(ScrollingHost);
 
@@ -72,7 +73,6 @@ namespace Telegram.Views
             ScrollingHost.AddHandler(PointerWheelChangedEvent, new PointerEventHandler(OnPointerWheelChanged), true);
 
             _toolTipShadow = new ThemeShadowEx(ToolTip, 32);
-            _manageShadow = new ThemeShadowEx(ManageCard, Constants.BubbleElevation);
         }
 
         public override HostedPagePositionBase GetPosition()
@@ -100,40 +100,82 @@ namespace Telegram.Views
             }
         }
 
+        // The back and edit buttons start to collapse once the profile has scrolled this far, then
+        // shrink by a fifth and rise by 16 over StickyHeader.CollapseRange, landing where the back
+        // button of every other page does.
+        private const float ChromeCollapseStart = 148;
+        private const float ChromeShrink = 0.2f;
+        private const float ChromeLift = 16;
+
+        // The least height the tabs and the settling are given for the header.
+        private const float MinimumHeaderHeight = StickyHeader.CollapsedHeight + 10;
+
+        /// <summary>
+        /// Everything that follows the scroll position on the compositor: the tab strip pinning under
+        /// the collapsed header, the media clip, the back and edit buttons, and the header's own
+        /// collapse. Built once per page, which is once per open: the page is not retained.
+        /// </summary>
         private void InitializeScrolling()
         {
-            var properties = ElementCompositionPreview.GetScrollViewerManipulationPropertySet(ScrollingHost);
-            var visual = ElementComposition.GetElementVisual(HeaderPanel);
-            var border = ElementComposition.GetElementVisual(CardBackground);
-            var menu = ElementComposition.GetElementVisual(MenuRoot);
+            var scroll = ElementCompositionPreview.GetScrollViewerManipulationPropertySet(ScrollingHost);
+            var compositor = scroll.Compositor;
+
+            var tabs = ElementComposition.GetElementVisual(HeaderPanel);
             var media = ElementComposition.GetElementVisual(MediaFrame);
-            media.Clip = media.Compositor.CreateInsetClip();
+            var back = ElementComposition.GetElementVisual(BackButton);
+            var edit = ElementComposition.GetElementVisual(EditRoot);
 
             ElementCompositionPreview.SetIsTranslationEnabled(HeaderPanel, true);
             ElementCompositionPreview.SetIsTranslationEnabled(BackButton, true);
             ElementCompositionPreview.SetIsTranslationEnabled(EditRoot, true);
 
-            var translation = visual.Compositor.CreateExpressionAnimation(ViewModel.IsSavedMessages ? "-scrollViewer.Translation.Y" :
-                $"_.ActualHeight > 16 ? scrollViewer.Translation.Y > -(_.ActualHeight + 8) ? 0 : -scrollViewer.Translation.Y - (_.ActualHeight + 8) : -scrollViewer.Translation.Y");
-            translation.SetReferenceParameter("scrollViewer", properties);
-            translation.SetReferenceParameter("_", ProfileHeader.Properties);
+            // The strip pins once the content has scrolled the header's ActualHeight plus the
+            // overlap, which leaves it resting under the collapsed bar the way a StickyHeaderTabs
+            // does. Until the header is taller than that bar it has not been measured, and the
+            // strip stays at the top. Saved Messages has no header to scroll past.
+            var pinned = FormattableString.Invariant($"(_.ActualHeight + {StickyHeaderTabs.HeaderOverlap})");
+            var pin = compositor.CreateExpressionAnimation(ViewModel.IsSavedMessages
+                ? "-scroll.Translation.Y"
+                : $"_.ActualHeight > 16 ? -scroll.Translation.Y > {pinned} ? -scroll.Translation.Y - {pinned} : 0 : -scroll.Translation.Y");
+            pin.SetReferenceParameter("scroll", scroll);
+            pin.SetReferenceParameter("_", ProfileHeader.Properties);
 
-            var clip = visual.Compositor.CreateExpressionAnimation(
-                "-scrollViewer.Translation.Y + 4");
-            clip.SetReferenceParameter("scrollViewer", properties);
-            clip.SetReferenceParameter("properties", ProfileHeader.Properties);
+            tabs.StartAnimation("Translation.Y", pin);
 
-            //var fadeIn = visual.Compositor.CreateExpressionAnimation(
-            //    "properties.ActualHeight > 16 ? scrollViewer.Translation.Y > -(properties.ActualHeight - 16) ? 0 : ((-scrollViewer.Translation.Y - (properties.ActualHeight - 16)) / 16) : 1");
-            //fadeIn.SetReferenceParameter("scrollViewer", properties);
-            //fadeIn.SetReferenceParameter("properties", ProfileHeader.Properties);
+            var clip = compositor.CreateExpressionAnimation("-scroll.Translation.Y + 4");
+            clip.SetReferenceParameter("scroll", scroll);
 
-            visual.StartAnimation("Translation.Y", translation);
+            media.Clip = compositor.CreateInsetClip();
             media.Clip.StartAnimation("TopInset", clip);
 
-            //border.StartAnimation("Opacity", fadeOut);
+            // Shown by ShowHideSubtitle once the header has collapsed.
+            ElementComposition.GetElementVisual(MenuRoot).Opacity = 0;
 
-            menu.Opacity = 0;
+            back.CenterPoint = new Vector3(24, 16, 0);
+
+            if (ProfileHeader.Visibility == Visibility.Visible && !ViewModel.IsSavedMessages)
+            {
+                var progress = FormattableString.Invariant($"clamp((-scroll.Translation.Y - {ChromeCollapseStart}) / {StickyHeader.CollapseRange}, 0, 1)");
+                var factor = FormattableString.Invariant($"(1 - {progress} * {ChromeShrink})");
+
+                var scale = compositor.CreateExpressionAnimation($"vector3({factor}, {factor}, 1)");
+                scale.SetReferenceParameter("scroll", scroll);
+
+                var lift = compositor.CreateExpressionAnimation(FormattableString.Invariant($"-{ChromeLift} * {progress}"));
+                lift.SetReferenceParameter("scroll", scroll);
+
+                back.StartAnimation("Scale", scale);
+                back.StartAnimation("Translation.Y", lift);
+                edit.StartAnimation("Translation.Y", lift);
+            }
+            else
+            {
+                back.Scale = new Vector3(1 - ChromeShrink);
+                back.Properties.InsertVector3("Translation", new Vector3(0, -ChromeLift, 0));
+                edit.Properties.InsertVector3("Translation", new Vector3(0, -ChromeLift, 0));
+            }
+
+            ProfileHeader.InitializeScrolling(scroll);
         }
 
         public void OnBackRequested(BackRequestedRoutedEventArgs args)
@@ -149,7 +191,7 @@ namespace Telegram.Views
             }
         }
 
-        protected override void OnNavigatedTo(NavigationEventArgs e)
+        protected override void OnNavigatedTo(NavigatedEventArgs e)
         {
             if (PowerSavingPolicy.AreSmoothTransitionsEnabled && AppSettings.Diagnostics.ConnectedAnimationsDebug)
             {
@@ -157,10 +199,11 @@ namespace Telegram.Views
             }
 
             ViewModel.PropertyChanged += OnPropertyChanged;
+            _navigatedTo = true;
 
             if (ViewModel.SelectedItem is ProfileTabItem tab)
             {
-                MediaFrame.Navigate(tab.PageType, tab.Parameter, new SuppressNavigationTransitionInfo());
+                MediaFrame.Navigate(tab.PageType, tab.Parameter, PageTransition.None);
             }
 
             InitializeScrolling();
@@ -170,40 +213,13 @@ namespace Telegram.Views
                 ProfileHeader.Margin = new Thickness(0, 0, 0, -8);
                 ShowHideSubtitle(true);
             }
-
-            var properties = ElementCompositionPreview.GetScrollViewerManipulationPropertySet(ScrollingHost);
-
-            var visual3 = ElementComposition.GetElementVisual(EditRoot);
-            var visual4 = ElementComposition.GetElementVisual(BackButton);
-            visual4.CenterPoint = new Vector3(24, 16, 0);
-
-            if (ProfileHeader.Visibility == Visibility.Visible && !ViewModel.IsSavedMessages)
-            {
-                var expOut2 = "clamp(1 - ((-(scrollViewer.Translation.Y + 148) / 32) * 0.2), 0.8, 1)";
-                var slideOut2 = properties.Compositor.CreateExpressionAnimation($"vector3({expOut2}, {expOut2}, 1)");
-                slideOut2.SetReferenceParameter("scrollViewer", properties);
-
-                var slideOut3 = properties.Compositor.CreateExpressionAnimation("-clamp(((-(scrollViewer.Translation.Y + 148) / 32) * 16), 0, 16)");
-                slideOut3.SetReferenceParameter("scrollViewer", properties);
-
-                visual4.StartAnimation("Scale", slideOut2);
-                visual4.StartAnimation("Translation.Y", slideOut3);
-                visual3.StartAnimation("Translation.Y", slideOut3);
-            }
-            else
-            {
-                visual4.Scale = new Vector3(0.8f);
-                visual4.Properties.InsertVector3("Translation", new Vector3(0, -16, 0));
-                visual3.Properties.InsertVector3("Translation", new Vector3(0, -16, 0));
-            }
-
-            ProfileHeader.InitializeScrolling(properties);
         }
 
-        protected override void OnNavigatedFrom(NavigationEventArgs e)
+        protected override void OnNavigatedFrom(NavigatedEventArgs e)
         {
             ViewModel.PropertyChanged -= OnPropertyChanged;
             ViewModel.Delegate = null;
+            _navigatedTo = false;
 
             if (_notifyCollectionChanged != null)
             {
@@ -234,7 +250,7 @@ namespace Telegram.Views
             }
         }
 
-        protected override void OnNavigatingFrom(NavigatingCancelEventArgs e)
+        protected override void OnNavigatingFrom(NavigatingEventArgs e)
         {
             if (PowerSavingPolicy.AreSmoothTransitionsEnabled && AppSettings.Diagnostics.ConnectedAnimationsDebug && e.SourcePageType == typeof(ChatPage) && ViewModel.NavigationService.TryGetChatFromParameter(e.Parameter, out ChatMessageTopic nextTopic))
             {
@@ -253,7 +269,7 @@ namespace Telegram.Views
         {
             if (e.PropertyName.Equals("SharedCount") && ViewModel.SelectedItem is ProfileTabItem tab)
             {
-                MediaFrame.Navigate(tab.PageType, null, new SuppressNavigationTransitionInfo());
+                MediaFrame.Navigate(tab.PageType, null, PageTransition.None);
             }
         }
 
@@ -298,6 +314,13 @@ namespace Telegram.Views
 
         private void UpdateBackButton()
         {
+            // The header can be laid out before navigation hands the page its view model.
+            // UpdateChat calls this again once there is one.
+            if (ViewModel == null)
+            {
+                return;
+            }
+
             BackButton.RequestedTheme = ScrollingHost.VerticalOffset >= ProfileHeader.OccludedHeight
                 ? ElementTheme.Default
                 : ProfileHeader.HeaderTheme;
@@ -342,6 +365,11 @@ namespace Telegram.Views
         public void UpdateChatEmojiStatus(Chat chat)
         {
             ProfileHeader.UpdateChatEmojiStatus(chat);
+        }
+
+        public void UpdateChatActionBar(Chat chat)
+        {
+            ProfileHeader.UpdateChatActionBar(chat);
         }
 
         public void UpdateChatAccentColors(Chat chat)
@@ -459,7 +487,7 @@ namespace Telegram.Views
 
         private bool _backgroundUpdated;
 
-        private void OnNavigating(object sender, NavigatingCancelEventArgs e)
+        private void OnNavigating(object sender, NavigatingEventArgs e)
         {
             if (_notifyCollectionChanged != null)
             {
@@ -479,9 +507,9 @@ namespace Telegram.Views
                     TargetPageParameter = e.Parameter
                 };
 
+                // Torn down once released, so the history stays on screen while the tab slides out.
                 savedMessagesPage.ViewModel.NavigatingFrom(args);
                 savedMessagesPage.ViewModel.NavigatedFrom(null, false);
-                savedMessagesPage.Deactivate(true);
             }
             else if (MediaFrame.Content is ProfileTabPage tabPage)
             {
@@ -490,7 +518,15 @@ namespace Telegram.Views
             }
         }
 
-        private void OnNavigated(object sender, NavigationEventArgs e)
+        private void OnMediaReleased(object sender, NavigationPageReleasedEventArgs e)
+        {
+            if (e.Page is IProfileChatPage savedMessagesPage)
+            {
+                savedMessagesPage.Deactivate(e.Navigation);
+            }
+        }
+
+        private void OnNavigated(object sender, NavigatedEventArgs e)
         {
             UpdateSearch(e.Content);
 
@@ -505,7 +541,7 @@ namespace Telegram.Views
                 BackgroundRoot.Visibility = Visibility.Visible;
 
                 savedMessagesPage.Activate(ViewModel.NavigationService);
-                savedMessagesPage.HeaderHeight = Math.Max(Header.ActualHeight, 48 + 10);
+                savedMessagesPage.HeaderHeight = Math.Max(Header.ActualHeight, MinimumHeaderHeight);
                 savedMessagesPage.ViewModel.Dispatcher = ViewModel.Dispatcher;
                 savedMessagesPage.ViewModel.NavigationService = ViewModel.NavigationService;
                 _ = savedMessagesPage.ViewModel.NavigatedToAsync(e.Parameter, e.NavigationMode, new Telegram.Navigation.Services.NavigationState());
@@ -521,7 +557,7 @@ namespace Telegram.Views
                 return;
             }
 
-            tabPage.HeaderHeight = Math.Max(Header.ActualHeight, 48 + 10);
+            tabPage.HeaderHeight = Math.Max(Header.ActualHeight, MinimumHeaderHeight);
 
             if (e.Content is ProfileSavedChatsTabPage or ProfileMediaTabPage or ProfileGiftsTabPage)
             {
@@ -608,10 +644,15 @@ namespace Telegram.Views
             UpdateBackButton();
 
             MediaFrame.MinHeight = ScrollingHost.ActualHeight + e.NewSize.Height - 80;
+        }
 
+        // Before the tab is measured: a list laid out under a header shorter than the real one
+        // realizes the rows the header then covers.
+        private void OnHeaderMeasured(object sender, EventArgs e)
+        {
             if (MediaFrame.Content is ProfileTabPage tabPage)
             {
-                tabPage.HeaderHeight = Math.Max(e.NewSize.Height, 48 + 10);
+                tabPage.HeaderHeight = Math.Max(Header.DesiredSize.Height, MinimumHeaderHeight);
             }
         }
 
@@ -627,13 +668,13 @@ namespace Telegram.Views
             var width = Math.Min(24 + 1000 + 24, BackgroundRoot.ActualSize.X) - 24 - 24;
             var x = (BackgroundRoot.ActualSize.X - width) / 2;
 
-            var elli1 = CanvasGeometry.CreateRoundedRectangle(null, x, 0, width, BackgroundRoot.ActualSize.Y, 4, 4);
+            using var elli1 = CanvasGeometry.CreateRoundedRectangle(null, x, 0, width, BackgroundRoot.ActualSize.Y, 4, 4);
             var ellipse = material.Compositor.CreatePathGeometry(new CompositionPath(elli1));
             var clip = material.Compositor.CreateGeometricClip(ellipse);
 
             var animation = material.Compositor.CreateExpressionAnimation("max(4, _.Translation.Y + HeaderHeight + 4)");
             animation.SetReferenceParameter("_", properties);
-            animation.SetScalarParameter("HeaderHeight", Math.Max(Header.ActualSize.Y, 48 + 10));
+            animation.SetScalarParameter("HeaderHeight", Math.Max(Header.ActualSize.Y, MinimumHeaderHeight));
 
             material.Clip = clip;
             clip.StartAnimation("Offset.Y", animation);
@@ -770,9 +811,9 @@ namespace Telegram.Views
             // The header collapses over the first band and the tabs pin at the end of the second.
             // With nothing in the header below its collapsing part the two bands meet, and a header
             // collapsed over tabs that have not pinned yet is not a place to rest.
-            var collapsed = ProfileHeader.HeaderHeight - 48;
-            var approach = ProfileHeader.ActualSize.Y - 48;
-            var content = Math.Max(ProfileHeader.ActualSize.Y - 24, 48 + 10);
+            var collapsed = ProfileHeader.HeaderHeight - StickyHeader.CollapsedHeight;
+            var approach = ProfileHeader.ActualSize.Y - StickyHeader.CollapsedHeight;
+            var content = Math.Max(ProfileHeader.ActualSize.Y - 24, MinimumHeaderHeight);
 
             bool settle;
             double target;
@@ -1062,20 +1103,22 @@ namespace Telegram.Views
 
         private int _prevSelectedIndex = -1;
 
+        // The tabs arrive after awaits, so the binding can select one after the page has been
+        // navigated from. A chat tab opened then is activated with nothing left to deactivate it,
+        // and outlives its views subscribed to the chat. OnNavigatedTo opens the selected tab.
+        private bool _navigatedTo;
+
         private void Navigation_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (Navigation.SelectedItem is ProfileTabItem page && (page.Parameter != null || page.PageType != MediaFrame.Content?.GetType()))
+            if (_navigatedTo && Navigation.SelectedItem is ProfileTabItem page && (page.Parameter != null || page.PageType != MediaFrame.Content?.GetType()))
             {
                 Logger.Info(page.PageType);
 
-                NavigationTransitionInfo transition = _prevSelectedIndex == -1
-                    ? new SuppressNavigationTransitionInfo()
-                    : new SlideNavigationTransitionInfo
-                    {
-                        Effect = _prevSelectedIndex < Navigation.SelectedIndex
-                            ? SlideNavigationTransitionEffect.FromRight
-                            : SlideNavigationTransitionEffect.FromLeft
-                    };
+                var transition = _prevSelectedIndex == -1
+                    ? PageTransition.None
+                    : _prevSelectedIndex < Navigation.SelectedIndex
+                    ? PageTransition.Forward
+                    : PageTransition.Backward;
 
                 _hasBeenScrolled = false;
 
@@ -1154,12 +1197,13 @@ namespace Telegram.Views
             }
             else if (MediaFrame.Content is ProfileGiftsTabPage)
             {
+                // The item names the order it switches to.
                 var sort = new MenuFlyoutItem
                 {
                     Text = ViewModel.GiftsTab.SortByPrice
-                        ? Strings.Gift2FilterSortByValue
-                        : Strings.Gift2FilterSortByDate,
-                    Icon = MenuFlyoutHelper.CreateIcon(ViewModel.GiftsTab.SortByPrice ? Icons.DollarArrowUp : Icons.CalendarArrowUp)
+                        ? Strings.Gift2FilterSortByDate
+                        : Strings.Gift2FilterSortByValue,
+                    Icon = MenuFlyoutHelper.CreateIcon(ViewModel.GiftsTab.SortByPrice ? Icons.CalendarArrowUp : Icons.DollarArrowUp)
                 };
 
                 var unlimited = new MenuFlyoutItem
@@ -1199,8 +1243,25 @@ namespace Telegram.Views
                 upgradable.Click += (s, args) => UpdateFilters(() => ViewModel.GiftsTab.ExcludeUpgradable = !ViewModel.GiftsTab.ExcludeUpgradable);
                 unique.Click += (s, args) => UpdateFilters(() => ViewModel.GiftsTab.ExcludeUpgraded = !ViewModel.GiftsTab.ExcludeUpgraded);
 
-                flyout.Items.Add(sort);
-                flyout.CreateFlyoutSeparator();
+                var gifts = ViewModel.GiftsTab;
+
+                // A collection keeps the order its owner gave it.
+                if (gifts.SelectedCollection?.Id is null or 0)
+                {
+                    flyout.Items.Add(sort);
+                }
+
+                // The first collection is All gifts, which is not one of the user's.
+                if (gifts.IsOwned && gifts.Collections.Count - 1 < gifts.ClientService.Options.GiftCollectionCountMax)
+                {
+                    flyout.CreateFlyoutItem(gifts.CreateCollection, (ReceivedGift)null, Strings.Gift2NewCollection, Icons.FolderAdd);
+                }
+
+                if (flyout.Items.Count > 0)
+                {
+                    flyout.CreateFlyoutSeparator();
+                }
+
                 flyout.Items.Add(unlimited);
                 flyout.Items.Add(limited);
                 flyout.Items.Add(upgradable);
@@ -1256,7 +1317,7 @@ namespace Telegram.Views
                 popup.MaxDate = DateTimeOffset.Now.Date;
 
                 var confirm = await ViewModel.ShowPopupAsync(popup);
-                if (confirm == ContentDialogResult.Primary && popup.SelectedDates.Count > 0)
+                if (confirm == ModalPopupResult.Primary && popup.SelectedDates.Count > 0)
                 {
                     var first = popup.SelectedDates.FirstOrDefault();
                     var offset = first.Date.ToUnixTimeSeconds();
@@ -1326,6 +1387,13 @@ namespace Telegram.Views
             }
 
             _manageCollapsed = !show;
+
+            if (ManagePanel == null)
+            {
+                FindName(nameof(ManagePanel));
+                _manageShadow = new ThemeShadowEx(ManageCard, Constants.BubbleElevation);
+            }
+
             ManagePanel.Visibility = Visibility.Visible;
 
             var manage = ElementComposition.GetElementVisual(ManagePanel);

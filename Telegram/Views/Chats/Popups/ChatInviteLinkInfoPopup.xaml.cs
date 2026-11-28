@@ -19,7 +19,7 @@ using Windows.UI.Xaml.Controls.Primitives;
 
 namespace Telegram.Views.Chats.Popups
 {
-    public sealed partial class ChatInviteLinkInfoPopup : ContentPopup, IIncrementalCollectionOwner
+    public sealed partial class ChatInviteLinkInfoPopup : ModalPopup, IIncrementalCollectionOwner
     {
         private readonly ChatInviteLinksViewModel _viewModel;
         private readonly long _chatId;

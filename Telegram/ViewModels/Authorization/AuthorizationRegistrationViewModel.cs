@@ -6,6 +6,7 @@
 //
 
 using Telegram.Common;
+using Telegram.Controls;
 using Telegram.Navigation;
 using Telegram.Services;
 using Telegram.Td.Api;
@@ -55,14 +56,14 @@ namespace Telegram.ViewModels.Authorization
                 async void CancelSignUp()
                 {
                     var decline = await ShowPopupAsync(Strings.TosUpdateDecline, Strings.TermsOfService, Strings.DeclineDeactivate, Strings.Back);
-                    if (decline != ContentDialogResult.Primary)
+                    if (decline != ModalPopupResult.Primary)
                     {
                         SendExecute();
                         return;
                     }
 
                     var delete = await ShowPopupAsync(Strings.TosDeclineDeleteAccount, Strings.AppName, Strings.Deactivate, Strings.Cancel);
-                    if (delete != ContentDialogResult.Primary)
+                    if (delete != ModalPopupResult.Primary)
                     {
                         SendExecute();
                         return;
@@ -72,7 +73,7 @@ namespace Telegram.ViewModels.Authorization
                 }
 
                 var confirm = await ShowPopupAsync(waitRegistration.TermsOfService.Text, Strings.TermsOfService, Strings.SignUp, Strings.Decline);
-                if (confirm != ContentDialogResult.Primary)
+                if (confirm != ModalPopupResult.Primary)
                 {
                     CancelSignUp();
                     return;
@@ -81,7 +82,7 @@ namespace Telegram.ViewModels.Authorization
                 if (waitRegistration.TermsOfService.MinUserAge > 0)
                 {
                     var age = await ShowPopupAsync(string.Format(Strings.TosAgeText, waitRegistration.TermsOfService.MinUserAge), Strings.TosAgeTitle, Strings.Agree, Strings.Cancel);
-                    if (age != ContentDialogResult.Primary)
+                    if (age != ModalPopupResult.Primary)
                     {
                         CancelSignUp();
                         return;

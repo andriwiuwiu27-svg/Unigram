@@ -36,7 +36,7 @@ namespace Telegram.Views.Popups
 
         private void Label_Submitted(object sender, EventArgs e)
         {
-            Hide(ContentDialogResult.Primary);
+            Hide(ModalPopupResult.Primary);
         }
 
         private bool _empty = true;
@@ -59,7 +59,7 @@ namespace Telegram.Views.Popups
 
         private void Remove_Click(object sender, RoutedEventArgs e)
         {
-            Hide(ContentDialogResult.Primary);
+            Hide(ModalPopupResult.Primary);
         }
     }
 }

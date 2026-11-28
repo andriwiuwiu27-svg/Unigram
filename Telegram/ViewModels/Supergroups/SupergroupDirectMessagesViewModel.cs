@@ -7,6 +7,7 @@
 
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
+using Telegram.Controls;
 using Telegram.Navigation.Services;
 using Telegram.Services;
 using Telegram.Td.Api;
@@ -84,11 +85,11 @@ namespace Telegram.ViewModels.Supergroups
                 args.Cancel = true;
 
                 var confirm = await ShowPopupAsync(Strings.MessageSuggestionsUnsavedChanges, Strings.UnsavedChanges, Strings.ChatThemeSaveDialogApply, Strings.ChatThemeSaveDialogDiscard);
-                if (confirm == ContentDialogResult.Primary)
+                if (confirm == ModalPopupResult.Primary)
                 {
                     ContinueImpl(args);
                 }
-                else if (confirm == ContentDialogResult.Secondary)
+                else if (confirm == ModalPopupResult.Secondary)
                 {
                     _completed = true;
                     NavigationService.GoBack(args);

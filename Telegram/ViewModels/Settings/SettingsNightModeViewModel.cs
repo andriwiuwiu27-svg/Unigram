@@ -6,6 +6,7 @@
 //
 
 using System;
+using Telegram.Controls;
 using Telegram.Services;
 using Telegram.Services.Settings;
 using Telegram.Td.Api;
@@ -32,7 +33,7 @@ namespace Telegram.ViewModels.Settings
             if (location == null)
             {
                 var confirm = await ShowPopupAsync(Strings.GpsDisabledAlert, Strings.AppName, Strings.ConnectingToProxyEnable, Strings.Cancel);
-                if (confirm == ContentDialogResult.Primary)
+                if (confirm == ModalPopupResult.Primary)
                 {
                     await Launcher.LaunchUriAsync(new Uri("ms-settings:privacy-location"));
                 }

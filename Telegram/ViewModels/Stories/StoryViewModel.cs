@@ -51,6 +51,25 @@ namespace Telegram.ViewModels.Stories
 
         public int Date { get; private set; }
 
+        /// <summary>
+        /// The username a link to the story is built on: a public chat's, or a public user's if
+        /// everyone can see the story.
+        /// </summary>
+        public bool TryGetLinkUsername(out string username)
+        {
+            if (ClientService.TryGetSupergroup(Chat, out Supergroup supergroup))
+            {
+                return supergroup.HasActiveUsername(out username);
+            }
+            else if (ClientService.TryGetUser(Chat, out User user) && PrivacySettings is StoryPrivacySettingsEveryone)
+            {
+                return user.HasActiveUsername(out username);
+            }
+
+            username = null;
+            return false;
+        }
+
         public long PosterChatId { get; }
 
         public Chat Chat { get; }
@@ -62,6 +81,8 @@ namespace Telegram.ViewModels.Stories
         public bool IsBeingPosted { get; private set; }
 
         public bool IsBeingEdited { get; private set; }
+
+        public bool IsEdited { get; private set; }
 
         /// <summary>
         /// Why posting the story failed. TDLib forgets such a story, so this view model is all that
@@ -139,6 +160,7 @@ namespace Telegram.ViewModels.Stories
             Date = story.Date;
             IsBeingPosted = story.IsBeingPosted;
             IsBeingEdited = story.IsBeingEdited;
+            IsEdited = story.IsEdited;
             Caption = story.Caption;
             Content = story.Content;
             PrivacySettings = story.PrivacySettings;
@@ -156,7 +178,19 @@ namespace Telegram.ViewModels.Stories
             HasExpiredViewers = story.HasExpiredViewers;
             Areas = story.Areas;
             ChosenReactionType = story.ChosenReactionType;
+            PosterId = story.PosterId;
+            RepostInfo = story.RepostInfo;
         }
+
+        /// <summary>
+        /// Who posted the story, if known; for a group's story, the member or chat that did.
+        /// </summary>
+        public MessageSender PosterId { get; private set; }
+
+        /// <summary>
+        /// The story this one reposts; null if it isn't a repost.
+        /// </summary>
+        public StoryRepostInfo RepostInfo { get; private set; }
 
         public FormattedText Caption { get; private set; }
 

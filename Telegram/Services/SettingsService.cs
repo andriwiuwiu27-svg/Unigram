@@ -27,6 +27,7 @@ namespace Telegram.Services
 
         bool HideArchivedChats { get; set; }
         bool HideRichPasteToast { get; set; }
+        long BroadcastGroupSuggestionDate { get; set; }
         bool IsSecretPreviewsEnabled { get; set; }
         int LastMessageTtl { get; set; }
 
@@ -92,6 +93,13 @@ namespace Telegram.Services
         {
             get => _hideRichPasteToast ??= GetValueOrDefault("HideRichPasteToast", false);
             set => AddOrUpdateValue(ref _hideRichPasteToast, "HideRichPasteToast", value);
+        }
+
+        private long? _broadcastGroupSuggestionDate;
+        public long BroadcastGroupSuggestionDate
+        {
+            get => _broadcastGroupSuggestionDate ??= GetValueOrDefault("BroadcastGroupSuggestionDate", 0L);
+            set => AddOrUpdateValue(ref _broadcastGroupSuggestionDate, "BroadcastGroupSuggestionDate", value);
         }
 
         private RecentEmojiSettings _recentEmoji;

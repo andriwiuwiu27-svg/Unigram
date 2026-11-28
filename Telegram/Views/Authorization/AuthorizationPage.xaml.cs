@@ -9,6 +9,7 @@ using System;
 using System.Numerics;
 using Telegram.Common;
 using Telegram.Controls;
+using Telegram.Navigation.Services;
 using Telegram.Navigation;
 using Telegram.Streams;
 using Telegram.ViewModels.Authorization;
@@ -32,13 +33,17 @@ namespace Telegram.Views.Authorization
 
         private bool _waiting = true;
 
-        protected override void OnNavigatedTo(NavigationEventArgs e)
+        protected override void OnNavigatedTo(NavigatedEventArgs e)
         {
             ViewModel.Window.SetTitleBar(TitleBar);
             ViewModel.PropertyChanged += OnPropertyChanged;
+
+            Back.Visibility = Frame?.NavigationService?.CanGoBack is true
+                ? Visibility.Visible
+                : Visibility.Collapsed;
         }
 
-        protected override void OnNavigatedFrom(NavigationEventArgs e)
+        protected override void OnNavigatedFrom(NavigatedEventArgs e)
         {
             ViewModel.Window.SetTitleBar(null);
             ViewModel.PropertyChanged -= OnPropertyChanged;

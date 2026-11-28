@@ -1,7 +1,7 @@
 {
   "font": {"family": "Telegram", "unitsPerEm": 1024, "ascent": 960, "descent": 64, "version": "2.186"},
   "sources": {
-    "fluent": {"type": "npm", "package": "@fluentui/svg-icons", "version": "1.1.345", "prefix": "icons/"}
+    "fluent": {"type": "npm", "package": "@fluentui/svg-icons", "version": "1.1.347", "prefix": "icons/"}
   },
   "icons": [
     {"name": "uniE001", "code": "E001", "src": "alias:E8FB", "note": "same glyph as ic_fluent_checkmark_20_regular"},
@@ -721,6 +721,11 @@
     {"name": "tl_fluent_panel_left_text_20_regular", "code": "F7B6", "src": "icons/tl_fluent_panel_left_text_20_regular.svg"},
     {"name": "tl_fluent_panel_bottom_text_20_regular", "code": "F7B7", "src": "icons/tl_fluent_panel_bottom_text_20_regular.svg"},
     {"name": "tl_fluent_panel_right_text_20_regular", "code": "F7B8", "src": "icons/tl_fluent_panel_right_text_20_regular.svg"},
+    {"name": "ic_fluent_add_20_filled", "code": "F7B9", "src": "fluent:add_20_filled"},
+    {"name": "tl_fluent_stories_add_20_regular", "code": "F7BA", "src": "icons/tl_fluent_stories_add_20_regular.svg"},
+    {"name": "tl_fluent_payment_dismiss_20_filled", "code": "F7BB", "src": "icons/tl_fluent_payment_dismiss_20_filled.svg"},
+    {"name": "tl_fluent_brush_20_regular", "code": "F7BC", "src": "icons/tl_fluent_brush_20_regular.svg"},
+    {"name": "tl_fluent_brush_16_regular", "code": "F7BD", "src": "icons/tl_fluent_brush_16_regular.svg"},
     {"name": "uE6000", "code": "E6000", "src": "icons/uE6000.svg"}
   ]
 }

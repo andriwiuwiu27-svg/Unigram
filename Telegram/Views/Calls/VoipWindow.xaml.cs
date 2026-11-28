@@ -57,6 +57,10 @@ namespace Telegram.Views.Calls
         private readonly DispatcherTimer _durationTimer;
         private readonly DispatcherTimer _discardedTimer;
 
+        // A state change raised before OnWindowClosed unsubscribed can still be queued on the
+        // dispatcher, and running it would start _discardedTimer on a window that is gone.
+        private bool _closed;
+
         private readonly DisplayRequest _displayRequest = new();
 
         private VoipConnectionState _background;
@@ -248,6 +252,11 @@ namespace Telegram.Views.Calls
 
         private void OnStateChanged(VoipCallStateChangedEventArgs args)
         {
+            if (_closed)
+            {
+                return;
+            }
+
             if (args.State == VoipState.Ready)
             {
                 Screen.IsEnabled = args.ReadyState == VoipReadyState.Established || _call.Duration > 0;
@@ -928,6 +937,7 @@ namespace Telegram.Views.Calls
 
         protected override void OnWindowClosed()
         {
+            _closed = true;
             _durationTimer.Stop();
             _discardedTimer.Stop();
 

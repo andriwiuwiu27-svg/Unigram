@@ -9,6 +9,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Telegram.Collections;
 using Telegram.Common;
+using Telegram.Controls;
 using Telegram.Navigation.Services;
 using Telegram.Services;
 using Telegram.Td.Api;
@@ -232,7 +233,7 @@ namespace Telegram.ViewModels.Supergroups
                 }
 
                 var confirm = await ShowPopupAsync(message, Strings.DiscussionLinkGroup, Strings.DiscussionLinkGroup, Strings.Cancel);
-                if (confirm != ContentDialogResult.Primary)
+                if (confirm != ModalPopupResult.Primary)
                 {
                     return;
                 }
@@ -256,7 +257,7 @@ namespace Telegram.ViewModels.Supergroups
                 if (response is Ok)
                 {
                     NavigationService.GoBack();
-                    NavigationService.Frame.ForwardStack.Clear();
+                    NavigationService.ClearForwardStack();
                 }
             }
         }
@@ -288,7 +289,7 @@ namespace Telegram.ViewModels.Supergroups
             }
 
             var confirm = await ShowPopupAsync(string.Format(Strings.DiscussionUnlinkChannelAlert, linkedChat.Title), Strings.DiscussionUnlinkGroup, Strings.DiscussionUnlink, Strings.Cancel);
-            if (confirm != ContentDialogResult.Primary)
+            if (confirm != ModalPopupResult.Primary)
             {
                 return;
             }
@@ -297,7 +298,7 @@ namespace Telegram.ViewModels.Supergroups
             if (response is Ok && !supergroup.IsChannel)
             {
                 NavigationService.GoBack();
-                NavigationService.Frame.ForwardStack.Clear();
+                NavigationService.ClearForwardStack();
             }
             else
             {
@@ -316,7 +317,7 @@ namespace Telegram.ViewModels.Supergroups
             var completion = new TaskCompletionSource<Chat>();
 
             var confirm = await ShowPopupAsync(new NewGroupPopup(completion, string.Format(Strings.GroupCreateDiscussionDefaultName, chat.Title)));
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 var linkedChat = await completion.Task;
                 if (linkedChat != null)
@@ -330,7 +331,7 @@ namespace Telegram.ViewModels.Supergroups
                     if (response is Ok)
                     {
                         NavigationService.GoBack();
-                        NavigationService.Frame.ForwardStack.Clear();
+                        NavigationService.ClearForwardStack();
                     }
                 }
             }

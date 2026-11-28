@@ -22,7 +22,7 @@ namespace Telegram.Common
     {
         private readonly ILifetimeService _lifetimeService;
 
-        public TLRootNavigationService(ISession session, WindowContext window, Frame frame, string id)
+        public TLRootNavigationService(ISession session, WindowContext window, NavigationFrame frame, string id)
             : base(session, window, frame, id)
         {
             _lifetimeService = LifetimeService.Current;
@@ -55,16 +55,16 @@ namespace Telegram.Common
                     }
                     break;
                 case AuthorizationStateWaitCode:
-                    Navigate(typeof(AuthorizationCodePage), navigationStackEnabled: false);
+                    Navigate(typeof(AuthorizationCodePage));
                     break;
                 case AuthorizationStateWaitEmailAddress:
-                    Navigate(typeof(AuthorizationEmailAddressPage), navigationStackEnabled: false);
+                    Navigate(typeof(AuthorizationEmailAddressPage));
                     break;
                 case AuthorizationStateWaitEmailCode:
-                    Navigate(typeof(AuthorizationEmailCodePage), navigationStackEnabled: false);
+                    Navigate(typeof(AuthorizationEmailCodePage));
                     break;
                 case AuthorizationStateWaitRegistration:
-                    Navigate(typeof(AuthorizationRegistrationPage), navigationStackEnabled: false);
+                    Navigate(typeof(AuthorizationRegistrationPage));
                     break;
                 case AuthorizationStateWaitPassword waitPassword:
                     if (!string.IsNullOrEmpty(waitPassword.RecoveryEmailAddressPattern))
@@ -74,7 +74,7 @@ namespace Telegram.Common
 
                     Navigate(string.IsNullOrEmpty(waitPassword.RecoveryEmailAddressPattern)
                         ? typeof(AuthorizationPasswordPage)
-                        : typeof(AuthorizationRecoveryPage), navigationStackEnabled: false);
+                        : typeof(AuthorizationRecoveryPage));
                     break;
             }
         }

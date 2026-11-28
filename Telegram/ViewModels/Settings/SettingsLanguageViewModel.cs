@@ -188,7 +188,7 @@ namespace Telegram.ViewModels.Settings
             var popup = new DoNotTranslatePopup(_officialLanguages, exclude);
 
             var confirm = await ShowPopupAsync(popup);
-            if (confirm == ContentDialogResult.Primary && popup.SelectedItems != null)
+            if (confirm == ModalPopupResult.Primary && popup.SelectedItems != null)
             {
                 Settings.Translate.DoNot = popup.SelectedItems;
                 RaisePropertyChanged(nameof(DoNotTranslate));
@@ -226,7 +226,7 @@ namespace Telegram.ViewModels.Settings
         public async void Delete(LanguagePackInfo info)
         {
             var confirm = await ShowPopupAsync(Strings.DeleteLocalization, Strings.AppName, Strings.Delete, Strings.Cancel, destructive: true);
-            if (confirm != ContentDialogResult.Primary)
+            if (confirm != ModalPopupResult.Primary)
             {
                 return;
             }

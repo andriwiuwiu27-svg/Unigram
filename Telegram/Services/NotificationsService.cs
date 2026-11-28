@@ -10,6 +10,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Security;
 using System.Threading.Tasks;
 using Telegram.Common;
 using Telegram.Controls;
@@ -24,9 +25,6 @@ using Windows.Data.Xml.Dom;
 using Windows.UI.Notifications;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
-#if UNPACKAGED
-using System.Security;
-#endif
 
 namespace Telegram.Services
 {
@@ -101,7 +99,6 @@ namespace Telegram.Services
         {
             _aggregator.Subscribe<UpdateUnreadMessageCount>(this, Handle)
                 .Subscribe<UpdateUnreadChatCount>(Handle)
-                .Subscribe<UpdateSuggestedActions>(Handle)
                 .Subscribe<UpdateServiceNotification>(Handle)
                 .Subscribe<UpdateNewOauthRequest>(Handle)
                 .Subscribe<UpdateTermsOfService>(Handle)
@@ -187,14 +184,14 @@ namespace Telegram.Services
                 async void DeleteAccount(XamlRoot xamlRoot)
                 {
                     var decline = await MessagePopup.ShowAsync(xamlRoot, Strings.TosUpdateDecline, Strings.TermsOfService, Strings.DeclineDeactivate, Strings.Back);
-                    if (decline != ContentDialogResult.Primary)
+                    if (decline != ModalPopupResult.Primary)
                     {
                         Handle(update);
                         return;
                     }
 
                     var delete = await MessagePopup.ShowAsync(xamlRoot, Strings.TosDeclineDeleteAccount, Strings.AppName, Strings.Deactivate, Strings.Cancel);
-                    if (delete != ContentDialogResult.Primary)
+                    if (delete != ModalPopupResult.Primary)
                     {
                         Handle(update);
                         return;
@@ -217,7 +214,7 @@ namespace Telegram.Services
                     }
 
                     var confirm = await MessagePopup.ShowAsync(xamlRoot, update.TermsOfService.Text, Strings.PrivacyPolicyAndTerms, Strings.Agree, Strings.Cancel);
-                    if (confirm != ContentDialogResult.Primary)
+                    if (confirm != ModalPopupResult.Primary)
                     {
                         DeleteAccount(xamlRoot);
                         return;
@@ -226,7 +223,7 @@ namespace Telegram.Services
                     if (update.TermsOfService.MinUserAge > 0)
                     {
                         var age = await MessagePopup.ShowAsync(xamlRoot, string.Format(Strings.TosAgeText, update.TermsOfService.MinUserAge), Strings.TosAgeTitle, Strings.Agree, Strings.Cancel);
-                        if (age != ContentDialogResult.Primary)
+                        if (age != ModalPopupResult.Primary)
                         {
                             DeleteAccount(xamlRoot);
                             return;
@@ -238,47 +235,6 @@ namespace Telegram.Services
             }
         }
 
-        public async void Handle(UpdateSuggestedActions update)
-        {
-            Logger.Info("UpdateSuggestedActions");
-
-            var enableArchiveAndMuteNewChats = update.AddedActions.FirstOrDefault(x => x is SuggestedActionEnableArchiveAndMuteNewChats);
-            if (enableArchiveAndMuteNewChats == null)
-            {
-                return;
-            }
-
-            await ViewService.WaitForMainWindowAsync();
-
-            var window = WindowContext.Active ?? WindowContext.Main;
-            var dispatcher = window?.Dispatcher;
-
-            dispatcher?.Dispatch(async () =>
-            {
-                var xamlRoot = window.XamlRoot;
-                if (xamlRoot == null)
-                {
-                    return;
-                }
-
-                if (enableArchiveAndMuteNewChats is SuggestedActionEnableArchiveAndMuteNewChats)
-                {
-                    var confirm = await MessagePopup.ShowAsync(xamlRoot, Strings.HideNewChatsAlertText, Strings.HideNewChatsAlertTitle, Strings.OK, Strings.Cancel);
-                    if (confirm == ContentDialogResult.Primary)
-                    {
-                        var response = await _clientService.SendAsync(new GetArchiveChatListSettings());
-                        if (response is ArchiveChatListSettings settings)
-                        {
-                            settings.ArchiveAndMuteNewChatsFromUnknownUsers = true;
-                            _clientService.Send(new SetArchiveChatListSettings(settings));
-                        }
-                    }
-
-                    _clientService.Send(new HideSuggestedAction(enableArchiveAndMuteNewChats));
-                }
-            });
-        }
-
         public void Handle(UpdateNewOauthRequest update)
         {
             // A notification even with the app in front: the request comes from another device,
@@ -286,7 +242,7 @@ namespace Telegram.Services
             var launch = string.Format(CultureInfo.InvariantCulture, "oauth={0}&amp;session={1}", Toast.ToBase64(update.Url), _clientService.SessionId);
             var date = DateTime.UtcNow.ToString("s") + "Z";
 
-            UpdateToast(Strings.BotAuthNotificationTitle, string.Format(Strings.BotAuthNotification, update.Domain, update.Location), $"{_sessionService.Id}", false, false, null, launch, null, null, null, date, false, DateTimeOffset.Now.AddSeconds(60));
+            UpdateToast(Strings.BotAuthNotificationTitle, string.Format(Strings.BotAuthNotification, update.Domain, update.Location), $"{_sessionService.Id}", false, false, null, launch, 0, null, null, date, false, DateTimeOffset.Now.AddSeconds(60));
         }
 
         public async void Handle(UpdateServiceNotification update)
@@ -321,12 +277,12 @@ namespace Telegram.Services
                 if (update.Type.StartsWith("AUTH_KEY_DROP_"))
                 {
                     var confirm = await MessagePopup.ShowAsync(xamlRoot, text, Strings.AppName, Strings.LogOut, Strings.Cancel);
-                    if (confirm == ContentDialogResult.Primary)
+                    if (confirm == ModalPopupResult.Primary)
                     {
                         _clientService.Send(new Destroy());
                     }
                 }
-                else if (ContentPopup.IsAnyPopupOpen(xamlRoot))
+                else if (ModalPopup.IsAnyPopupOpen(xamlRoot))
                 {
                     await MessagePopup.ShowNestedAsync(xamlRoot, text, Strings.AppName, Strings.OK);
                 }
@@ -483,22 +439,28 @@ namespace Telegram.Services
 
         public async void Handle(UpdateNotificationGroup update)
         {
-            try
-            {
-                var applicationId = Toast.ApplicationId;
-                if (applicationId != null)
-                {
-                    var history = ToastNotificationManager.History;
+            var applicationId = Toast.ApplicationId;
 
-                    foreach (var removed in update.RemovedNotificationIds)
+            lock (_pendingLock)
+            {
+                foreach (var removed in update.RemovedNotificationIds)
+                {
+                    // A toast is shown only after a dispatch and maybe a sound lookup, so a removal
+                    // can overtake it. Taking it out of _pending is what stops it from appearing.
+                    if (_pending.Remove(removed) || applicationId == null)
                     {
-                        history.Remove($"{removed}", $"{_clientService.SessionId}_{update.NotificationGroupId}", applicationId);
+                        continue;
+                    }
+
+                    try
+                    {
+                        ToastNotificationManager.History.Remove($"{removed}", $"{_clientService.SessionId}_{update.NotificationGroupId}", applicationId);
+                    }
+                    catch
+                    {
+                        // All the remote procedure calls must be wrapped in a try-catch block
                     }
                 }
-            }
-            catch
-            {
-                // All the remote procedure calls must be wrapped in a try-catch block
             }
 
             if (_suppress == true)
@@ -524,10 +486,29 @@ namespace Telegram.Services
                 return;
             }
 
+            // All of them before the first await, or a removal arriving meanwhile would miss the later ones.
+            lock (_pendingLock)
+            {
+                foreach (var notification in update.AddedNotifications)
+                {
+                    _pending.Add(notification.Id);
+                }
+            }
+
             foreach (var notification in update.AddedNotifications)
             {
-                await ProcessNotification(update.NotificationGroupId, update.NotificationSoundId, update.ChatId, notification);
-                //_clientService.Send(new RemoveNotification(update.NotificationGroupId, notification.Id));
+                await ProcessNotification(update.NotificationGroupId, update.Type, update.NotificationSoundId, notification);
+            }
+        }
+
+        private readonly HashSet<int> _pending = new();
+        private readonly object _pendingLock = new();
+
+        private void Forget(int id)
+        {
+            lock (_pendingLock)
+            {
+                _pending.Remove(id);
             }
         }
 
@@ -542,37 +523,52 @@ namespace Telegram.Services
             //ProcessNotification(update.NotificationGroupId, 0, update.Notification);
         }
 
-        private async Task ProcessNotification(int group, long soundId, long chatId, Td.Api.Notification notification)
+        private async Task ProcessNotification(int group, NotificationGroupType groupType, long soundId, Td.Api.Notification notification)
         {
             var time = Formatter.ToLocalTime(notification.Date);
             if (time < DateTime.Now.AddHours(-1))
             {
+                Forget(notification.Id);
                 _clientService.Send(new RemoveNotification(group, notification.Id));
                 return;
             }
 
-            switch (notification.Type)
+            if (notification.Type is NotificationTypeNewMessage newMessage)
             {
-                case NotificationTypeNewCall:
-                    break;
-                case NotificationTypeNewMessage newMessage:
-                    await ProcessNewMessage(group, notification.Id, newMessage.Message, time, soundId, notification.IsSilent);
-                    break;
-                case NotificationTypeNewSecretChat:
-                    break;
+                await ProcessNewMessage(group, groupType, notification.Id, newMessage.Message, newMessage.ShowPreview, time, soundId, notification.IsSilent);
+            }
+            else
+            {
+                Forget(notification.Id);
             }
         }
 
-        private async Task ProcessNewMessage(int groupId, int id, Message message, DateTime date, long soundId, bool silent)
+        private async Task ProcessNewMessage(int groupId, NotificationGroupType groupType, int id, Message message, bool showPreview, DateTime date, long soundId, bool silent)
         {
             var chat = _clientService.GetChat(message.ChatId);
             if (chat == null)
             {
                 Logger.Info("Chat is null");
+                Forget(id);
                 return;
             }
 
-            UpdateAsync(chat, message, async () =>
+            // TDLib applies the chat's mute but not the topic's. Mentions are left alone: TDLib
+            // already decided those by the sender's settings.
+            if (groupType is NotificationGroupTypeMessages && message.TopicId is MessageTopicForum forumTopic)
+            {
+                // Asked for afresh: TDLib doesn't announce a topic's mute running out, so the
+                // cached topic keeps its old mute_for.
+                var response = await _clientService.SendAsync(new GetForumTopic(chat.Id, forumTopic.ForumTopicId));
+                if (response is ForumTopic topic && _settings.Notifications.IsMuted(chat, topic))
+                {
+                    Logger.Info("Topic is muted");
+                    Forget(id);
+                    return;
+                }
+            }
+
+            UpdateAsync(chat, message, id, async () =>
             {
                 var caption = GetCaption(chat, silent);
                 var content = GetContent(chat, message);
@@ -603,8 +599,6 @@ namespace Telegram.Services
                     }
                 }
 
-                var showPreview = _settings.Notifications.GetShowPreview(chat);
-
                 if (chat.Type is ChatTypeSecret || !showPreview || !_settings.Notifications.ShowName || LifetimeService.Current.Passcode.IsLockscreenRequired)
                 {
                     picture = string.Empty;
@@ -622,11 +616,11 @@ namespace Telegram.Services
                     canReply = false;
                 }
 
-                UpdateToast(caption, content, $"{_sessionService.Id}", silent, silent || soundId == 0, soundFile, launch, $"{id}", $"{groupId}", picture, dateTime, canReply);
+                UpdateToast(caption, content, $"{_sessionService.Id}", silent, silent || soundId == 0, soundFile, launch, id, $"{groupId}", picture, dateTime, canReply);
             });
         }
 
-        private void UpdateAsync(Chat chat, Message message, Action action)
+        private void UpdateAsync(Chat chat, Message message, int id, Action action)
         {
             try
             {
@@ -651,12 +645,14 @@ namespace Telegram.Services
                         if (args.ChatId == chat.Id && args.MessageTopic.AreTheSame(message.TopicId))
                         {
                             Logger.Info("Topic is open");
+                            Forget(id);
                             return;
                         }
                     }
                     else if (service.IsChatOpen(chat.Id, true))
                     {
                         Logger.Info("Chat is open");
+                        Forget(id);
                         return;
                     }
 
@@ -669,7 +665,7 @@ namespace Telegram.Services
             }
         }
 
-        private void UpdateToast(string caption, string message, string account, bool suppressPopup, bool silent, Td.Api.File soundFile, string launch, string tag, string group, string picture, string date, bool canReply, DateTimeOffset? expirationTime = null)
+        private void UpdateToast(string caption, string message, string account, bool suppressPopup, bool silent, Td.Api.File soundFile, string launch, int notificationId, string group, string picture, string date, bool canReply, DateTimeOffset? expirationTime = null)
         {
             var applicationId = Toast.ApplicationId;
             if (applicationId == null)
@@ -692,16 +688,17 @@ namespace Telegram.Services
                 caption = string.Format("{0} \u2b62 {1}", caption, user.FullName());
             }
 
-            xml += $"<text><![CDATA[{caption}]]></text><text><![CDATA[{message}]]></text>";
+            // Escaped, not CDATA: a message or a title holding "]]>" would end the section early.
+            xml += $"<text>{SecurityElement.Escape(caption)}</text><text>{SecurityElement.Escape(message)}</text>";
             xml += "</binding></visual>";
 
             if (!string.IsNullOrEmpty(group) && canReply)
             {
-                xml += string.Format("<actions><input id='input' type='text' placeHolderContent='{0}' /><action activationType='background' placement='contextMenu' arguments='action=markAsRead&amp;", Strings.Reply);
+                xml += string.Format("<actions><input id='input' type='text' placeHolderContent='{0}' /><action activationType='background' placement='contextMenu' arguments='action=markAsRead&amp;", SecurityElement.Escape(Strings.Reply));
                 xml += launch;
-                xml += string.Format("' content='{0}'/><action activationType='background' arguments='action=reply&amp;", Strings.MarkAsRead);
+                xml += string.Format("' content='{0}'/><action activationType='background' arguments='action=reply&amp;", SecurityElement.Escape(Strings.MarkAsRead));
                 xml += launch;
-                xml += string.Format("' hint-inputId='input' content='{0}'/></actions>", Strings.Send);
+                xml += string.Format("' hint-inputId='input' content='{0}'/></actions>", SecurityElement.Escape(Strings.Send));
             }
 
             /* Single notification with unread count:
@@ -735,10 +732,10 @@ namespace Telegram.Services
                 var notification = new ToastNotification(document);
                 notification.ExpirationTime = expirationTime;
 
-                if (!string.IsNullOrEmpty(tag))
+                if (notificationId != 0)
                 {
-                    notification.Tag = tag;
-                    notification.RemoteId = tag;
+                    notification.Tag = $"{notificationId}";
+                    notification.RemoteId = notification.Tag;
                 }
 
                 if (!string.IsNullOrEmpty(group))
@@ -752,7 +749,17 @@ namespace Telegram.Services
                 var suppress = suppressPopup || ticks - _lastShownToast <= 7000;
 
                 notification.SuppressPopup = suppress;
-                notifier.Show(notification);
+
+                lock (_pendingLock)
+                {
+                    if (notificationId != 0 && !_pending.Remove(notificationId))
+                    {
+                        Logger.Info("Removed before shown");
+                        return;
+                    }
+
+                    notifier.Show(notification);
+                }
 
                 if (ticks - _lastShownToast <= 7000)
                 {
@@ -764,7 +771,9 @@ namespace Telegram.Services
                     SoundEffects.Play(soundFile);
                 }
 
-                if (_lastShownToast == 0 || ticks - _lastShownToast > 7000)
+                // Only a toast that popped up starts the window, so a silent one sent straight to
+                // Action Center doesn't hide the next.
+                if (!suppress)
                 {
                     _lastShownToast = ticks;
                 }
@@ -829,25 +838,50 @@ namespace Telegram.Services
                     return;
                 }
 
+                var forumTopicId = data.TryGetValue("forum_topic_id", out string forum_topic_id) && int.TryParse(forum_topic_id, out int topicId) ? topicId : 0;
+
                 if (string.Equals(action, "reply", StringComparison.OrdinalIgnoreCase) && data.TryGetValue("input", out string text))
                 {
                     var messageText = text.Replace("\r\n", "\n").Replace('\v', '\n').Replace('\r', '\n');
                     var formatted = ClientEx.ParseMarkdown(messageText);
 
-                    // TODO: topic id
+                    // TODO: the other topic kinds GetLaunch writes
+                    var topic = forumTopicId != 0 ? new MessageTopicForum(forumTopicId) : null;
 
                     var replyToMessage = data.TryGetValue("msg_id", out string msg_id) && long.TryParse(msg_id, out long messageId) ? new InputMessageReplyToMessage(messageId, null, 0, string.Empty) : null;
-                    var response = await _clientService.SendAsync(new SendMessage(chat.Id, null, replyToMessage, new MessageSendOptions(null, false, true, 0, false, null, 0, 0, false), new InputMessageText(formatted, null, false)));
+                    var response = await _clientService.SendAsync(new SendMessage(chat.Id, topic, replyToMessage, new MessageSendOptions(null, false, true, 0, false, null, 0, 0, false), new InputMessageText(formatted, null, false)));
 
-                    if (chat.Type is ChatTypePrivate && chat.LastMessage != null)
+                    if (chat.Type is ChatTypePrivate)
                     {
-                        await _clientService.SendAsync(new ViewMessages(chat.Id, new long[] { chat.LastMessage.Id }, new MessageSourceNotification(), true));
+                        await MarkAsReadAsync(chat, forumTopicId);
                     }
                 }
-                else if (string.Equals(action, "markasread", StringComparison.OrdinalIgnoreCase) && chat.LastMessage != null)
+                else if (string.Equals(action, "markasread", StringComparison.OrdinalIgnoreCase))
                 {
-                    await _clientService.SendAsync(new ViewMessages(chat.Id, new long[] { chat.LastMessage.Id }, new MessageSourceNotification(), true));
+                    await MarkAsReadAsync(chat, forumTopicId);
                 }
+            }
+        }
+
+        private async Task MarkAsReadAsync(Chat chat, int forumTopicId)
+        {
+            // A forum is read topic by topic, so the chat's last message may sit in another topic
+            // and leave this one unread.
+            var lastMessage = chat.LastMessage;
+            if (forumTopicId != 0)
+            {
+                var response = await _clientService.SendAsync(new GetForumTopic(chat.Id, forumTopicId));
+                if (response is not ForumTopic topic)
+                {
+                    return;
+                }
+
+                lastMessage = topic.LastMessage;
+            }
+
+            if (lastMessage != null)
+            {
+                await _clientService.SendAsync(new ViewMessages(chat.Id, new long[] { lastMessage.Id }, new MessageSourceNotification(), true));
             }
         }
 
@@ -892,7 +926,7 @@ namespace Telegram.Services
             }
 
             var brief = ChatCell.UpdateBriefLabel(message.Content, message.IsOutgoing, true, out _);
-            var clean = brief.ReplaceSpoilers(false);
+            var clean = ChatCell.RemoveCodes(_clientService, chat, brief).ReplaceSpoilers(false);
 
             var content = ChatCell.UpdateFromLabel(_clientService, chat, message) + clean.Text;
 

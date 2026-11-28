@@ -475,12 +475,25 @@ namespace Telegram.Controls.Messages.Content
 
         void IPageBlockContext.TextEntityClick(TextEntityClickEventArgs args)
         {
-            MessageBubble.TextEntityClick(_message, args);
+            // No message behind the draft preview and the translation popup, which only call
+            // UpdateView, nor after Recycle: links still open, the other entities need a message.
+            if (_message != null)
+            {
+                MessageBubble.TextEntityClick(_message, args);
+            }
+            else if (args.Type is TextEntityTypeTextUrl textUrl)
+            {
+                ((IPageBlockContext)this).OpenUrl(textUrl.Url);
+            }
+            else if (args.Type is TextEntityTypeUrl && args.Text is string url)
+            {
+                ((IPageBlockContext)this).OpenUrl(url);
+            }
         }
 
         void IPageBlockContext.OpenUrl(string url)
         {
-            MessageHelper.OpenUrl(_clientService ?? _message?.ClientService, _message?.Delegate?.NavigationService, url);
+            MessageHelper.OpenUrl(_clientService ?? _message?.ClientService, _message?.Delegate?.NavigationService ?? _delegate?.NavigationService, url);
         }
 
         void IPageBlockContext.OpenInlineButton(InlineButton button)

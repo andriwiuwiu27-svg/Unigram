@@ -174,7 +174,8 @@ namespace Telegram.Controls.Chats
         /// </remarks>
         private void SetAnchor(bool end, [CallerMemberName] string source = null)
         {
-            if (ItemsPanelRoot is not ItemsStackPanel panel)
+            var panel = ItemsStackPanel;
+            if (panel == null)
             {
                 return;
             }
@@ -423,7 +424,10 @@ namespace Telegram.Controls.Chats
 
         private readonly DispatcherTimer _scrollTracker = new();
 
-        private TaskCompletionSource<bool> _waitItemsPanelRoot = new();
+        private TaskCompletionSource<bool> _waitItemsPanelRoot = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private ItemsStackPanel _itemsPanelRoot;
+
+        public ItemsStackPanel ItemsStackPanel => _itemsPanelRoot ?? ItemsPanelRoot as ItemsStackPanel;
 
         public PanelScrollingDirection ScrollingDirection { get; private set; }
 
@@ -479,14 +483,23 @@ namespace Telegram.Controls.Chats
             ShouldViewMessage = true;
         }
 
+        public void RegisterItemsStackPanel(ItemsStackPanel panel)
+        {
+            if (_itemsPanelRoot != null || panel == null)
+            {
+                return;
+            }
+
+            _itemsPanelRoot = panel;
+            _waitItemsPanelRoot.TrySetResult(true);
+            ApplyAnchor();
+        }
+
         private void OnLoaded(object sender, RoutedEventArgs e)
         {
-            if (ItemsPanelRoot != null)
+            if (_itemsPanelRoot != null)
             {
-                ItemsPanelRoot.SizeChanged += OnSizeChanged;
-
-                _waitItemsPanelRoot.TrySetResult(true);
-                ApplyAnchor();
+                _itemsPanelRoot.SizeChanged += OnSizeChanged;
             }
 
             ViewChanging();
@@ -494,16 +507,16 @@ namespace Telegram.Controls.Chats
 
         private void OnUnloaded(object sender, RoutedEventArgs e)
         {
-            Logger.Info($"ItemsPanelRoot.Children.Count: {ItemsPanelRoot?.Children.Count}");
+            Logger.Info($"ItemsStackPanel.Children.Count: {ItemsStackPanel?.Children.Count}");
             Logger.Info($"Items.Count: {Items.Count}");
 
-            if (ItemsPanelRoot != null)
+            if (_itemsPanelRoot != null)
             {
-                ItemsPanelRoot.SizeChanged -= OnSizeChanged;
+                _itemsPanelRoot.SizeChanged -= OnSizeChanged;
             }
 
             _waitItemsPanelRoot.TrySetResult(false);
-            _waitItemsPanelRoot = new();
+            _waitItemsPanelRoot = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
             _raiseViewChanged = false;
         }
@@ -591,7 +604,7 @@ namespace Telegram.Controls.Chats
                 return 1;
             }
 
-            var itemsPanel = ItemsPanelRoot;
+            var itemsPanel = _itemsPanelRoot;
             if (itemsPanel != null)
             {
                 var transform = itemsPanel.TransformToVisual(this);
@@ -728,7 +741,7 @@ namespace Telegram.Controls.Chats
             }
 
             // calculate the position object in order to know how much to scroll to
-            var transform = selectorItem.TransformToVisual(ItemsPanelRoot ?? scrollViewer.ContentTemplateRoot);
+            var transform = selectorItem.TransformToVisual(_itemsPanelRoot ?? scrollViewer.ContentTemplateRoot);
             var position = transform.TransformPoint(new Point());
 
             if (alignment == VerticalAlignment.Top)
@@ -856,9 +869,11 @@ namespace Telegram.Controls.Chats
             Logger.Info($"Focus returned {moved}");
         }
 
+        private bool IsResetting => ItemsSource is ISynchronizedList { IsResetting: true };
+
         private async Task ScrollIntoViewAsync(MessageViewModel item, ScrollIntoViewAlignment alignment, bool fastPath)
         {
-            if (ItemsPanelRoot == null)
+            if (_itemsPanelRoot == null)
             {
                 // Some actions cause IsItemsHostInvalid to become true.
                 // If this is the case, ItemsPanelRoot will return null, and scrolling may not work.
@@ -866,6 +881,12 @@ namespace Telegram.Controls.Chats
                 if (_waitItemsPanelRoot.Task.Status == TaskStatus.RanToCompletion)
                 {
                     Logger.Info("ItemsPanelRoot == null, UpdateLayout");
+
+                    if (IsResetting)
+                    {
+                        Logger.Error("UpdateLayout during a reset");
+                    }
+
                     ScrollingHost.UpdateLayout();
                 }
                 else
@@ -876,7 +897,7 @@ namespace Telegram.Controls.Chats
             }
 
             var index = Items.IndexOf(item);
-            var panel = ItemsPanelRoot as ItemsStackPanel;
+            var panel = _itemsPanelRoot;
 
             if (panel == null || index >= panel.FirstCacheIndex && index <= panel.LastCacheIndex)
             {
@@ -889,6 +910,11 @@ namespace Telegram.Controls.Chats
             // 1.4-stable/dxaml/xcp/dxaml/lib/ModernCollectionBasePanel_WindowManagement_Partial.cpp#L2138
             if (fastPath)
             {
+                if (IsResetting)
+                {
+                    Logger.Error("ScrollIntoView and UpdateLayout during a reset");
+                }
+
                 ScrollIntoView(item, alignment);
                 panel.UpdateLayout();
 
@@ -920,6 +946,11 @@ namespace Telegram.Controls.Chats
                     panel.LayoutUpdated += layoutUpdated;
                     ScrollingHost.ViewChanged -= viewChanged;
                 }
+            }
+
+            if (IsResetting)
+            {
+                Logger.Error("ScrollIntoView during a reset");
             }
 
             try
@@ -955,7 +986,7 @@ namespace Telegram.Controls.Chats
 
         private void OnSelectionEnabledChanged(bool oldValue, bool newValue)
         {
-            var panel = ItemsPanelRoot as ItemsStackPanel;
+            var panel = ItemsStackPanel;
             if (panel == null)
             {
                 return;
@@ -1269,7 +1300,7 @@ namespace Telegram.Controls.Chats
                 return;
             }
 
-            _itemsPanel = _listView.ItemsPanelRoot as ItemsStackPanel;
+            _itemsPanel = _listView.ItemsStackPanel;
             if (_itemsPanel == null)
             {
                 return;

@@ -7,6 +7,7 @@
 
 using Telegram.Controls;
 using Telegram.Converters;
+using Telegram.Navigation;
 using Telegram.Services;
 using Telegram.Td.Api;
 using Telegram.ViewModels.Delegates;
@@ -23,6 +24,7 @@ namespace Telegram.Views.Settings
         public SettingsProfilePage()
         {
             InitializeComponent();
+            Transition = PageTransition.Entrance;
             Title = Strings.AccountSettings;
         }
 

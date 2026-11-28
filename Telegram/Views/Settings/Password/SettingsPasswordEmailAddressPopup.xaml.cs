@@ -15,7 +15,7 @@ using Windows.UI.Xaml.Input;
 
 namespace Telegram.Views.Settings.Password
 {
-    public sealed partial class SettingsPasswordEmailAddressPopup : ContentPopup
+    public sealed partial class SettingsPasswordEmailAddressPopup : ModalPopup
     {
         private readonly IClientService _clientService;
         private readonly Function _function;
@@ -35,7 +35,7 @@ namespace Telegram.Views.Settings.Password
 
         public PasswordState PasswordState { get; private set; }
 
-        private async void OnPrimaryButtonClick(ContentDialog sender, ContentDialogButtonClickEventArgs args)
+        private async void OnPrimaryButtonClick(ModalPopup sender, ModalPopupButtonClickEventArgs args)
         {
             try
             {
@@ -107,7 +107,7 @@ namespace Telegram.Views.Settings.Password
         {
             if (e.Key == Windows.System.VirtualKey.Enter)
             {
-                Hide(ContentDialogResult.Primary);
+                Hide(ModalPopupResult.Primary);
                 e.Handled = true;
             }
         }
@@ -115,10 +115,10 @@ namespace Telegram.Views.Settings.Password
         private async void Skip_Click(object sender, RoutedEventArgs e)
         {
             var confirm = await MessagePopup.ShowNestedAsync(XamlRoot, Strings.YourEmailSkipWarningText, Strings.YourEmailSkipWarning, Strings.YourEmailSkip, Strings.Cancel);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 _skip = true;
-                Hide(ContentDialogResult.Primary);
+                Hide(ModalPopupResult.Primary);
             }
         }
     }

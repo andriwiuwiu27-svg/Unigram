@@ -7,7 +7,9 @@
 
 using System.Numerics;
 using Telegram.Common;
+using Telegram.Navigation;
 using Windows.UI;
+using Windows.UI.Composition;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Media;
@@ -43,6 +45,12 @@ namespace Telegram.Controls.Stories.Widgets
         private readonly EllipseGeometry _large = new();
         private readonly EllipseGeometry _small = new();
 
+        // The same three circles again for the shadow's mask.
+        private readonly OutlineMask _mask;
+        private readonly CompositionEllipseGeometry _maskCircle;
+        private readonly CompositionEllipseGeometry _maskLarge;
+        private readonly CompositionEllipseGeometry _maskSmall;
+
         private double _side;
 
         private bool _isDark;
@@ -71,7 +79,14 @@ namespace Telegram.Controls.Stories.Widgets
             Children.Add(_canvas);
             Children.Add(_slot);
 
-            VisualUtilities.DropShadow(_bubble, 4, 0.18f, _shadow, offset: new Vector3(0, 0.7f, 0));
+            var compositor = BootStrapper.Current.Compositor;
+
+            _mask = new OutlineMask(compositor);
+            _mask.Add(_maskCircle = compositor.CreateEllipseGeometry());
+            _mask.Add(_maskLarge = compositor.CreateEllipseGeometry());
+            _mask.Add(_maskSmall = compositor.CreateEllipseGeometry());
+
+            VisualUtilities.DropShadow(_bubble, 4, 0.18f, _shadow, offset: new Vector3(0, 0.7f, 0), mask: _mask.Brush);
 
             SizeChanged += OnSizeChanged;
         }
@@ -145,25 +160,36 @@ namespace Telegram.Controls.Stories.Widgets
             var side = _side;
             var left = side * OverhangX;
 
-            _bubble.Width = _shadow.Width = side * (1 + OverhangX * 2);
-            _bubble.Height = _shadow.Height = side * (1 + OverhangY);
+            var width = side * (1 + OverhangX * 2);
+            var height = side * (1 + OverhangY);
+
+            _bubble.Width = _shadow.Width = width;
+            _bubble.Height = _shadow.Height = height;
+            _mask.Size = new Vector2((float)width, (float)height);
 
             Canvas.SetLeft(_bubble, -left);
             Canvas.SetLeft(_shadow, -left);
 
-            _circle.Center = new Point((float)(left + side / 2), (float)(side / 2));
-            _circle.RadiusX = _circle.RadiusY = side / 2;
+            UpdateCircle(_circle, _maskCircle, left + side / 2, side / 2, side / 2);
 
-            UpdateTail(_large, TailLarge, left, side);
-            UpdateTail(_small, TailSmall, left, side);
+            UpdateTail(_large, _maskLarge, TailLarge, left, side);
+            UpdateTail(_small, _maskSmall, TailSmall, left, side);
         }
 
-        private void UpdateTail(EllipseGeometry geometry, Vector3 circle, double left, double side)
+        private void UpdateTail(EllipseGeometry geometry, CompositionEllipseGeometry mask, Vector3 circle, double left, double side)
         {
             var x = _isFlipped ? 1 - circle.X : circle.X;
 
-            geometry.Center = new Point((float)(left + x * side), (float)(circle.Y * side));
-            geometry.RadiusX = geometry.RadiusY = circle.Z * side;
+            UpdateCircle(geometry, mask, left + x * side, circle.Y * side, circle.Z * side);
+        }
+
+        private static void UpdateCircle(EllipseGeometry geometry, CompositionEllipseGeometry mask, double x, double y, double radius)
+        {
+            geometry.Center = new Point((float)x, (float)y);
+            geometry.RadiusX = geometry.RadiusY = radius;
+
+            mask.Center = new Vector2((float)x, (float)y);
+            mask.Radius = new Vector2((float)radius);
         }
     }
 }

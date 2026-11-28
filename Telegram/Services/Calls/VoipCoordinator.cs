@@ -10,6 +10,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Telegram.Common;
+using Telegram.Controls;
 using Telegram.Native.Calls;
 using Telegram.Navigation.Services;
 using Telegram.Services.Calls;
@@ -70,7 +71,7 @@ namespace Telegram.Services
                     }
 
                     var confirm = await navigation.ShowPopupAsync(message, title, Strings.OK, Strings.Cancel);
-                    if (confirm == ContentDialogResult.Primary)
+                    if (confirm == ModalPopupResult.Primary)
                     {
                         privateCall.Discard();
                         return false;
@@ -100,7 +101,7 @@ namespace Telegram.Services
                     }
 
                     var confirm = await navigation.ShowPopupAsync(message, title, Strings.OK, Strings.Cancel);
-                    if (confirm == ContentDialogResult.Primary)
+                    if (confirm == ModalPopupResult.Primary)
                     {
                         groupCall.Discard();
                         return false;
@@ -297,18 +298,19 @@ namespace Telegram.Services
 
             var popup = new VideoChatAliasesPopup(clientService, chat, true, availableAliases.Senders);
 
+            // Close is the schedule button.
             var confirm = await popup.ShowQueuedAsync(navigation.XamlRoot);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm is ModalPopupResult.Primary or ModalPopupResult.Close)
             {
                 var alias = popup.SelectedSender ?? new MessageSenderUser(clientService.Options.MyId);
                 var startDate = 0;
 
-                if (popup.IsScheduleSelected)
+                if (confirm == ModalPopupResult.Close)
                 {
                     var schedule = new ScheduleVideoChatPopup(chat.Type is ChatTypeSupergroup supergroup && supergroup.IsChannel);
 
                     var again = await schedule.ShowQueuedAsync(navigation.XamlRoot);
-                    if (again != ContentDialogResult.Primary)
+                    if (again != ModalPopupResult.Primary)
                     {
                         return;
                     }
@@ -320,7 +322,7 @@ namespace Telegram.Services
                     var streams = new VideoChatStreamsPopup(clientService, chat.Id, true);
 
                     var again = await streams.ShowQueuedAsync(navigation.XamlRoot);
-                    if (again != ContentDialogResult.Primary)
+                    if (again != ModalPopupResult.Primary)
                     {
                         return;
                     }
@@ -330,7 +332,7 @@ namespace Telegram.Services
                         var schedule = new ScheduleVideoChatPopup(true);
 
                         var oneMore = await schedule.ShowQueuedAsync(navigation.XamlRoot);
-                        if (oneMore != ContentDialogResult.Primary)
+                        if (oneMore != ModalPopupResult.Primary)
                         {
                             return;
                         }
@@ -360,7 +362,7 @@ namespace Telegram.Services
                 var popup = new VideoChatAliasesPopup(clientService, chat, false, availableAliases.Senders);
 
                 var confirm = await popup.ShowQueuedAsync(navigation.XamlRoot);
-                if (confirm != ContentDialogResult.Primary)
+                if (confirm != ModalPopupResult.Primary)
                 {
                     return;
                 }

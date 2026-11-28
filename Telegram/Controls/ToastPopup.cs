@@ -827,15 +827,6 @@ namespace Telegram.Controls
 
                     void handler(object sender, object e)
                     {
-                        var popups = VisualTreeHelper.GetOpenPopupsForXamlRoot(navigationService.XamlRoot);
-                        foreach (var popup in popups)
-                        {
-                            if (popup.Child is ContentDialog dialog)
-                            {
-                                dialog.Hide();
-                            }
-                        }
-
                         hyperlink.Click -= handler;
 
                         if (feature != null)
@@ -874,7 +865,7 @@ namespace Telegram.Controls
             var markdown = ClientEx.ParseMarkdown(text);
 
             var confirm = await ShowActionAsync(navigationService.XamlRoot, markdown, action, ToastPopupIcon.Premium);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 var popups = VisualTreeHelper.GetOpenPopupsForXamlRoot(navigationService.XamlRoot);
                 foreach (var popup in popups)
@@ -1097,17 +1088,17 @@ namespace Telegram.Controls
         }
 
 
-        public static Task<ContentDialogResult> ShowActionAsync(XamlRoot xamlRoot, string text, string action, ToastPopupIcon icon, ElementTheme requestedTheme = ElementTheme.Dark, TimeSpan? dismissAfter = null)
+        public static Task<ModalPopupResult> ShowActionAsync(XamlRoot xamlRoot, string text, string action, ToastPopupIcon icon, ElementTheme requestedTheme = ElementTheme.Dark, TimeSpan? dismissAfter = null)
         {
             return ShowActionAsync(xamlRoot, ClientEx.ParseMarkdown(text), action, icon, ToastPlacementMode.Center, requestedTheme, dismissAfter);
         }
 
-        public static Task<ContentDialogResult> ShowActionAsync(XamlRoot xamlRoot, FormattedText text, string action, ToastPopupIcon icon, ElementTheme requestedTheme = ElementTheme.Dark, TimeSpan? dismissAfter = null)
+        public static Task<ModalPopupResult> ShowActionAsync(XamlRoot xamlRoot, FormattedText text, string action, ToastPopupIcon icon, ElementTheme requestedTheme = ElementTheme.Dark, TimeSpan? dismissAfter = null)
         {
             return ShowActionAsync(xamlRoot, text, action, icon, ToastPlacementMode.Center, requestedTheme, dismissAfter);
         }
 
-        public static Task<ContentDialogResult> ShowActionAsync(XamlRoot xamlRoot, FormattedText text, string action, ToastPopupIcon? icon, ToastPlacementMode placement, ElementTheme requestedTheme = ElementTheme.Dark, TimeSpan? dismissAfter = null)
+        public static Task<ModalPopupResult> ShowActionAsync(XamlRoot xamlRoot, FormattedText text, string action, ToastPopupIcon? icon, ToastPlacementMode placement, ElementTheme requestedTheme = ElementTheme.Dark, TimeSpan? dismissAfter = null)
         {
             return ShowActionAsync(xamlRoot, text, action, CreateActionIcon(icon), placement, requestedTheme, dismissAfter);
         }
@@ -1134,12 +1125,12 @@ namespace Telegram.Controls
             };
         }
 
-        public static Task<ContentDialogResult> ShowActionAsync(XamlRoot xamlRoot, string text, string action, AnimatedImageSource icon, ElementTheme requestedTheme = ElementTheme.Dark, TimeSpan? dismissAfter = null)
+        public static Task<ModalPopupResult> ShowActionAsync(XamlRoot xamlRoot, string text, string action, AnimatedImageSource icon, ElementTheme requestedTheme = ElementTheme.Dark, TimeSpan? dismissAfter = null)
         {
             return ShowActionAsync(xamlRoot, ClientEx.ParseMarkdown(text), action, icon, requestedTheme, dismissAfter);
         }
 
-        public static Task<ContentDialogResult> ShowActionAsync(XamlRoot xamlRoot, FormattedText text, string action, AnimatedImageSource icon, ElementTheme requestedTheme = ElementTheme.Dark, TimeSpan? dismissAfter = null)
+        public static Task<ModalPopupResult> ShowActionAsync(XamlRoot xamlRoot, FormattedText text, string action, AnimatedImageSource icon, ElementTheme requestedTheme = ElementTheme.Dark, TimeSpan? dismissAfter = null)
         {
             AnimatedImage animated = null;
             if (icon != null)
@@ -1160,22 +1151,22 @@ namespace Telegram.Controls
 
             return ShowActionAsync(xamlRoot, text, action, animated, ToastPlacementMode.Center, requestedTheme, dismissAfter);
         }
-        public static Task<ContentDialogResult> ShowActionAsync(XamlRoot xamlRoot, string text, string action, FrameworkElement icon, ElementTheme requestedTheme = ElementTheme.Dark, TimeSpan? dismissAfter = null)
+        public static Task<ModalPopupResult> ShowActionAsync(XamlRoot xamlRoot, string text, string action, FrameworkElement icon, ElementTheme requestedTheme = ElementTheme.Dark, TimeSpan? dismissAfter = null)
         {
             return ShowActionAsync(xamlRoot, ClientEx.ParseMarkdown(text), action, icon, ToastPlacementMode.Center, requestedTheme, dismissAfter);
         }
 
-        public static Task<ContentDialogResult> ShowActionAsync(XamlRoot xamlRoot, FormattedText text, string action, FrameworkElement icon, ElementTheme requestedTheme = ElementTheme.Dark, TimeSpan? dismissAfter = null)
+        public static Task<ModalPopupResult> ShowActionAsync(XamlRoot xamlRoot, FormattedText text, string action, FrameworkElement icon, ElementTheme requestedTheme = ElementTheme.Dark, TimeSpan? dismissAfter = null)
         {
             return ShowActionAsync(xamlRoot, text, action, icon, ToastPlacementMode.Center, requestedTheme, dismissAfter);
         }
 
-        public static Task<ContentDialogResult> ShowActionAsync(XamlRoot xamlRoot, FormattedText text, string action, FrameworkElement icon, ToastPlacementMode placement, ElementTheme requestedTheme = ElementTheme.Dark, TimeSpan? dismissAfter = null)
+        public static Task<ModalPopupResult> ShowActionAsync(XamlRoot xamlRoot, FormattedText text, string action, FrameworkElement icon, ToastPlacementMode placement, ElementTheme requestedTheme = ElementTheme.Dark, TimeSpan? dismissAfter = null)
         {
             var toast = ShowImpl(xamlRoot, text, icon, placement, requestedTheme, dismissAfter, action: action);
             if (toast?.Content is Grid content)
             {
-                var tsc = new TaskCompletionSource<ContentDialogResult>();
+                var tsc = new TaskCompletionSource<ModalPopupResult>();
                 var undo = new Button()
                 {
                     Content = action,
@@ -1190,7 +1181,7 @@ namespace Telegram.Controls
                 {
                     Logger.Info("closed");
 
-                    tsc.TrySetResult(ContentDialogResult.Primary);
+                    tsc.TrySetResult(ModalPopupResult.Primary);
                     undo.Click -= handler;
 
                     toast.IsOpen = false;
@@ -1198,7 +1189,7 @@ namespace Telegram.Controls
 
                 void closed(ToastPopup sender, object e)
                 {
-                    tsc.TrySetResult(ContentDialogResult.None);
+                    tsc.TrySetResult(ModalPopupResult.None);
                     sender.Closed -= closed;
                 }
 
@@ -1211,10 +1202,10 @@ namespace Telegram.Controls
                 return tsc.Task;
             }
 
-            return Task.FromResult(ContentDialogResult.None);
+            return Task.FromResult(ModalPopupResult.None);
         }
 
-        public static Task<ContentDialogResult> ShowActionAsync(XamlRoot xamlRoot, FrameworkElement text, string action, FrameworkElement icon, ToastPlacementMode placement, ElementTheme requestedTheme = ElementTheme.Dark, TimeSpan? dismissAfter = null, CancellationToken cancellationToken = default)
+        public static Task<ModalPopupResult> ShowActionAsync(XamlRoot xamlRoot, FrameworkElement text, string action, FrameworkElement icon, ToastPlacementMode placement, ElementTheme requestedTheme = ElementTheme.Dark, TimeSpan? dismissAfter = null, CancellationToken cancellationToken = default)
         {
             var toast = ShowImpl(xamlRoot, text, icon, placement, requestedTheme, dismissAfter, action: action);
             if (toast?.Content is Grid content)
@@ -1229,7 +1220,7 @@ namespace Telegram.Controls
                     });
                 }
 
-                var tsc = new TaskCompletionSource<ContentDialogResult>();
+                var tsc = new TaskCompletionSource<ModalPopupResult>();
                 var undo = new Button()
                 {
                     Content = action,
@@ -1244,7 +1235,7 @@ namespace Telegram.Controls
                 {
                     Logger.Info("closed");
 
-                    tsc.TrySetResult(ContentDialogResult.Primary);
+                    tsc.TrySetResult(ModalPopupResult.Primary);
                     undo.Click -= handler;
 
                     toast.IsOpen = false;
@@ -1252,7 +1243,7 @@ namespace Telegram.Controls
 
                 void closed(ToastPopup sender, object e)
                 {
-                    tsc.TrySetResult(ContentDialogResult.None);
+                    tsc.TrySetResult(ModalPopupResult.None);
                     sender.Closed -= closed;
                 }
 
@@ -1265,20 +1256,20 @@ namespace Telegram.Controls
                 return tsc.Task;
             }
 
-            return Task.FromResult(ContentDialogResult.None);
+            return Task.FromResult(ModalPopupResult.None);
         }
 
-        public static Task<ContentDialogResult> ShowCountdownAsync(XamlRoot xamlRoot, string text, string action, TimeSpan dismissAfter, ElementTheme requestedTheme = ElementTheme.Dark)
+        public static Task<ModalPopupResult> ShowCountdownAsync(XamlRoot xamlRoot, string text, string action, TimeSpan dismissAfter, ElementTheme requestedTheme = ElementTheme.Dark)
         {
             return ShowCountdownAsync(xamlRoot, ClientEx.ParseMarkdown(text), action, dismissAfter, ToastPlacementMode.Center, requestedTheme);
         }
 
-        public static Task<ContentDialogResult> ShowCountdownAsync(XamlRoot xamlRoot, FormattedText text, string action, TimeSpan dismissAfter, ElementTheme requestedTheme = ElementTheme.Dark)
+        public static Task<ModalPopupResult> ShowCountdownAsync(XamlRoot xamlRoot, FormattedText text, string action, TimeSpan dismissAfter, ElementTheme requestedTheme = ElementTheme.Dark)
         {
             return ShowCountdownAsync(xamlRoot, text, action, dismissAfter, ToastPlacementMode.Center, requestedTheme);
         }
 
-        public static Task<ContentDialogResult> ShowCountdownAsync(XamlRoot xamlRoot, FormattedText text, string action, TimeSpan dismissAfter, ToastPlacementMode placement, ElementTheme requestedTheme = ElementTheme.Dark)
+        public static Task<ModalPopupResult> ShowCountdownAsync(XamlRoot xamlRoot, FormattedText text, string action, TimeSpan dismissAfter, ToastPlacementMode placement, ElementTheme requestedTheme = ElementTheme.Dark)
         {
             var animated = new Grid
             {

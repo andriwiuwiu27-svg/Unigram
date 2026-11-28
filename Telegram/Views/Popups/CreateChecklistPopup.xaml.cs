@@ -541,12 +541,12 @@ namespace Telegram.Views.Popups
 
         private async void OnClosing(ModalPopup sender, ModalPopupClosingEventArgs args)
         {
-            if (args.Result != ContentDialogResult.Primary && !AreTheSame())
+            if (args.Result != ModalPopupResult.Primary && !AreTheSame())
             {
                 var deferral = args.GetDeferral();
 
                 var confirm = await MessagePopup.ShowNestedAsync(XamlRoot, Strings.CancelTodoAlertText, Strings.CancelTodoAlertTitle, Strings.PassportDiscard, Strings.Cancel, destructive: true);
-                if (confirm != ContentDialogResult.Primary)
+                if (confirm != ModalPopupResult.Primary)
                 {
                     args.Cancel = true;
                 }

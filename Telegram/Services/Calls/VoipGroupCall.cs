@@ -11,6 +11,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Telegram.Common;
+using Telegram.Controls;
 using Telegram.Native.Calls;
 using Telegram.Navigation;
 using Telegram.Navigation.Services;
@@ -147,9 +148,11 @@ namespace Telegram.Services.Calls
             var descriptor = new VoipGroupDescriptor
             {
                 IsConference = false,
+                IsStream = groupCall.IsRtmpStream,
                 //AudioInputId = _inputWatcher.GetAndUpdateAsync().Result,
                 //AudioOutputId = _outputWatcher.GetAndUpdateAsync().Result,
-                IsNoiseSuppressionEnabled = AppSettings.VoIP.IsNoiseSuppressionEnabled
+                IsNoiseSuppressionEnabled = AppSettings.VoIP.IsNoiseSuppressionEnabled,
+                IsReferenceImpl = UseReferenceImpl
             };
 
             lock (_managerLock)
@@ -160,6 +163,7 @@ namespace Telegram.Services.Calls
                 _manager.BroadcastTimeRequested += OnBroadcastTimeRequested;
                 _manager.AudioBroadcastPartRequested += OnAudioBroadcastPartRequested;
                 _manager.VideoBroadcastPartRequested += OnVideoBroadcastPartRequested;
+                _manager.RejoinRequested += OnRejoinRequested;
                 _manager.MediaChannelDescriptionsRequested += OnMediaChannelDescriptionsRequested;
             }
 
@@ -301,7 +305,8 @@ namespace Telegram.Services.Calls
                 IsConference = true,
                 //AudioInputId = _inputWatcher.GetAndUpdateAsync().Result,
                 //AudioOutputId = _outputWatcher.GetAndUpdateAsync().Result,
-                IsNoiseSuppressionEnabled = AppSettings.VoIP.IsNoiseSuppressionEnabled
+                IsNoiseSuppressionEnabled = AppSettings.VoIP.IsNoiseSuppressionEnabled,
+                IsReferenceImpl = UseReferenceImpl
             };
 
             lock (_managerLock)
@@ -312,6 +317,7 @@ namespace Telegram.Services.Calls
                 _manager.BroadcastTimeRequested += OnBroadcastTimeRequested;
                 _manager.AudioBroadcastPartRequested += OnAudioBroadcastPartRequested;
                 _manager.VideoBroadcastPartRequested += OnVideoBroadcastPartRequested;
+                _manager.RejoinRequested += OnRejoinRequested;
                 _manager.MediaChannelDescriptionsRequested += OnMediaChannelDescriptionsRequested;
                 _manager.SetEncryptDecrypt(EncryptData, DecryptData);
             }
@@ -363,7 +369,8 @@ namespace Telegram.Services.Calls
                 IsConference = true,
                 //AudioInputId = _inputWatcher.GetAndUpdateAsync().Result,
                 //AudioOutputId = _outputWatcher.GetAndUpdateAsync().Result,
-                IsNoiseSuppressionEnabled = AppSettings.VoIP.IsNoiseSuppressionEnabled
+                IsNoiseSuppressionEnabled = AppSettings.VoIP.IsNoiseSuppressionEnabled,
+                IsReferenceImpl = UseReferenceImpl
             };
 
             lock (_managerLock)
@@ -374,6 +381,7 @@ namespace Telegram.Services.Calls
                 _manager.BroadcastTimeRequested += OnBroadcastTimeRequested;
                 _manager.AudioBroadcastPartRequested += OnAudioBroadcastPartRequested;
                 _manager.VideoBroadcastPartRequested += OnVideoBroadcastPartRequested;
+                _manager.RejoinRequested += OnRejoinRequested;
                 _manager.MediaChannelDescriptionsRequested += OnMediaChannelDescriptionsRequested;
                 _manager.SetEncryptDecrypt(EncryptData, DecryptData);
             }
@@ -610,7 +618,7 @@ namespace Telegram.Services.Calls
                 popup.RequestedTheme = ElementTheme.Dark;
 
                 var confirm = await popup.ShowQueuedAsync(xamlRoot);
-                if (confirm == ContentDialogResult.Primary && (IsJoined || NeedRejoin))
+                if (confirm == ModalPopupResult.Primary && (IsJoined || NeedRejoin))
                 {
                     Rejoin(popup.SelectedSender);
                 }
@@ -623,7 +631,7 @@ namespace Telegram.Services.Calls
 
             lock (_managerLock)
             {
-                _manager?.SetConnectionMode(VoipGroupConnectionMode.None, false, IsRtmpStream);
+                _manager?.SetConnectionMode(VoipGroupConnectionMode.None, false);
                 _manager?.EmitJoinPayload(async (ssrc, payload) =>
                 {
                     if (_manager == null)
@@ -674,7 +682,7 @@ namespace Telegram.Services.Calls
                         bool broadcast;
                         if (JsonObject.TryParse(json.TextValue, out JsonObject data))
                         {
-                            broadcast = data.GetNamedBoolean("stream", false);
+                            broadcast = data.GetNamedBoolean("stream", false) || data.GetNamedBoolean("rtmp", false);
                         }
                         else
                         {
@@ -687,7 +695,7 @@ namespace Telegram.Services.Calls
                         // the lock around EmitJoinPayload was released.
                         lock (_managerLock)
                         {
-                            _manager?.SetConnectionMode(broadcast ? VoipGroupConnectionMode.Broadcast : VoipGroupConnectionMode.Rtc, true, IsRtmpStream);
+                            _manager?.SetConnectionMode(broadcast ? VoipGroupConnectionMode.Broadcast : VoipGroupConnectionMode.Rtc, true);
                             _manager?.SetJoinResponsePayload(json.TextValue);
                         }
 
@@ -804,7 +812,8 @@ namespace Telegram.Services.Calls
                 IsConference = !IsVideoChat,
                 VideoContentType = VoipVideoContentType.Screencast,
                 VideoCapture = _screenCapturer,
-                AudioProcessId = item.ProcessId
+                AudioProcessId = item.ProcessId,
+                IsReferenceImpl = UseReferenceImpl
             };
 
             lock (_managerLock)
@@ -830,7 +839,7 @@ namespace Telegram.Services.Calls
         {
             lock (_managerLock)
             {
-                _screenManager?.SetConnectionMode(VoipGroupConnectionMode.None, false, IsRtmpStream);
+                _screenManager?.SetConnectionMode(VoipGroupConnectionMode.None, false);
                 _screenManager?.EmitJoinPayload(async (ssrc, payload) =>
                 {
                     var response = await ClientService.SendAsync(new StartGroupCallScreenSharing(Id, ssrc, payload));
@@ -846,7 +855,7 @@ namespace Telegram.Services.Calls
                             }
 
                             _screenSource = ssrc;
-                            _screenManager.SetConnectionMode(VoipGroupConnectionMode.Rtc, true, IsRtmpStream);
+                            _screenManager.SetConnectionMode(VoipGroupConnectionMode.Rtc, true);
                             _screenManager.SetJoinResponsePayload(json.TextValue);
                         }
                     }
@@ -946,7 +955,24 @@ namespace Telegram.Services.Calls
                 var response = await ClientService.SendAsync(new GetGroupCallStreams(Id));
                 if (response is GroupCallStreams streams && streams.Streams.Count > 0)
                 {
-                    args.Deferral(streams.Streams[0].TimeOffset);
+                    // The edge is a part past the stream's last timestamp, read from channel 1 at scale 0, the one
+                    // unified parts are fetched from: the list comes in no fixed order and may repeat a channel.
+                    long timeOffset = -1;
+
+                    foreach (var stream in streams.Streams)
+                    {
+                        if (stream.ChannelId == 1 && stream.Scale == 0)
+                        {
+                            timeOffset = Math.Max(timeOffset, stream.TimeOffset);
+                        }
+                    }
+
+                    if (timeOffset < 0)
+                    {
+                        timeOffset = streams.Streams[0].TimeOffset;
+                    }
+
+                    args.Deferral(timeOffset + 1000);
 
                     lock (_streamStateLock)
                     {
@@ -959,7 +985,8 @@ namespace Telegram.Services.Calls
                 }
                 else
                 {
-                    args.Deferral(0);
+                    // 0 is no stream yet, asked again in a second; an error falls back to the server's time.
+                    args.Deferral(response is Error ? ClientService.UnixTimeMilliseconds : 0);
 
                     lock (_streamStateLock)
                     {
@@ -985,14 +1012,7 @@ namespace Telegram.Services.Calls
         private async void OnAudioBroadcastPartRequested(VoipGroupManager sender, AudioBroadcastPartRequestedEventArgs args)
         {
             var response = await ClientService.SendAsync(new GetGroupCallStreamSegment(Id, args.Time, args.Scale, 0, null));
-            if (response is Data data)
-            {
-                args.Deferral(args.Time, ClientService.UnixTimeMilliseconds, data.DataValue);
-            }
-            else
-            {
-                args.Deferral(args.Time, ClientService.UnixTimeMilliseconds, null);
-            }
+            AnswerBroadcastPart(args.Deferral, response);
         }
 
         private async void OnVideoBroadcastPartRequested(VoipGroupManager sender, VideoBroadcastPartRequestedEventArgs args)
@@ -1006,14 +1026,50 @@ namespace Telegram.Services.Calls
             };
 
             var response = await ClientService.SendAsync(new GetGroupCallStreamSegment(Id, args.Time, args.Scale, args.ChannelId, videoQuality));
+            AnswerBroadcastPart(args.Deferral, response);
+        }
+
+        private void AnswerBroadcastPart(BroadcastPartRequestedDeferral deferral, Object response)
+        {
             if (response is Data data)
             {
-                args.Deferral(args.Time, ClientService.UnixTimeMilliseconds, data.DataValue);
+                deferral(BroadcastPartStatus.Success, ClientService.UnixTimeMilliseconds, data.DataValue);
             }
             else
             {
-                args.Deferral(args.Time, ClientService.UnixTimeMilliseconds, null);
+                deferral(GetBroadcastPartStatus(response as Error), ClientService.UnixTimeMilliseconds, null);
             }
+        }
+
+        private static BroadcastPartStatus GetBroadcastPartStatus(Error error)
+        {
+            if (error == null)
+            {
+                return BroadcastPartStatus.ResyncNeeded;
+            }
+
+            // TIME_TOO_BIG is a part the server has not cut yet; a flood wait and an answer TDLib could not read
+            // (the CDN redirect among them) are worth asking again too.
+            if (error.Code == 429
+                || error.Message.StartsWith("FLOOD_WAIT", StringComparison.Ordinal)
+                || error.Message.Contains("TIME_TOO_BIG")
+                || error.Message.Contains("Receive unexpected server response"))
+            {
+                return BroadcastPartStatus.NotReady;
+            }
+
+            if (error.Message.Contains("GROUPCALL_JOIN_MISSING"))
+            {
+                return BroadcastPartStatus.RejoinNeeded;
+            }
+
+            return BroadcastPartStatus.ResyncNeeded;
+        }
+
+        private void OnRejoinRequested(VoipGroupManager sender, object args)
+        {
+            // TDLib sees the same GROUPCALL_JOIN_MISSING and raises need_rejoin, which is what rejoins the call.
+            Logger.Info("Broadcast asked to rejoin");
         }
 
         private async void OnMediaChannelDescriptionsRequested(VoipGroupManager sender, MediaChannelDescriptionsRequestedEventArgs args)
@@ -1238,6 +1294,7 @@ namespace Telegram.Services.Calls
                 manager.BroadcastTimeRequested -= OnBroadcastTimeRequested;
                 manager.AudioBroadcastPartRequested -= OnAudioBroadcastPartRequested;
                 manager.VideoBroadcastPartRequested -= OnVideoBroadcastPartRequested;
+                manager.RejoinRequested -= OnRejoinRequested;
                 manager.MediaChannelDescriptionsRequested -= OnMediaChannelDescriptionsRequested;
             }
 
@@ -2005,6 +2062,9 @@ namespace Telegram.Services.Calls
         public bool IsVideoChat { get; private set; }
 
         public bool IsLiveStory { get; private set; }
+
+        // The server can roll group calls back to the custom engine.
+        private bool UseReferenceImpl => ClientService.Config.GetNamedBoolean("unigram_calls_group_reference_impl", true);
 
         /// <summary>
         /// Invite link for the group call; for group calls that aren't bound to a chat.

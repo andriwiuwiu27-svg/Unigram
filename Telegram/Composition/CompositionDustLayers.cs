@@ -59,6 +59,12 @@ namespace Telegram.Composition
 
         private const int MaskSize = 256;
 
+        /// <summary>
+        /// How much of a pixel's layer is chance rather than its column: a pixel at x, as a fraction
+        /// of the width, is in layer floor((x * (1 - Scatter) + r * Scatter) * count) for r in [0, 1).
+        /// </summary>
+        public const double Scatter = 0.3;
+
         // A brush belongs to the compositor that created it and every window has its own, so these
         // are per view. What is shared is the encoded noise behind them, which is the whole cost.
         [ThreadStatic]
@@ -82,6 +88,12 @@ namespace Telegram.Composition
         // to animate is not ready in time. The instance is built when the view is, which is early
         // enough that this has always come back by the time anything is deleted.
         public override bool IsReady => _masks != null;
+
+        /// <summary>
+        /// This view's masks, which between them hold every pixel exactly once, or null until
+        /// <see cref="Prepare"/> has come back.
+        /// </summary>
+        public static CompositionSurfaceBrush[] Masks => _masks;
 
         /// <summary>
         /// The masks depend only on the layer count, so this runs once per view unless the count is
@@ -236,7 +248,7 @@ namespace Telegram.Composition
             {
                 for (int x = 0; x < MaskSize; x++)
                 {
-                    var bias = x / (double)MaskSize * 0.7 + _random.NextDouble() * 0.3;
+                    var bias = x / (double)MaskSize * (1 - Scatter) + _random.NextDouble() * Scatter;
                     var layer = Math.Min(count - 1, (int)(bias * count));
 
                     var offset = (y * MaskSize + x) * 4;

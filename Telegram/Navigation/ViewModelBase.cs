@@ -122,17 +122,7 @@ namespace Telegram.Navigation
             NavigationService.HidePopup(popupType);
         }
 
-        public Task<ContentDialogResult> ShowPopupAsync(ContentPopup popup, object parameter = null, ElementTheme requestedTheme = ElementTheme.Default)
-        {
-            return NavigationService.ShowPopupAsync(popup, parameter, requestedTheme);
-        }
-
-        public void ShowPopup(ContentPopup popup, object parameter = null, ElementTheme requestedTheme = ElementTheme.Default)
-        {
-            _ = NavigationService.ShowPopupAsync(popup, parameter, requestedTheme);
-        }
-
-        public Task<ContentDialogResult> ShowPopupAsync(ModalPopup popup, object parameter = null, ElementTheme requestedTheme = ElementTheme.Default)
+        public Task<ModalPopupResult> ShowPopupAsync(ModalPopup popup, object parameter = null, ElementTheme requestedTheme = ElementTheme.Default)
         {
             return NavigationService.ShowPopupAsync(popup, parameter, requestedTheme);
         }
@@ -142,27 +132,27 @@ namespace Telegram.Navigation
             _ = NavigationService.ShowPopupAsync(popup, parameter, requestedTheme);
         }
 
-        public virtual Task<ContentDialogResult> ShowPopupAsync(string message, string title = null, string primary = null, string secondary = null, string tertiary = null, bool destructive = false, ElementTheme requestedTheme = ElementTheme.Default)
+        public virtual Task<ModalPopupResult> ShowPopupAsync(string message, string title = null, string primary = null, string secondary = null, string tertiary = null, bool destructive = false, ElementTheme requestedTheme = ElementTheme.Default)
         {
-            if (ContentPopup.IsAnyPopupOpen(XamlRoot))
+            if (ModalPopup.IsAnyPopupOpen(XamlRoot))
             {
-                return MessagePopup.ShowNestedAsync(XamlRoot, message, title, primary, secondary ?? tertiary, destructive, requestedTheme);
+                return MessagePopup.ShowNestedAsync(XamlRoot, message, title, primary, secondary, tertiary, destructive, requestedTheme);
             }
 
             return MessagePopup.ShowAsync(XamlRoot, message, title, primary, secondary, tertiary, destructive, requestedTheme);
         }
 
-        public Task<ContentDialogResult> ShowPopupNestedAsync(string message, string title = null, string primary = null, string secondary = null, bool destructive = false, ElementTheme requestedTheme = ElementTheme.Default)
+        public Task<ModalPopupResult> ShowPopupNestedAsync(string message, string title = null, string primary = null, string secondary = null, bool destructive = false, ElementTheme requestedTheme = ElementTheme.Default)
         {
-            return MessagePopup.ShowNestedAsync(XamlRoot, message, title, primary, secondary, destructive, requestedTheme);
+            return MessagePopup.ShowNestedAsync(XamlRoot, message, title, primary, secondary, null, destructive, requestedTheme);
         }
 
-        public Task<ContentDialogResult> ShowPopupAsync(FormattedText message, string title = null, string primary = null, string secondary = null, string tertiary = null, bool destructive = false, ElementTheme requestedTheme = ElementTheme.Default)
+        public Task<ModalPopupResult> ShowPopupAsync(FormattedText message, string title = null, string primary = null, string secondary = null, string tertiary = null, bool destructive = false, ElementTheme requestedTheme = ElementTheme.Default)
         {
             return MessagePopup.ShowAsync(XamlRoot, message, title, primary, secondary, tertiary, destructive, requestedTheme);
         }
 
-        //public Task<ContentDialogResult> ShowPopupAsync(FrameworkElement target, FormattedText message, string title = null, string primary = null, string secondary = null, bool destructive = false, ElementTheme requestedTheme = ElementTheme.Default)
+        //public Task<ModalPopupResult> ShowPopupAsync(FrameworkElement target, FormattedText message, string title = null, string primary = null, string secondary = null, bool destructive = false, ElementTheme requestedTheme = ElementTheme.Default)
         //{
         //    return MessagePopup.ShowAsync(target, message, title, primary, secondary, destructive, requestedTheme);
         //}

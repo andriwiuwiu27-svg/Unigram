@@ -136,7 +136,7 @@ namespace Telegram.Views.Popups
             }
 
             var confirm = await popup.ShowAsync(xamlRoot);
-            if (confirm != ContentDialogResult.Primary)
+            if (confirm != ModalPopupResult.Primary)
             {
                 return null;
             }

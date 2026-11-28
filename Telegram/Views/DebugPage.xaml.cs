@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using Telegram.Common;
 using Telegram.Controls;
 using Telegram.Native;
+using Telegram.Navigation;
 using Telegram.Services;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
@@ -20,9 +21,9 @@ using Windows.UI.Xaml.Controls.Primitives;
 namespace Telegram.Views
 {
     /// <summary>
-    /// An empty page that can be used on its own or navigated to within a Frame.
+    /// An empty page that can be used on its own or navigated to within a NavigationFrame.
     /// </summary>
-    public sealed partial class DebugPage : Page
+    public sealed partial class DebugPage : NavigationPage
     {
         private DispatcherTimer _memoryUsageTimer;
         private double _memoryUsage;
@@ -41,6 +42,7 @@ namespace Telegram.Views
         public DebugPage()
         {
             this.InitializeComponent();
+            Transition = PageTransition.Entrance;
 
             var butt = new RepeatButton();
             butt.HorizontalAlignment = HorizontalAlignment.Center;

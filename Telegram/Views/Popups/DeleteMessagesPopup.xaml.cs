@@ -30,8 +30,11 @@ namespace Telegram.Views.Popups
         private readonly int _messagesCount;
         private int _deleteAllCount;
 
+        private bool _updatingDeleteAll;
+
         private IList<MessageSender> _reportSpam;
-        private IList<MessageSender> _deleteAll;
+        private IList<MessageSender> _deleteAllMessages;
+        private IList<MessageSender> _deleteAllReactions;
         private IList<MessageSender> _banUser;
 
         public DeleteMessagesPopup(IClientService clientService, Chat chat, MessageTopic topic, IList<MessageWithOwner> messages, IDictionary<MessageId, MessageProperties> properties)
@@ -58,11 +61,13 @@ namespace Telegram.Views.Popups
             if (senders.Count > 1 && supergroup?.IsChannel is false && supergroup?.IsDirectMessagesGroup is false)
             {
                 ReportSpamCheck.Content = Strings.DeleteReportSpam;
-                DeleteAllCheck.Content = Strings.DeleteAllFromUsers;
+                DeleteAllMessagesCheck.Content = Strings.DeleteAllMessagesFromUsers;
+                DeleteAllReactionsCheck.Content = Strings.DeleteAllReactionsFromUsers;
                 BanUserCheck.Content = Strings.DeleteBanUsers;
 
                 ReportSpamCount.Text =
-                    DeleteAllCount.Text =
+                    DeleteAllMessagesCount.Text =
+                    DeleteAllReactionsCount.Text =
                     BanUserCount.Text = senders.Count.ToString();
 
                 PermissionsToggle.Content = Strings.DeleteToggleRestrictUsers;
@@ -73,20 +78,25 @@ namespace Telegram.Views.Popups
             }
             else if (senders.Count > 0 && supergroup?.IsChannel is false && supergroup?.IsDirectMessagesGroup is false)
             {
+                ReportSpamExpander.IsExpandable =
+                    BanUserExpander.IsExpandable = false;
+
+                DeleteAllMessagesExpander.Visibility =
+                    DeleteAllReactionsExpander.Visibility = Visibility.Collapsed;
+                DeleteAllExpander.Visibility = Visibility.Visible;
+
                 ReportSpamCheck.Content = Strings.DeleteReportSpam;
-                DeleteAllCheck.Content = string.Format(Strings.DeleteAllFrom, clientService.GetTitle(senders[0]));
+                DeleteAllText.Text = string.Format(Strings.DeleteAllFrom, clientService.GetTitle(senders[0]));
+                DeleteAllCount.Text = "0/2";
                 BanUserCheck.Content = string.Format(Strings.DeleteBan, clientService.GetTitle(senders[0]));
 
                 ReportSpamCount.Visibility =
-                    DeleteAllCount.Visibility =
                     BanUserCount.Visibility = Visibility.Collapsed;
 
                 ReportSpamIcon.Visibility =
-                    DeleteAllIcon.Visibility =
                     BanUserIcon.Visibility = Visibility.Collapsed;
 
                 ReportSpamExpander.Margin =
-                    DeleteAllExpander.Margin =
                     BanUserExpander.Margin = new Thickness(0, 0, -72, 0);
 
                 PermissionsToggle.Content = Strings.DeleteToggleRestrictUser;
@@ -200,7 +210,8 @@ namespace Telegram.Views.Popups
             _senders = senders;
 
             _reportSpam = Array.Empty<MessageSender>();
-            _deleteAll = Array.Empty<MessageSender>();
+            _deleteAllMessages = Array.Empty<MessageSender>();
+            _deleteAllReactions = Array.Empty<MessageSender>();
             _banUser = Array.Empty<MessageSender>();
 
             ViewModel.CanSendBasicMessages = chat.Permissions.CanSendBasicMessages;
@@ -250,19 +261,24 @@ namespace Telegram.Views.Popups
             if (groupCall.CanDeleteMessages)
             {
                 ReportSpamCheck.Content = Strings.DeleteReportSpam;
-                DeleteAllCheck.Content = string.Format(Strings.DeleteAllFrom, clientService.GetTitle(message.SenderId));
+                DeleteAllMessagesCheck.Content = string.Format(Strings.DeleteAllFrom, clientService.GetTitle(message.SenderId));
                 BanUserCheck.Content = string.Format(Strings.DeleteBan, clientService.GetTitle(message.SenderId));
 
+                DeleteAllReactionsExpander.Visibility = Visibility.Collapsed;
+
                 ReportSpamCount.Visibility =
-                    DeleteAllCount.Visibility =
-                    BanUserCount.Visibility = Visibility.Collapsed;
+                    DeleteAllMessagesCount.Visibility =
+                    DeleteAllReactionsCount.Visibility = Visibility.Collapsed;
+                BanUserCount.Visibility = Visibility.Collapsed;
 
                 ReportSpamIcon.Visibility =
-                    DeleteAllIcon.Visibility =
+                    DeleteAllMessagesIcon.Visibility =
+                    DeleteAllReactionsIcon.Visibility =
                     BanUserIcon.Visibility = Visibility.Collapsed;
 
                 ReportSpamExpander.Margin =
-                    DeleteAllExpander.Margin =
+                    DeleteAllMessagesExpander.Margin =
+                    DeleteAllReactionsExpander.Margin =
                     BanUserExpander.Margin = new Thickness(0, 0, -72, 0);
 
                 PermissionsToggle.Content = Strings.DeleteToggleRestrictUser;
@@ -285,7 +301,8 @@ namespace Telegram.Views.Popups
             _senders = [message.SenderId];
 
             _reportSpam = Array.Empty<MessageSender>();
-            _deleteAll = Array.Empty<MessageSender>();
+            _deleteAllMessages = Array.Empty<MessageSender>();
+            _deleteAllReactions = Array.Empty<MessageSender>();
             _banUser = Array.Empty<MessageSender>();
         }
 
@@ -308,7 +325,9 @@ namespace Telegram.Views.Popups
 
         public IList<MessageSender> ReportSpam => _reportSpam;
 
-        public IList<MessageSender> DeleteAll => _deleteAll;
+        public IList<MessageSender> DeleteAllMessages => _deleteAllMessages;
+
+        public IList<MessageSender> DeleteAllReactions => _deleteAllReactions;
 
         public ChatMemberStatus SelectedStatus => PermissionsPanel.Visibility == Visibility.Collapsed
                     ? new ChatMemberStatusBanned()
@@ -316,20 +335,25 @@ namespace Telegram.Views.Popups
 
         private void ReportSpam_Expanded(object sender, EventArgs e)
         {
-            Populate(ReportSpamRoot, ReportSpam_Checked);
+            Populate(ReportSpamRoot, _reportSpam, ReportSpam_Checked);
         }
 
-        private void DeleteAll_Expanded(object sender, EventArgs e)
+        private void DeleteAllMessages_Expanded(object sender, EventArgs e)
         {
-            Populate(DeleteAllRoot, DeleteAll_Checked);
+            Populate(DeleteAllMessagesRoot, _deleteAllMessages, DeleteAllMessages_Checked);
+        }
+
+        private void DeleteAllReactions_Expanded(object sender, EventArgs e)
+        {
+            Populate(DeleteAllReactionsRoot, _deleteAllReactions, DeleteAllReactions_Checked);
         }
 
         private void BanUser_Expanded(object sender, EventArgs e)
         {
-            Populate(BanUserRoot, BanUser_Checked);
+            Populate(BanUserRoot, _banUser, BanUser_Checked);
         }
 
-        private void Populate(StackPanel root, RoutedEventHandler handler)
+        private void Populate(StackPanel root, IList<MessageSender> senders, RoutedEventHandler handler)
         {
             if (root.Children.Count > 0)
             {
@@ -363,7 +387,7 @@ namespace Telegram.Views.Popups
                 {
                     Tag = sender,
                     Content = content,
-                    IsChecked = false
+                    IsChecked = senders.Contains(sender)
                 };
 
                 selector.Checked += handler;
@@ -385,18 +409,70 @@ namespace Telegram.Views.Popups
             }
         }
 
-        private void DeleteAll_Checked(object sender, RoutedEventArgs e)
+        private void DeleteAllMessages_Checked(object sender, RoutedEventArgs e)
         {
-            if ((CheckBox)sender == DeleteAllCheck)
+            if ((CheckBox)sender == DeleteAllMessagesCheck)
             {
-                _deleteAll = Toggle(DeleteAllCheck.IsChecked == true, DeleteAllRoot, DeleteAllCount, DeleteAll_Checked);
+                _deleteAllMessages = Toggle(DeleteAllMessagesCheck.IsChecked == true, DeleteAllMessagesRoot, DeleteAllMessagesCount, DeleteAllMessages_Checked);
             }
             else
             {
-                _deleteAll = UpdateSelection(DeleteAllRoot, DeleteAllCount, DeleteAllCheck, DeleteAll_Checked);
+                _deleteAllMessages = UpdateSelection(DeleteAllMessagesRoot, DeleteAllMessagesCount, DeleteAllMessagesCheck, DeleteAllMessages_Checked);
             }
 
-            if (_deleteAllCount > 0 && DeleteAllCheck.IsChecked == true)
+            UpdateTitle(DeleteAllMessagesCheck.IsChecked == true);
+        }
+
+        private void DeleteAll_Checked(object sender, RoutedEventArgs e)
+        {
+            if (_updatingDeleteAll)
+            {
+                return;
+            }
+
+            _updatingDeleteAll = true;
+            DeleteAllMessagesItem.IsChecked =
+                DeleteAllReactionsItem.IsChecked = DeleteAllCheck.IsChecked == true;
+            _updatingDeleteAll = false;
+
+            UpdateDeleteAll();
+        }
+
+        private void DeleteAllItem_Checked(object sender, RoutedEventArgs e)
+        {
+            if (_updatingDeleteAll)
+            {
+                return;
+            }
+
+            UpdateDeleteAll();
+        }
+
+        private void UpdateDeleteAll()
+        {
+            var messages = DeleteAllMessagesItem.IsChecked == true;
+            var reactions = DeleteAllReactionsItem.IsChecked == true;
+            var count = (messages ? 1 : 0) + (reactions ? 1 : 0);
+
+            _deleteAllMessages = messages ? _senders.ToList() : Array.Empty<MessageSender>();
+            _deleteAllReactions = reactions ? _senders.ToList() : Array.Empty<MessageSender>();
+
+            DeleteAllCount.Text = $"{count}/2";
+
+            _updatingDeleteAll = true;
+            DeleteAllCheck.IsChecked = count == 2
+                ? true
+                : count == 0
+                ? false
+                : null;
+            _updatingDeleteAll = false;
+
+            UpdateTitle(messages);
+        }
+
+        private void UpdateTitle(bool deleteAllMessages)
+        {
+            if (_deleteAllCount > 0 && deleteAllMessages)
             {
                 Title = string.Format(Strings.DeleteMessagesTitle, Locale.Declension(Strings.R.messages, _deleteAllCount));
             }
@@ -405,6 +481,18 @@ namespace Telegram.Views.Popups
                 Title = _messagesCount == 1
                     ? Strings.DeleteSingleMessagesTitle
                     : string.Format(Strings.DeleteMessagesTitle, Locale.Declension(Strings.R.messages, _messagesCount));
+            }
+        }
+
+        private void DeleteAllReactions_Checked(object sender, RoutedEventArgs e)
+        {
+            if ((CheckBox)sender == DeleteAllReactionsCheck)
+            {
+                _deleteAllReactions = Toggle(DeleteAllReactionsCheck.IsChecked == true, DeleteAllReactionsRoot, DeleteAllReactionsCount, DeleteAllReactions_Checked);
+            }
+            else
+            {
+                _deleteAllReactions = UpdateSelection(DeleteAllReactionsRoot, DeleteAllReactionsCount, DeleteAllReactionsCheck, DeleteAllReactions_Checked);
             }
         }
 

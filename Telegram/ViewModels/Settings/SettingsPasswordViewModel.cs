@@ -7,6 +7,7 @@
 
 using System;
 using System.Threading.Tasks;
+using Telegram.Controls;
 using Telegram.Navigation;
 using Telegram.Navigation.Services;
 using Telegram.Services;
@@ -41,14 +42,14 @@ namespace Telegram.ViewModels.Settings
         {
             var password = new SettingsPasswordCreatePopup();
 
-            if (ContentDialogResult.Primary != await ShowPopupAsync(password))
+            if (ModalPopupResult.Primary != await ShowPopupAsync(password))
             {
                 return;
             }
 
             var hint = new SettingsPasswordHintPopup(ClientService, _password, password.Password);
 
-            if (ContentDialogResult.Primary != await ShowPopupAsync(hint))
+            if (ModalPopupResult.Primary != await ShowPopupAsync(hint))
             {
                 return;
             }
@@ -61,7 +62,7 @@ namespace Telegram.ViewModels.Settings
             var popup = new SettingsPasswordEmailAddressPopup(ClientService, new SetRecoveryEmailAddress(_password, string.Empty));
 
             var confirm = await ShowPopupAsync(popup);
-            if (confirm == ContentDialogResult.Primary && popup.PasswordState?.RecoveryEmailAddressCodeInfo != null)
+            if (confirm == ModalPopupResult.Primary && popup.PasswordState?.RecoveryEmailAddressCodeInfo != null)
             {
                 await ShowPopupAsync(new SettingsPasswordEmailCodePopup(ClientService, popup.PasswordState?.RecoveryEmailAddressCodeInfo, SettingsPasswordEmailCodeType.New));
             }
@@ -83,7 +84,7 @@ namespace Telegram.ViewModels.Settings
             }
 
             var confirm = await ShowPopupAsync(message, Strings.TurnPasswordOffQuestionTitle, Strings.OK, Strings.Cancel);
-            if (confirm != ContentDialogResult.Primary)
+            if (confirm != ModalPopupResult.Primary)
             {
                 return;
             }
@@ -94,7 +95,7 @@ namespace Telegram.ViewModels.Settings
                 if (passwordState.HasPassword is false)
                 {
                     NavigationService.GoBack();
-                    NavigationService.Frame.ForwardStack.Clear();
+                    NavigationService.ClearForwardStack();
                 }
                 else
                 {

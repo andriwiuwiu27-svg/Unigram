@@ -6,8 +6,7 @@
                xmlns:native="using:Telegram.Native.Controls"
                mc:Ignorable="d"
                d:DesignHeight="300"
-               d:DesignWidth="400"
-               Margin="0,-2">
+               d:DesignWidth="400">
 
     <GridView x:Name="ScrollingHost"
               IsItemClickEnabled="True"

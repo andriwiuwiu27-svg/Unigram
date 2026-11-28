@@ -4,6 +4,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:controls="using:Telegram.Controls"
+             xmlns:navigation="using:Telegram.Navigation"
              xmlns:cells="using:Telegram.Controls.Cells"
              xmlns:selectors="using:Telegram.Selectors"
              xmlns:viewModels="using:Telegram.ViewModels"
@@ -67,6 +68,10 @@
             <RowDefinition />
         </Grid.RowDefinitions>
         <!-- TODO: Hide in forward popup -->
+        <Border x:Name="ChatFoldersShadow"
+                CornerRadius="16"
+                Height="32"
+                Margin="16,4,16,4" />
         <controls:TopNavView x:Name="ChatFolders"
                              ItemsSource="{x:Bind ViewModel.Tabs}"
                              SelectedIndex="{x:Bind ViewModel.SelectedTab, Mode=TwoWay}"
@@ -75,11 +80,9 @@
                              FocusFollowsSingleSelection="True"
                              SingleSelectionFollowsFocus="False"
                              Height="32"
-                             Margin="16,6,16,2"
+                             Margin="16,4,16,4"
                              Padding="2,0"
-                             Background="{ThemeResource TextControlBackground}"
-                             BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
-                             BorderThickness="1"
+                             Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                              CornerRadius="16">
             <controls:TopNavView.ItemContainerStyle>
                 <Style TargetType="controls:TopNavViewItem">
@@ -279,9 +282,9 @@
             <ScrollViewer x:Name="ScrollingHost"
                           SizeChanged="OnSizeChanged"
                           ViewChanged="OnViewChanged">
-                <Frame x:Name="MediaFrame"
-                       Navigating="OnNavigating"
-                       Navigated="OnNavigated" />
+                <navigation:NavigationFrame x:Name="MediaFrame"
+                                            Navigating="OnNavigating"
+                                            Navigated="OnNavigated" />
             </ScrollViewer>
 
             <Grid x:Name="ManagePanel"

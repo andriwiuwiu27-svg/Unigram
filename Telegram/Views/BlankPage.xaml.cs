@@ -5,16 +5,18 @@
 // file LICENSE or copy at https://www.gnu.org/licenses/gpl-3.0.txt)
 //
 
+using Telegram.Navigation;
 using Telegram.Navigation.Services;
 using Telegram.Services;
 using Telegram.Td.Api;
 using Telegram.Views.Authorization;
+using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Navigation;
 
 namespace Telegram.Views
 {
-    public sealed partial class BlankPage : Page
+    public sealed partial class BlankPage : NavigationPage
     {
         private IClientService _clientService;
         private INavigationService _navigationService;
@@ -25,7 +27,8 @@ namespace Telegram.Views
             InitializeComponent();
             DataContext = new object();
 
-            NavigationCacheMode = NavigationCacheMode.Required;
+            Retention = PageRetention.Keep;
+            Transition = PageTransition.None;
         }
 
         public void Activate(INavigationService navigationService)
@@ -35,21 +38,27 @@ namespace Telegram.Views
             _aggregator ??= navigationService.Session.Resolve<IEventAggregator>();
         }
 
-        protected override void OnNavigatedTo(NavigationEventArgs e)
+        protected override void OnNavigatedTo(NavigatedEventArgs e)
         {
-            if (e.NavigationMode == NavigationMode.Back && Frame.ForwardStack.Count > 0 && Frame.ForwardStack[^1].SourcePageType == typeof(AuthorizationPage))
+            if (e.NavigationMode == NavigationMode.Back && _navigationService?.ForwardStack is { Count: > 0 } forward && forward[^1].SourcePageType == typeof(AuthorizationPage))
             {
                 _clientService.Send(new Destroy());
             }
-            else if (_navigationService != null && _navigationService.Window.UpdateChatTheme(ActualTheme, null, null, null, null))
+            else if (_navigationService != null)
             {
-                if (_clientService == null)
-                {
-                    return;
-                }
+                ResetChatTheme(_navigationService, ActualTheme, _clientService, _aggregator);
+            }
+        }
 
-                _aggregator.Publish(new UpdateDefaultBackground(false, _clientService.GetDefaultBackground(false)));
-                _aggregator.Publish(new UpdateDefaultBackground(true, _clientService.GetDefaultBackground(true)));
+        /// <summary>
+        /// Puts back the default chat theme and background, which is what the empty detail pane shows.
+        /// </summary>
+        public static void ResetChatTheme(INavigationService navigationService, ElementTheme theme, IClientService clientService, IEventAggregator aggregator)
+        {
+            if (navigationService.Window.UpdateChatTheme(theme, null, null, null, null) && clientService != null)
+            {
+                aggregator.Publish(new UpdateDefaultBackground(false, clientService.GetDefaultBackground(false)));
+                aggregator.Publish(new UpdateDefaultBackground(true, clientService.GetDefaultBackground(true)));
             }
         }
     }

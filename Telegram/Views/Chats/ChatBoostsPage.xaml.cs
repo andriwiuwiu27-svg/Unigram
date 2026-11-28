@@ -8,6 +8,7 @@
 using System;
 using Telegram.Common;
 using Telegram.Controls.Cells;
+using Telegram.Navigation;
 using Telegram.Td.Api;
 using Telegram.ViewModels.Chats;
 using Windows.UI.Xaml;
@@ -22,6 +23,7 @@ namespace Telegram.Views.Chats
         public ChatBoostsPage()
         {
             InitializeComponent();
+            Transition = PageTransition.Entrance;
             Title = Strings.Boosts;
         }
 

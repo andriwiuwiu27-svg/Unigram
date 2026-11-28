@@ -7,6 +7,7 @@
 
 using System.ComponentModel;
 using Telegram.Common;
+using Telegram.Navigation.Services;
 using Telegram.Navigation;
 using Telegram.Td.Api;
 using Telegram.ViewModels;
@@ -30,6 +31,7 @@ namespace Telegram.Views
         public RevenuePage()
         {
             InitializeComponent();
+            Transition = PageTransition.Entrance;
 
             Title = Strings.Monetization;
         }
@@ -42,13 +44,13 @@ namespace Telegram.Views
             }
         }
 
-        protected override void OnNavigatedTo(NavigationEventArgs e)
+        protected override void OnNavigatedTo(NavigatedEventArgs e)
         {
             ViewModel.PropertyChanged += OnPropertyChanged;
 
             if (ViewModel.SelectedItem is RevenueTabItem tab)
             {
-                MediaFrame.Navigate(tab.Type, null, new SuppressNavigationTransitionInfo());
+                MediaFrame.Navigate(tab.Type, null, PageTransition.None);
             }
 
             if (ViewModel.ClientService.TryGetChat((long)ViewModel.NavigationService.CurrentPageParam, out Chat chat))
@@ -57,7 +59,7 @@ namespace Telegram.Views
             }
         }
 
-        protected override void OnNavigatedFrom(NavigationEventArgs e)
+        protected override void OnNavigatedFrom(NavigatedEventArgs e)
         {
             ViewModel.PropertyChanged -= OnPropertyChanged;
         }
@@ -66,15 +68,15 @@ namespace Telegram.Views
         {
             if (e.PropertyName.Equals("SharedCount") && ViewModel.SelectedItem is RevenueTabItem tab)
             {
-                MediaFrame.Navigate(tab.Type, null, new SuppressNavigationTransitionInfo());
+                MediaFrame.Navigate(tab.Type, null, PageTransition.None);
             }
         }
 
-        private void OnNavigating(object sender, NavigatingCancelEventArgs e)
+        private void OnNavigating(object sender, NavigatingEventArgs e)
         {
         }
 
-        private void OnNavigated(object sender, NavigationEventArgs e)
+        private void OnNavigated(object sender, NavigatedEventArgs e)
         {
             if (e.Content is ChatStatisticsPage statistics)
             {
@@ -98,14 +100,11 @@ namespace Telegram.Views
             {
                 Logger.Info(page.Type);
 
-                NavigationTransitionInfo transition = _prevSelectedIndex == -1
-                    ? new SuppressNavigationTransitionInfo()
-                    : new SlideNavigationTransitionInfo
-                    {
-                        Effect = _prevSelectedIndex < Navigation.SelectedIndex
-                            ? SlideNavigationTransitionEffect.FromRight
-                            : SlideNavigationTransitionEffect.FromLeft
-                    };
+                var transition = _prevSelectedIndex == -1
+                    ? PageTransition.None
+                    : _prevSelectedIndex < Navigation.SelectedIndex
+                    ? PageTransition.Forward
+                    : PageTransition.Backward;
 
                 _prevSelectedIndex = Navigation.SelectedIndex;
                 MediaFrame.Navigate(page.Type, null, transition);

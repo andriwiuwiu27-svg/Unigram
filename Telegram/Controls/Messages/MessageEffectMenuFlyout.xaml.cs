@@ -227,7 +227,7 @@ namespace Telegram.Controls.Messages
             pillShadow.BlurRadius = 16;
             pillShadow.Opacity = 0.14f;
             pillShadow.Color = Colors.Black;
-            pillShadow.Mask = Pill.GetAlphaMask();
+            pillShadow.Mask = OutlineMask.FromPath(Pill, new Vector2(width, height + yy + byy));
 
             var pillReceiver = compositor.CreateSpriteVisual();
             pillReceiver.Shadow = pillShadow;
@@ -383,7 +383,7 @@ namespace Telegram.Controls.Messages
             var popup = new ChooseStatusDurationPopup();
 
             var confirm = await popup.ShowQueuedAsync(XamlRoot);
-            //if (confirm == ContentDialogResult.Primary && _mode == EmojiDrawerMode.EmojiStatus && sticker.FullType is StickerFullTypeCustomEmoji customEmoji)
+            //if (confirm == ModalPopupResult.Primary && _mode == EmojiDrawerMode.EmojiStatus && sticker.FullType is StickerFullTypeCustomEmoji customEmoji)
             //{
             //    _clientService.Send(new SetEmojiStatus(new EmojiStatus(customEmoji.CustomEmojiId, popup.Value)));
             //}

@@ -62,7 +62,7 @@ namespace Telegram.Views
         {
             if (_messagesShift.HasRanges())
             {
-                var panel = Messages.ItemsPanelRoot as ItemsStackPanel;
+                var panel = Messages.ItemsStackPanel;
                 if (panel != null)
                 {
                     var reverse = panel.ItemsUpdatingScrollMode == ItemsUpdatingScrollMode.KeepLastItemInView;
@@ -139,7 +139,7 @@ namespace Telegram.Views
                 return;
             }
 
-            var panel = Messages.ItemsPanelRoot as ItemsStackPanel;
+            var panel = Messages.ItemsStackPanel;
             if (panel == null /*|| panel.FirstVisibleIndex < 0 || panel.LastVisibleIndex >= _messages.Count*/)
             {
                 return;
@@ -543,7 +543,14 @@ namespace Telegram.Views
                     }
                 }
 
-                var childHeight = container.ContentTemplateRoot.ActualSize.Y;
+                // A container is realized before its template applies, and an activation can arrive
+                // in between. It has no height yet, so skipping it leaves top and bottom right.
+                if (container.ContentTemplateRoot is not UIElement templateRoot)
+                {
+                    continue;
+                }
+
+                var childHeight = templateRoot.ActualSize.Y;
 
                 if (top <= 0 && top + childHeight > 0 && !summaryAbove)
                 {
@@ -1240,7 +1247,7 @@ namespace Telegram.Views
         {
             var builder = new StringBuilder();
 
-            if (Messages.ItemsPanelRoot is ItemsStackPanel panel)
+            if (Messages.ItemsStackPanel is ItemsStackPanel panel)
             {
                 builder.AppendFormat("live {0}   cache [{1}-{2}]", panel.Children.Count, panel.FirstCacheIndex, panel.LastCacheIndex);
                 builder.AppendLine();
@@ -1335,7 +1342,13 @@ namespace Telegram.Views
                         relevantHashSet.Retyped++;
                         relevantHashSet.TotalCount++;
 
-                        if (selector.ContentTemplateRoot is MessageSelector discarded)
+                        // The template is about to be replaced, so whatever is owed to the old
+                        // content has to reach it now.
+                        if (selector.IsContentRecycleOwed)
+                        {
+                            RecycleContent(selector, selector.IsHeaderUnreadOwed);
+                        }
+                        else if (selector.ContentTemplateRoot is MessageSelector discarded)
                         {
                             discarded.Recycle();
                         }
@@ -1411,23 +1424,20 @@ namespace Telegram.Views
                 // XAML has indicated that the item is no longer being shown, so add it to the recycle queue
                 _typeToStrategy[container.TypeName].Queue.Add(args.ItemContainer);
 
-                if (args.ItemContainer.ContentTemplateRoot is MessageSelector selector)
+                // Inside a reset this runs before the panel walks its pinned containers, and the
+                // content's teardown takes locks it shares with decode, reader and TDLib threads
+                // (see RangeObservableCollection.IsResetting). So it waits for the reset to return,
+                // or for the container to be used again, whichever comes first.
+                if (_messages.IsResetting)
                 {
-                    selector.Recycle();
+                    container.IsContentRecycleOwed = true;
+                    container.IsHeaderUnreadOwed = message.Content is MessageHeaderUnread;
 
-                    if (_sizeChangedHandler != null)
-                    {
-                        selector.SizeChanged -= _sizeChangedHandler;
-                    }
+                    _contentRecycleOwed.Add(container);
                 }
-                else if (args.ItemContainer.ContentTemplateRoot is MessageService service)
+                else
                 {
-                    service.Recycle();
-                }
-
-                if (message.Content is MessageHeaderUnread)
-                {
-                    args.ItemContainer.EffectiveViewportChanged -= HeaderUnread_EffectiveViewportChanged;
+                    RecycleContent(container, message.Content is MessageHeaderUnread);
                 }
 
                 if (_oldestItem == container)
@@ -1450,6 +1460,18 @@ namespace Telegram.Views
             }
             else
             {
+                if (container.IsContentRecycleOwed)
+                {
+                    RecycleContent(container, container.IsHeaderUnreadOwed);
+                }
+
+                // A reset only recycles; a container prepared inside one means a layout ran nested
+                // in it, from whatever opened the way - our own call, or a wait that pumped messages.
+                if (_messages.IsResetting)
+                {
+                    Logger.Error("Container prepared during a reset");
+                }
+
                 if (message.Content is MessageHeaderUnread)
                 {
                     args.ItemContainer.EffectiveViewportChanged += HeaderUnread_EffectiveViewportChanged;
@@ -1557,6 +1579,48 @@ namespace Telegram.Views
         private ContextRequestedHandler _contextRequestedHandler;
         private SizeChangedEventHandler _sizeChangedHandler;
 
+        private readonly List<ChatHistoryViewItem> _contentRecycleOwed = new();
+
+        private void RecycleContent(ChatHistoryViewItem container, bool headerUnread)
+        {
+            container.IsContentRecycleOwed = false;
+
+            if (container.ContentTemplateRoot is MessageSelector selector)
+            {
+                selector.Recycle();
+
+                if (_sizeChangedHandler != null)
+                {
+                    selector.SizeChanged -= _sizeChangedHandler;
+                }
+            }
+            else if (container.ContentTemplateRoot is MessageService service)
+            {
+                service.Recycle();
+            }
+
+            if (headerUnread)
+            {
+                container.EffectiveViewportChanged -= HeaderUnread_EffectiveViewportChanged;
+            }
+        }
+
+        public void ResetCompleted()
+        {
+            // By index, because a recycle that raises a reset of its own appends to this list
+            // while it is being walked. Containers settled in the meantime by a prepare are skipped.
+            for (int i = 0; i < _contentRecycleOwed.Count; i++)
+            {
+                var container = _contentRecycleOwed[i];
+                if (container.IsContentRecycleOwed)
+                {
+                    RecycleContent(container, container.IsHeaderUnreadOwed);
+                }
+            }
+
+            _contentRecycleOwed.Clear();
+        }
+
         private void OnPreparingContainerForItem(object sender, ChatHistoryViewItem selector)
         {
             selector.AddHandler(ContextRequestedEvent, _contextRequestedHandler ??= new ContextRequestedHandler(Message_ContextRequested), true);
@@ -1569,7 +1633,7 @@ namespace Telegram.Views
 
             var diff = next.Y - prev.Y;
 
-            var panel = Messages.ItemsPanelRoot as ItemsStackPanel;
+            var panel = Messages.ItemsStackPanel;
             if (panel == null || prev.Y == next.Y || Math.Abs(diff) == 6)
             {
                 return;
@@ -1711,6 +1775,7 @@ namespace Telegram.Views
                     MessageGiftedPremium or MessageGiftedStars or MessageGift or MessagePremiumGiftCode => ChatHistoryViewItemType.ServiceGift,
                     MessageUpgradedGift => ChatHistoryViewItemType.ServiceUpgradedGift,
                     MessageUpgradedGiftPurchaseOffer => ChatHistoryViewItemType.ServiceUpgradedGiftPurchaseOffer,
+                    MessageUpgradedGiftOnChainPurchaseOffer { OfferMessageId: 0 } => ChatHistoryViewItemType.ServiceUpgradedGiftOnChainPurchaseOffer,
                     MessageTonWalletTransfer => ChatHistoryViewItemType.ServiceMessageTonWalletTransfer,
                     MessageChatHasProtectedContentDisableRequested => ChatHistoryViewItemType.ServiceChatHasProtectedContentDisableRequested,
                     MessageChatChangePhoto or MessageSuggestProfilePhoto or MessageAsyncStory => ChatHistoryViewItemType.ServicePhoto,
@@ -1738,7 +1803,7 @@ namespace Telegram.Views
 
         public bool IsItemVisible(MessageKey key)
         {
-            if (Messages.ItemsPanelRoot is ItemsStackPanel panel && _messageIdToSelector.TryGetValue(key, out var container))
+            if (Messages.ItemsStackPanel is ItemsStackPanel panel && _messageIdToSelector.TryGetValue(key, out var container))
             {
                 var index = Messages.IndexFromContainer(container);
                 return index >= panel.FirstVisibleIndex && index <= panel.LastVisibleIndex;
@@ -1872,6 +1937,8 @@ namespace Telegram.Views
                 keys.Add(message.Key);
                 keys.Remove(oldKey);
             }
+
+            CheckChecksHint();
         }
 
         public void UpdateMessageSummary(MessageViewModel message)

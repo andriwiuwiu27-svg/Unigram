@@ -80,7 +80,7 @@ namespace Telegram.Views.Premium.Popups
 
         private void Change_Click(object sender, RoutedEventArgs e)
         {
-            Hide(ContentDialogResult.Primary);
+            Hide(ModalPopupResult.Primary);
         }
     }
 }

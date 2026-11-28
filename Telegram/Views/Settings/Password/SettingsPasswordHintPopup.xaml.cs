@@ -14,7 +14,7 @@ using Windows.UI.Xaml.Input;
 
 namespace Telegram.Views.Settings.Password
 {
-    public sealed partial class SettingsPasswordHintPopup : ContentPopup
+    public sealed partial class SettingsPasswordHintPopup : ModalPopup
     {
         private readonly IClientService _clientService;
         private readonly string _oldPassword;
@@ -36,7 +36,7 @@ namespace Telegram.Views.Settings.Password
 
         public PasswordState PasswordState { get; private set; }
 
-        private async void OnPrimaryButtonClick(ContentDialog sender, ContentDialogButtonClickEventArgs args)
+        private async void OnPrimaryButtonClick(ModalPopup sender, ModalPopupButtonClickEventArgs args)
         {
             try
             {
@@ -102,14 +102,14 @@ namespace Telegram.Views.Settings.Password
         {
             if (e.Key == Windows.System.VirtualKey.Enter)
             {
-                Hide(ContentDialogResult.Primary);
+                Hide(ModalPopupResult.Primary);
                 e.Handled = true;
             }
         }
 
         private void Skip_Click(object sender, RoutedEventArgs e)
         {
-            Hide(ContentDialogResult.Primary);
+            Hide(ModalPopupResult.Primary);
         }
     }
 }

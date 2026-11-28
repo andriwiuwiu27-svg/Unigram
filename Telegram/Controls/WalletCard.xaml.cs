@@ -94,10 +94,11 @@ namespace Telegram.Controls
             //
             // No blur and a single pixel down: this is the highlight that makes the address read
             // as engraved into the card rather than printed on it.
-            VisualUtilities.DropShadow(CardAddress, radius: 0, opacity: 1.0f,
-                target: CardAddressShadow, color: Colors.White, offset: new Vector3(1, 0, 0));
+            _addressShadow ??= new TextShadow(CardAddressShadow, radius: 0, opacity: 1.0f,
+                color: Colors.White, offset: new Vector3(1, 0, 0));
 
             CreatePrintShadows();
+            UpdateTextShadows();
 
             // An eject asked for before the card was in a window has been waiting for its clock.
             _flusher = AnimatedImageLoader.GetFlusher(XamlRoot);
@@ -136,6 +137,7 @@ namespace Telegram.Controls
         {
             UpdateAddress(clientService, state.Address);
             UpdateBalance(clientService, state);
+            UpdateTextShadows();
         }
 
         /// <summary>
@@ -179,6 +181,8 @@ namespace Telegram.Controls
                 // converted into.
                 CardBalanceUsd.Visibility = Visibility.Collapsed;
             }
+
+            UpdateTextShadows();
         }
 
         private void UpdateAddress(IClientService clientService, string address)
@@ -384,6 +388,8 @@ namespace Telegram.Controls
             {
                 CardBalanceUsd.Visibility = Visibility.Collapsed;
             }
+
+            UpdateTextShadows();
         }
 
         /// <summary>
@@ -1488,27 +1494,39 @@ namespace Telegram.Controls
 
         #endregion
 
+        private TextShadow _addressShadow;
+
+        // A shadow's mask is a copy of the text rather than the text itself, so it is redrawn
+        // whenever the text may have changed. Each one does nothing if it has not.
+        private void UpdateTextShadows()
+        {
+            _addressShadow?.Update(CardAddress);
+            _balanceShadow?.Update(CardBalanceText);
+            _usdShadow?.Update(CardBalanceUsd);
+            _nameShadow?.Update(CardName);
+        }
+
         #region Print over stickers
 
         // The white print is lost on a light sticker, so over one it casts a shadow.
-        private SpriteVisual _balanceShadow;
-        private SpriteVisual _usdShadow;
-        private SpriteVisual _nameShadow;
+        private TextShadow _balanceShadow;
+        private TextShadow _usdShadow;
+        private TextShadow _nameShadow;
 
         private void CreatePrintShadows()
         {
-            _balanceShadow = CreatePrintShadow(CardBalanceText, CardBalanceTextShadow);
-            _usdShadow = CreatePrintShadow(CardBalanceUsd, CardBalanceUsdShadow);
-            _nameShadow = CreatePrintShadow(CardName, CardNameShadow);
+            _balanceShadow ??= CreatePrintShadow(CardBalanceTextShadow);
+            _usdShadow ??= CreatePrintShadow(CardBalanceUsdShadow);
+            _nameShadow ??= CreatePrintShadow(CardNameShadow);
 
             UpdatePrint(false);
         }
 
-        private static SpriteVisual CreatePrintShadow(TextBlock text, Border target)
+        private static TextShadow CreatePrintShadow(Border target)
         {
-            var visual = VisualUtilities.DropShadow(text, radius: 6, opacity: 0.6f, target: target, offset: new Vector3(0, 1, 0));
-            visual.Opacity = 0;
-            return visual;
+            var shadow = new TextShadow(target, radius: 6, opacity: 0.6f, offset: new Vector3(0, 1, 0));
+            shadow.Visual.Opacity = 0;
+            return shadow;
         }
 
         private void OnStickersArranged(object sender, EventArgs e)
@@ -1542,13 +1560,14 @@ namespace Telegram.Controls
             return element.TransformToVisual(StickerLayer).TransformBounds(new Rect(0, 0, (float)element.ActualWidth, (float)element.ActualHeight));
         }
 
-        private void UpdatePrintShadow(SpriteVisual shadow, TextBlock text, bool animated)
+        private void UpdatePrintShadow(TextShadow print, TextBlock text, bool animated)
         {
-            if (shadow == null)
+            if (print == null)
             {
                 return;
             }
 
+            var shadow = print.Visual;
             var opacity = StickerLayer.IsUnder(BoundsOnFace(text)) ? 1f : 0f;
 
             if (animated)

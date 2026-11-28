@@ -104,7 +104,7 @@ namespace Telegram.ViewModels.Business
             };
 
             var confirm = await ShowPopupAsync(popup);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 NavigationService.Navigate(typeof(ChatBusinessRepliesPage), new ChatBusinessRepliesIdNavigationArgs(popup.Text));
             }
@@ -134,7 +134,7 @@ namespace Telegram.ViewModels.Business
             };
 
             var confirm = await ShowPopupAsync(popup);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 ClientService.Send(new SetQuickReplyShortcutName(shortcut.Id, popup.Text));
             }
@@ -146,7 +146,7 @@ namespace Telegram.ViewModels.Business
             var message = Locale.Declension(Strings.R.BusinessRepliesDeleteMessage, 1);
 
             var confirm = await ShowPopupAsync(message, title, Strings.Remove, Strings.Cancel, destructive: true);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 ClientService.Send(new DeleteQuickReplyShortcut(shortcut.Id));
             }

@@ -179,6 +179,7 @@ namespace Telegram.Controls.Media
 
         public const string Payment16 = "\uE9AB";
         public const string PaymentFilled = "\uF790";
+        public const string PaymentDismissFilled = "\uF7BB";
         public const string Window16 = "\uE9AA";
         public const string WindowFilled16 = "\uEAC5";
         public const string CopyFilled16 = "\uEA97";
@@ -389,6 +390,7 @@ namespace Telegram.Controls.Media
         public const string EmojiAdd = "\uE9ED";
 
         public const string Stories = "\uE9D3";
+        public const string StoriesAdd = "\uF7BA";
         public const string ExpiredStory = "\uE9E5";
 
         public const string Rewind524 = "\uEA31";
@@ -421,6 +423,7 @@ namespace Telegram.Controls.Media
         public const string DataUsage = "\uE9D9";
         public const string Add = "\uE710";
         public const string AddFilled12 = "\uF7AA";
+        public const string AddFilled = "\uF7B9";
         public const string ChatStarsFilled = "\uE97C";
 
         public const string LastSeenFilled = "\uEA6D";
@@ -529,6 +532,8 @@ namespace Telegram.Controls.Media
 
         public const string PaintBrush = "\uE90E";
         public const string PaintBrushFilled = "\uEA51";
+        public const string Brush = "\uF7BC";
+        public const string Brush16 = "\uF7BD";
         public const string WallpaperFilled = "\uEA50";
 
         public const string HandWaveFilled = "\uEA7B";

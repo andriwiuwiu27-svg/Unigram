@@ -8,6 +8,7 @@
 using System;
 using System.Numerics;
 using Telegram.Common;
+using Telegram.Navigation.Services;
 using Telegram.Td.Api;
 using Telegram.ViewModels;
 using Telegram.ViewModels.Settings;
@@ -40,7 +41,7 @@ namespace Telegram.Views.Settings.Privacy
             }
         }
 
-        protected override void OnNavigatedTo(NavigationEventArgs e)
+        protected override void OnNavigatedTo(NavigatedEventArgs e)
         {
             UpdateMessage();
             BackgroundControl.Update(ViewModel.ClientService, ViewModel.Aggregator);
@@ -48,7 +49,7 @@ namespace Telegram.Views.Settings.Privacy
             ViewModel.PropertyChanged += OnPropertyChanged;
         }
 
-        protected override void OnNavigatedFrom(NavigationEventArgs e)
+        protected override void OnNavigatedFrom(NavigatedEventArgs e)
         {
             ViewModel.PropertyChanged -= OnPropertyChanged;
         }

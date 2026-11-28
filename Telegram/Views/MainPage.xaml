@@ -5,6 +5,7 @@
                    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
                    xmlns:muxc="using:Microsoft.UI.Xaml.Controls"
                    xmlns:controls="using:Telegram.Controls"
+                   xmlns:calls="using:Telegram.Controls.Calls"
                    xmlns:cells="using:Telegram.Controls.Cells"
                    xmlns:stories="using:Telegram.Controls.Stories"
                    xmlns:views="using:Telegram.Controls.Views"
@@ -19,15 +20,7 @@
                    Loaded="OnLoaded"
                    Unloaded="OnUnloaded">
 
-    <Page.Transitions>
-        <TransitionCollection>
-            <NavigationThemeTransition>
-                <SuppressNavigationTransitionInfo />
-            </NavigationThemeTransition>
-        </TransitionCollection>
-    </Page.Transitions>
-
-    <Page.Resources>
+    <UserControl.Resources>
         <DataTemplate x:Name="SessionItemTemplate"
                       x:DataType="services:ISession">
             <Grid Margin="-2,0">
@@ -76,7 +69,7 @@
                                        Grid.Column="2" />
             </Grid>
         </DataTemplate>
-    </Page.Resources>
+    </UserControl.Resources>
 
     <Grid x:Name="LayoutRoot">
         <Grid.RowDefinitions>
@@ -95,10 +88,6 @@
                           IsHitTestVisible="False"
                           Grid.Column="1"
                           Grid.RowSpan="2" />
-
-        <controls:GroupCallActiveHeader x:Load="False"
-                                        x:Name="CallBanner"
-                                        Grid.ColumnSpan="2" />
 
         <Grid Height="40"
               Grid.Row="1"
@@ -180,6 +169,12 @@
                     Margin="80,0,0,0"
                     Grid.Column="2"
                     Canvas.ZIndex="1" />
+
+            <calls:CallTitleBarIndicator x:Load="False"
+                                         x:Name="CallIndicator"
+                                         SizeChanged="CallIndicator_SizeChanged"
+                                         HorizontalAlignment="Right"
+                                         Canvas.ZIndex="2" />
         </Grid>
 
         <Grid x:Load="False"
@@ -378,7 +373,8 @@
                         </Grid.ColumnDefinitions>
                         <controls:SuggestTextBox x:Name="SearchField"
                                                  PlaceholderText="{CustomResource Search}"
-                                                 BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
+                                                 Background="{ThemeResource ControlAltFillColorTertiaryBrush}"
+                                                 BorderBrush="{ThemeResource ControlAltFillColorTertiaryBrush}"
                                                  Style="{StaticResource NoDeleteTextBoxStyle}"
                                                  AutomationProperties.LandmarkType="Search"
                                                  StartingIndex="1"
@@ -387,7 +383,29 @@
                                                  VerticalAlignment="Center"
                                                  GotFocus="Search_Click"
                                                  TextChanged="Search_TextChanged"
+                                                 SizeChanged="SearchField_SizeChanged"
                                                  Grid.Column="1">
+                            <controls:SuggestTextBox.Resources>
+                                <!-- A well deepens on hover; the stock brushes turn it into an outlined light box. -->
+                                <ResourceDictionary>
+                                    <ResourceDictionary.ThemeDictionaries>
+                                        <ResourceDictionary x:Key="Default">
+                                            <StaticResource x:Key="TextControlBackgroundPointerOver"
+                                                            ResourceKey="ControlAltFillColorQuarternaryBrush" />
+                                            <StaticResource x:Key="TextControlBorderBrushPointerOver"
+                                                            ResourceKey="ControlAltFillColorQuarternaryBrush" />
+                                        </ResourceDictionary>
+                                        <ResourceDictionary x:Key="Light">
+                                            <StaticResource x:Key="TextControlBackgroundPointerOver"
+                                                            ResourceKey="ControlAltFillColorQuarternaryBrush" />
+                                            <StaticResource x:Key="TextControlBorderBrushPointerOver"
+                                                            ResourceKey="ControlAltFillColorQuarternaryBrush" />
+                                        </ResourceDictionary>
+                                        <!-- Empty, so high contrast finds the stock brushes rather than Default's. -->
+                                        <ResourceDictionary x:Key="HighContrast" />
+                                    </ResourceDictionary.ThemeDictionaries>
+                                </ResourceDictionary>
+                            </controls:SuggestTextBox.Resources>
                             <!--<TextBox.Header>
                                 <ItemsControl x:Name="Test"
                                               x:Load="False"
@@ -467,6 +485,7 @@
                                                   FontFamily="{StaticResource SymbolThemeFontFamily}"
                                                   AutomationProperties.Name="{CustomResource ProxySettings}"
                                                   ToolTipService.ToolTip="{CustomResource ProxySettings}"
+                                                  CornerRadius="16"
                                                   Width="40"
                                                   Height="40" />
                             <controls:GlyphButton x:Name="Lock"
@@ -475,6 +494,7 @@
                                                   Click="Lock_Click"
                                                   AutomationProperties.Name="{CustomResource AccDescrPasscodeLock}"
                                                   ToolTipService.ToolTip="{CustomResource AccDescrPasscodeLock}"
+                                                  CornerRadius="16"
                                                   Width="40"
                                                   Height="40" />
                         </StackPanel>
@@ -504,7 +524,8 @@
                                         Margin="0,0,0,60" />
 
                                 <Border x:Name="ChatTabs"
-                                        x:Load="False">
+                                        x:Load="False"
+                                        SizeChanged="ChatTabs_SizeChanged">
                                     <Grid x:Name="ChatTabsView">
                                         <!-- Blurred background
                                         <Border Margin="0,-72,0,0">
@@ -512,6 +533,10 @@
                                                 <media:BlurBrush />
                                             </Border.Background>
                                         </Border>-->
+                                        <Border x:Name="ChatFoldersShadow"
+                                                CornerRadius="16"
+                                                Height="32"
+                                                Margin="16,4,16,0" />
                                         <controls:ChatFoldersNavView x:Name="ChatFolders"
                                                                      AutomationProperties.Name="{CustomResource Filters}"
                                                                      ItemsSource="{x:Bind ViewModel.Folders}"
@@ -529,11 +554,9 @@
                                                                      FocusFollowsSingleSelection="True"
                                                                      SingleSelectionFollowsFocus="False"
                                                                      Height="32"
-                                                                     Margin="16,6,16,2"
+                                                                     Margin="16,4,16,0"
                                                                      Padding="2,0"
-                                                                     Background="{ThemeResource TextControlBackground}"
-                                                                     BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
-                                                                     BorderThickness="1"
+                                                                     Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                                                                      CornerRadius="16">
                                             <controls:TopNavView.ItemContainerStyle>
                                                 <Style TargetType="controls:TopNavViewItem">
@@ -581,12 +604,29 @@
                                         </controls:ChatFoldersNavView>
                                     </Grid>
                                 </Border>
-                                <Grid x:Name="BannerMaster">
+                                <controls:SlidePanel x:Name="BannerMaster"
+                                                     CardBackground="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                                     CardCornerRadius="16"
+                                                     SizeChanged="BannerMaster_SizeChanged"
+                                                     Margin="16,4,16,0">
+                                    <controls:FrozenAccountCard x:Name="FrozenCard"
+                                                                x:Load="False"
+                                                                Click="{x:Bind ViewModel.UnfreezeAccount}"
+                                                                Canvas.ZIndex="1" />
+                                    <controls:ChatListHintCard x:Name="HintCard"
+                                                               x:Load="False"
+                                                               Click="HintCard_Click"
+                                                               HideClick="HintCard_HideClick"
+                                                               Canvas.ZIndex="1" />
+                                    <controls:UnconfirmedSessionCard x:Name="UnconfirmedCard"
+                                                                     x:Load="False"
+                                                                     ConfirmClick="{x:Bind ViewModel.ConfirmSession}"
+                                                                     DenyClick="{x:Bind ViewModel.DenySession}"
+                                                                     Canvas.ZIndex="1" />
                                     <controls:PlaybackMasterHeader x:Name="PlaybackMaster"
                                                                    x:Load="False"
-                                                                   Visibility="Collapsed"
-                                                                   Margin="16,4,16,4" />
-                                </Grid>
+                                                                   Canvas.ZIndex="1" />
+                                </controls:SlidePanel>
                             </StackPanel>
 
                             <views:ForumView x:Name="TopicListPresenter"
@@ -617,23 +657,10 @@
                                                        CanReorderItems="False"
                                                        Orientation="Vertical"
                                                        Padding="0,0,0,62"
+                                                       ScrollViewer.CanContentRenderOutsideBounds="True"
                                                        Grid.RowSpan="2">
                                 <ListView.Header>
                                     <StackPanel>
-                                        <Grid Visibility="{x:Bind UpdateScrollingHostHeaderVisibility(MasterDetail.CurrentState, ViewModel.IsPrimaryFolderSelected), Mode=OneWay}">
-                                            <controls:SuggestedActionSetBirthdateCard x:Name="SetBirthdateCard"
-                                                                                      x:Load="False"
-                                                                                      Click="{x:Bind ViewModel.SetBirthdate}"
-                                                                                      HideClick="{x:Bind ViewModel.HideBirthdate}" />
-                                            <controls:UnconfirmedSessionCard x:Name="UnconfirmedCard"
-                                                                             x:Load="False"
-                                                                             ConfirmClick="{x:Bind ViewModel.ConfirmSession}"
-                                                                             DenyClick="{x:Bind ViewModel.DenySession}" />
-                                            <controls:FrozenAccountCard x:Name="FrozenCard"
-                                                                        x:Load="False"
-                                                                        Click="{x:Bind ViewModel.UnfreezeAccount}" />
-                                        </Grid>
-
                                         <Grid x:Name="ArchivedChatsPresenter">
                                             <Border x:Name="ArchivedChatsPanel">
                                                 <Button Visibility="{x:Bind ArchivedChats.Visibility, Mode=OneWay}"
@@ -684,6 +711,11 @@
                                 </ListView.ItemContainerTransitions>
                             </controls:ChatListListView>
 
+                            <Border x:Name="ChatsGhost"
+                                    IsHitTestVisible="False"
+                                    VerticalAlignment="Top"
+                                    Grid.RowSpan="2" />
+
                             <Grid x:Name="EmptyState"
                                   x:Load="{x:Bind ViewModel.Chats.Items.IsEmpty, Mode=OneWay}"
                                   Grid.Row="1">
@@ -720,7 +752,7 @@
                         </Grid>
 
                         <Grid x:Name="ManagePanel"
-                              Background="{ThemeResource PageSubHeaderBackgroundBrush2}"
+                              Background="{ThemeResource PageSubHeaderBackgroundTranslucentBrush}"
                               VerticalAlignment="Bottom"
                               Margin="12,8"
                               CornerRadius="15"
@@ -854,56 +886,61 @@
                                               HorizontalAlignment="Center"
                                               Visibility="Collapsed" />
 
-                    <controls:TopNavView x:Name="Navigation"
-                                         SelectedIndex="0"
-                                         SelectionChanged="Navigation_SelectionChanged"
-                                         IsItemClickEnabled="True"
-                                         ItemClick="Navigation_ItemClick"
-                                         HorizontalAlignment="Stretch"
-                                         Background="{ThemeResource PageSubHeaderBackgroundBrush2}"
-                                         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                                         BorderThickness="1"
-                                         CornerRadius="24"
-                                         MaxWidth="200"
-                                         Height="48"
-                                         Padding="0,0,8,0"
-                                         Visibility="Collapsed">
-                        <controls:TopNavView.Template>
-                            <ControlTemplate TargetType="controls:TopNavView">
-                                <Grid>
-                                    <Border Background="{TemplateBinding Background}"
-                                            BorderBrush="{TemplateBinding BorderBrush}"
-                                            BorderThickness="{TemplateBinding BorderThickness}"
-                                            CornerRadius="{TemplateBinding CornerRadius}" />
-                                    <ItemsPresenter />
-                                </Grid>
-                            </ControlTemplate>
-                        </controls:TopNavView.Template>
-                        <controls:TopNavView.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <controls:ProfileButtonsGrid />
-                            </ItemsPanelTemplate>
-                        </controls:TopNavView.ItemsPanel>
-                        <controls:TopNavViewIconItem CornerRadius="24"
-                                                     MinWidth="64">
-                            <controls:TopNavViewIconItem.Content>
-                                <local:MainNavigationItemChats />
-                            </controls:TopNavViewIconItem.Content>
-                            <controls:TopNavViewIconItem.IconSource>
-                                <icons:TabChats />
-                            </controls:TopNavViewIconItem.IconSource>
-                        </controls:TopNavViewIconItem>
-                        <controls:TopNavViewIconItem ContextRequested="Settings_ContextRequested"
-                                                     CornerRadius="24"
-                                                     MinWidth="64">
-                            <controls:TopNavViewIconItem.Content>
-                                <local:MainNavigationItemSettings />
-                            </controls:TopNavViewIconItem.Content>
-                            <controls:TopNavViewIconItem.IconSource>
-                                <icons:TabSettings />
-                            </controls:TopNavViewIconItem.IconSource>
-                        </controls:TopNavViewIconItem>
-                    </controls:TopNavView>
+                    <Grid x:Name="NavigationRoot"
+                          HorizontalAlignment="Stretch"
+                          MaxWidth="200"
+                          Height="48"
+                          Padding="0,0,8,0"
+                          Visibility="Collapsed">
+                        <Rectangle x:Name="NavigationShadow"
+                                   RadiusX="24"
+                                   RadiusY="24" />
+                        <controls:TopNavView x:Name="Navigation"
+                                             SelectedIndex="0"
+                                             SelectionChanged="Navigation_SelectionChanged"
+                                             IsItemClickEnabled="True"
+                                             ItemClick="Navigation_ItemClick"
+                                             Background="{ThemeResource PageSubHeaderBackgroundTranslucentBrush}"
+                                             BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                             BorderThickness="1"
+                                             CornerRadius="24">
+                            <controls:TopNavView.Template>
+                                <ControlTemplate TargetType="controls:TopNavView">
+                                    <Grid>
+                                        <Border Background="{TemplateBinding Background}"
+                                                BorderBrush="{TemplateBinding BorderBrush}"
+                                                BorderThickness="{TemplateBinding BorderThickness}"
+                                                CornerRadius="{TemplateBinding CornerRadius}" />
+                                        <ItemsPresenter />
+                                    </Grid>
+                                </ControlTemplate>
+                            </controls:TopNavView.Template>
+                            <controls:TopNavView.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <controls:ProfileButtonsGrid />
+                                </ItemsPanelTemplate>
+                            </controls:TopNavView.ItemsPanel>
+                            <controls:TopNavViewIconItem CornerRadius="24"
+                                                         MinWidth="64">
+                                <controls:TopNavViewIconItem.Content>
+                                    <local:MainNavigationItemChats />
+                                </controls:TopNavViewIconItem.Content>
+                                <controls:TopNavViewIconItem.IconSource>
+                                    <icons:TabChats />
+                                </controls:TopNavViewIconItem.IconSource>
+                            </controls:TopNavViewIconItem>
+                            <controls:TopNavViewIconItem ContextRequested="Settings_ContextRequested"
+                                                         CornerRadius="24"
+                                                         MinWidth="64">
+                                <controls:TopNavViewIconItem.Content>
+                                    <local:MainNavigationItemSettings />
+                                </controls:TopNavViewIconItem.Content>
+                                <controls:TopNavViewIconItem.IconSource>
+                                    <icons:TabSettings />
+                                </controls:TopNavViewIconItem.IconSource>
+                            </controls:TopNavViewIconItem>
+                        </controls:TopNavView>
+                    </Grid>
                 </StackPanel>
 
                 <stories:StoriesStrip x:Name="Stories"

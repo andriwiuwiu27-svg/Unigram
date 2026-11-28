@@ -8,6 +8,7 @@
 using Telegram.Common;
 using Telegram.Controls;
 using Telegram.Controls.Drawers;
+using Telegram.Navigation.Services;
 using Telegram.Streams;
 using Telegram.ViewModels.Business;
 using Telegram.ViewModels.Drawers;
@@ -28,7 +29,7 @@ namespace Telegram.Views.Business
             Title = Strings.BusinessIntro;
         }
 
-        protected override void OnNavigatedTo(NavigationEventArgs e)
+        protected override void OnNavigatedTo(NavigatedEventArgs e)
         {
             ViewModel.PropertyChanged += OnPropertyChanged;
 
@@ -38,7 +39,7 @@ namespace Telegram.Views.Business
             UpdateSticker();
         }
 
-        protected override void OnNavigatedFrom(NavigationEventArgs e)
+        protected override void OnNavigatedFrom(NavigatedEventArgs e)
         {
             ViewModel.PropertyChanged -= OnPropertyChanged;
         }

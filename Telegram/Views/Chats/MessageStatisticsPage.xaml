@@ -9,14 +9,6 @@
                   xmlns:local="using:Telegram.Views"
                   mc:Ignorable="d">
 
-    <Page.Transitions>
-        <TransitionCollection>
-            <NavigationThemeTransition>
-                <SlideNavigationTransitionInfo Effect="FromRight" />
-            </NavigationThemeTransition>
-        </TransitionCollection>
-    </Page.Transitions>
-
     <local:HostedPage.Action>
         <controls:MoreButton Grid.Column="2">
             <Button.Flyout>

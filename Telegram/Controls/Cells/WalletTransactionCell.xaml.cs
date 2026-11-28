@@ -43,13 +43,19 @@ namespace Telegram.Controls.Cells
 
         public void UpdateInfo(IClientService clientService, TonWalletTransaction transaction)
         {
+            if (WalletHelper.GiftMarketActivity.TryGet(transaction.Type, out var activity))
+            {
+                UpdateGiftMarket(clientService, transaction, activity);
+                return;
+            }
+
             var transfer = transaction.Type as TonWalletTransactionTypeTransfer;
             var onRampDeposit = transaction.Type as TonWalletTransactionTypeOnRampDeposit;
             var nftTransfer = transaction.Type as TonWalletTransactionTypeNftTransfer;
             var giftTransfer = transaction.Type as TonWalletTransactionTypeTelegramGiftTransfer;
 
             UpdatePeer(clientService, transaction);
-            UpdateNft(clientService, nftTransfer?.Nft ?? giftTransfer?.Nft, nftTransfer?.IsOutgoing ?? giftTransfer?.IsOutgoing ?? false);
+            UpdateNft(clientService, nftTransfer?.Nft ?? giftTransfer?.Nft);
 
             if (transfer != null)
             {
@@ -58,6 +64,10 @@ namespace Telegram.Controls.Cells
             else if (onRampDeposit != null)
             {
                 UpdateAmount(onRampDeposit.Amount);
+            }
+            else if (nftTransfer != null || giftTransfer != null)
+            {
+                UpdateItems((nftTransfer?.IsOutgoing ?? giftTransfer.IsOutgoing) ? -1 : 1);
             }
 
             if (transaction.State is TonWalletTransactionStateFailed)
@@ -70,7 +80,7 @@ namespace Telegram.Controls.Cells
             }
             else if (onRampDeposit != null)
             {
-                Subtitle.Text = onRampDeposit.ProviderName;
+                Subtitle.Text = WalletHelper.CapitalizeProvider(onRampDeposit.ProviderName);
             }
             else if (nftTransfer != null)
             {
@@ -85,6 +95,40 @@ namespace Telegram.Controls.Cells
                 Subtitle.Text = Shorten(transaction.PeerAddress);
             }
 
+            UpdateDate(transaction);
+        }
+
+        private void UpdateGiftMarket(IClientService clientService, TonWalletTransaction transaction, WalletHelper.GiftMarketActivity activity)
+        {
+            Title.Text = Strings.WalletOnchainGiftTitle;
+            Photo.Source = ProfilePictureSourceText.GetGlyph(activity.Glyph, activity.IsOutgoing ? 5 : 3);
+
+            Subtitle.Text = transaction.State is TonWalletTransactionStateFailed
+                ? Strings.WalletFailedTransfer
+                : activity.Title;
+
+            UpdateNft(clientService, activity.Nft);
+
+            if (activity.Items != 0)
+            {
+                UpdateItems(activity.Items);
+            }
+            else if (activity.Amount != 0)
+            {
+                UpdateAmount(activity.Amount);
+            }
+            else
+            {
+                AmountInteger.Text = string.Empty;
+                AmountFraction.Text = string.Empty;
+                AmountGlyph.Text = string.Empty;
+            }
+
+            UpdateDate(transaction);
+        }
+
+        private void UpdateDate(TonWalletTransaction transaction)
+        {
             if (transaction.State is TonWalletTransactionStatePending)
             {
                 Date.Text = Strings.WalletSending;
@@ -102,10 +146,18 @@ namespace Telegram.Controls.Cells
                 Title.Text = Strings.WalletKeyUpdate;
                 Photo.Source = ProfilePictureSourceText.GetGlyph(Icons.KeyFilled, long.MinValue);
             }
-            else if (transaction.Type is TonWalletTransactionTypeOnRampDeposit)
+            else if (transaction.Type is TonWalletTransactionTypeOnRampDeposit onRampDeposit)
             {
-                Title.Text = Strings.WalletTransactionTopUp;
-                Photo.Source = ProfilePictureSourceText.GetGlyph(Icons.PaymentFilled);
+                if (WalletHelper.IsCryptoTopUp(onRampDeposit))
+                {
+                    Title.Text = Strings.WalletTransactionTopUpCrypto;
+                    Photo.Source = ProfilePictureSourceText.GetGlyph(Icons.Wallet);
+                }
+                else
+                {
+                    Title.Text = Strings.WalletTransactionTopUp;
+                    Photo.Source = ProfilePictureSourceText.GetGlyph(Icons.PaymentFilled);
+                }
             }
             else if (transaction.Type is TonWalletTransactionTypeTelegramGiftTransfer giftTransfer)
             {
@@ -244,7 +296,7 @@ namespace Telegram.Controls.Cells
             }
         }
 
-        private void UpdateNft(IClientService clientService, TonNft nft, bool outgoing)
+        private void UpdateNft(IClientService clientService, TonNft nft)
         {
             if (nft == null)
             {
@@ -267,10 +319,13 @@ namespace Telegram.Controls.Cells
             CollectibleName.Text = nft.Name;
             CollectibleInfo.Text = Strings.WalletCollectibleGift;
             CollectibleRoot.Visibility = Visibility.Visible;
+        }
 
-            //var outgoing = transfer.IsOutgoing;
+        private void UpdateItems(int items)
+        {
+            var outgoing = items < 0;
 
-            AmountInteger.Text = string.Format("{0}{1} {2}", outgoing ? "-" : "+", Locale.Declension(Strings.R.items, 1), Icons.Gift14);
+            AmountInteger.Text = string.Format("{0}{1} {2}", outgoing ? "-" : "+", Locale.Declension(Strings.R.items, Math.Abs(items)), Icons.Gift14);
             AmountFraction.Text = string.Empty;
             AmountGlyph.Text = string.Empty;
 

@@ -6,7 +6,6 @@
                      xmlns:common="using:Telegram.Common"
                      xmlns:controls="using:Telegram.Controls"
                      xmlns:cells="using:Telegram.Controls.Cells"
-                     xmlns:local="using:Telegram.Views.Popups"
                      mc:Ignorable="d"
                      Padding="0,24,0,0"
                      IsDismissButtonVisible="True"
@@ -17,6 +16,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
         <controls:TopNavView x:Name="Navigation"
                              Height="32"
@@ -37,58 +37,6 @@
                     </Grid>
                 </ItemsPanelTemplate>
             </controls:TopNavView.ItemsPanel>
-            <!--<controls:TopNavView.ItemContainerStyle>
-                <Style TargetType="controls:TopNavViewItem">
-                    <Setter Property="HorizontalAlignment"
-                            Value="Stretch" />
-                    <Setter Property="VerticalAlignment"
-                            Value="Stretch" />
-                    <Setter Property="HorizontalContentAlignment"
-                            Value="Center" />
-                    <Setter Property="VerticalContentAlignment"
-                            Value="Center" />
-                    <Setter Property="UseSystemFocusVisuals"
-                            Value="True" />
-                    <Setter Property="FocusVisualMargin"
-                            Value="-3" />
-                    <Setter Property="Template">
-                        <Setter.Value>
-                            <ControlTemplate TargetType="controls:TopNavViewItem">
-                                <Grid x:Name="ContentBorder"
-                                      Background="Transparent">
-                                    <ContentPresenter x:Name="ContentPresenter"
-                                                      Grid.Column="1"
-                                                      Margin="12,1,12,0"
-                                                      TextWrapping="NoWrap"
-                                                      FontWeight="SemiBold"
-                                                      Foreground="{TemplateBinding Foreground}"
-                                                      ContentTransitions="{TemplateBinding ContentTransitions}"
-                                                      ContentTemplate="{TemplateBinding ContentTemplate}"
-                                                      Content="{TemplateBinding Content}"
-                                                      HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
-                                                      ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"
-                                                      VerticalAlignment="Center"
-                                                      AutomationProperties.AccessibilityView="Raw"
-                                                      Canvas.ZIndex="1" />
-                                    <Grid x:Name="SelectionIndicatorGrid"
-                                          Control.IsTemplateFocusTarget="True"
-                                          Margin="4,4,4,0"
-                                          HorizontalAlignment="Stretch"
-                                          VerticalAlignment="Center"
-                                          Height="24"
-                                          CornerRadius="12">
-                                        <Rectangle x:Name="SelectionIndicator"
-                                                   Fill="{ThemeResource ContentDialogTopOverlaySolid}"
-                                                   Opacity="0"
-                                                   RadiusX="12"
-                                                   RadiusY="12" />
-                                    </Grid>
-                                </Grid>
-                            </ControlTemplate>
-                        </Setter.Value>
-                    </Setter>
-                </Style>
-            </controls:TopNavView.ItemContainerStyle>-->
             <controls:TopNavViewItem Content="{CustomResource AIEditorTabTranslate}" />
             <controls:TopNavViewItem Content="{CustomResource AIEditorTabStyle}"
                                      Grid.Column="1" />
@@ -239,41 +187,8 @@
                                                     </VisualState.Setters>
                                                 </VisualState>
                                             </VisualStateGroup>
-                                            <VisualStateGroup x:Name="ReorderHintStates">
-                                                <VisualState x:Name="NoReorderHint" />
-                                                <VisualState x:Name="BottomReorderHint">
-                                                    <Storyboard>
-                                                        <DragOverThemeAnimation TargetName="ContentBorder"
-                                                                                ToOffset="{ThemeResource ListViewItemReorderHintThemeOffset}"
-                                                                                Direction="Bottom" />
-                                                    </Storyboard>
-                                                </VisualState>
-                                                <VisualState x:Name="TopReorderHint">
-                                                    <Storyboard>
-                                                        <DragOverThemeAnimation TargetName="ContentBorder"
-                                                                                ToOffset="{ThemeResource ListViewItemReorderHintThemeOffset}"
-                                                                                Direction="Top" />
-                                                    </Storyboard>
-                                                </VisualState>
-                                                <VisualState x:Name="RightReorderHint">
-                                                    <Storyboard>
-                                                        <DragOverThemeAnimation TargetName="ContentBorder"
-                                                                                ToOffset="{ThemeResource ListViewItemReorderHintThemeOffset}"
-                                                                                Direction="Right" />
-                                                    </Storyboard>
-                                                </VisualState>
-                                                <VisualState x:Name="LeftReorderHint">
-                                                    <Storyboard>
-                                                        <DragOverThemeAnimation TargetName="ContentBorder"
-                                                                                ToOffset="{ThemeResource ListViewItemReorderHintThemeOffset}"
-                                                                                Direction="Left" />
-                                                    </Storyboard>
-                                                </VisualState>
-                                                <VisualStateGroup.Transitions>
-                                                    <VisualTransition To="NoReorderHint"
-                                                                      GeneratedDuration="0:0:0.2" />
-                                                </VisualStateGroup.Transitions>
-                                            </VisualStateGroup>
+                                            <!-- No ReorderHintStates: on a templated item XAML only ever sets NoReorderHint, and
+                                                 finding it when the template is applied creates every group here. -->
                                             <VisualStateGroup x:Name="DragStates">
                                                 <VisualState x:Name="NotDragging" />
                                                 <VisualState x:Name="Dragging">
@@ -387,11 +302,6 @@
                         </Grid>
                     </Button>
                 </controls:TopNavView.Header>
-                <!--<controls:TopNavView.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <local:TabStylePanel />
-                    </ItemsPanelTemplate>
-                </controls:TopNavView.ItemsPanel>-->
             </controls:TopNavView>
 
             <ScrollViewer VerticalScrollBarVisibility="Auto"
@@ -466,5 +376,28 @@
                 </Grid>
             </ScrollViewer>
         </Grid>
+
+        <StackPanel x:Name="AlwaysUse"
+                    Visibility="Collapsed"
+                    Margin="12,4,12,0"
+                    Grid.Row="2">
+            <Border Background="{ThemeResource LayerOnMicaBaseAltFillColorSecondaryBrush}"
+                    CornerRadius="16"
+                    Padding="12,4,12,4">
+                <CheckBox x:Name="AlwaysUseCheck"
+                          Checked="AlwaysUseCheck_Checked">
+                    <StackPanel>
+                        <TextBlock Text="{CustomResource AIEditorAlwaysUse}" />
+                        <TextBlock x:Name="AlwaysUseSelection"
+                                   Style="{StaticResource InfoCaptionTextBlockStyle}"
+                                   Margin="0,0,0,6"
+                                   Visibility="Collapsed" />
+                    </StackPanel>
+                </CheckBox>
+            </Border>
+            <TextBlock Text="{CustomResource AIEditorAlwaysUseInfo}"
+                       Style="{StaticResource InfoCaptionTextBlockStyle}"
+                       Margin="12,8,12,24" />
+        </StackPanel>
     </Grid>
 </controls:ModalPopup>

@@ -15,7 +15,7 @@ using Windows.UI.Xaml.Controls;
 
 namespace Telegram.Views.Payments
 {
-    public sealed partial class PaymentCredentialsPopup : ContentPopup
+    public sealed partial class PaymentCredentialsPopup : ModalPopup
     {
         public PaymentCredentialsViewModel ViewModel => DataContext as PaymentCredentialsViewModel;
 
@@ -60,12 +60,12 @@ namespace Telegram.Views.Payments
             }
         }
 
-        private void OnOpened(ContentDialog sender, ContentDialogOpenedEventArgs args)
+        private void OnOpened(ModalPopup sender, ModalPopupOpenedEventArgs args)
         {
             ViewModel.PropertyChanged += OnPropertyChanged;
         }
 
-        private void OnClosed(ContentDialog sender, ContentDialogClosedEventArgs args)
+        private void OnClosed(ModalPopup sender, ModalPopupClosedEventArgs args)
         {
             ViewModel.PropertyChanged -= OnPropertyChanged;
         }
@@ -95,7 +95,7 @@ namespace Telegram.Views.Payments
             }
         }
 
-        private async void OnPrimaryButtonClick(ContentDialog sender, ContentDialogButtonClickEventArgs args)
+        private async void OnPrimaryButtonClick(ModalPopup sender, ModalPopupButtonClickEventArgs args)
         {
             IsPrimaryButtonEnabled = false;
 
@@ -123,7 +123,7 @@ namespace Telegram.Views.Payments
                 var credentials = response.Stringify();
 
                 Credentials = new SavedCredentials(credentials, title);
-                Hide(ContentDialogResult.Primary);
+                Hide(ModalPopupResult.Primary);
             }
         }
     }

@@ -228,7 +228,7 @@ namespace Telegram.Views.Popups
                 return;
             }
 
-            Hide(ContentDialogResult.Primary);
+            Hide(ModalPopupResult.Primary);
         }
 
         private void Label_TextChanged(object sender, TextChangedEventArgs e)

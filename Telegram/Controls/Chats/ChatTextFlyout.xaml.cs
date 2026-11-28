@@ -13,6 +13,7 @@ using Telegram.Navigation;
 using Telegram.Services;
 using Telegram.Streams;
 using Telegram.Td.Api;
+using Windows.Foundation;
 using Windows.UI.Text;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Automation;
@@ -77,37 +78,53 @@ namespace Telegram.Controls.Chats
 
         public ListViewBase ControlledList => ScrollingHost;
 
-        /// <summary>
-        /// The flyout for <paramref name="content"/>, shown with
-        /// <c>AutocompleteFlyoutPresenterStyle</c>. Call <see cref="Elevate"/> from its
-        /// <see cref="FlyoutBase.Opened"/>: the style turns the default shadow off.
-        /// </summary>
-        public static Flyout CreateFlyout(ChatTextFlyout content)
+        public static MenuFlyout CreateFlyout(ChatTextFlyout content)
         {
-            return new Flyout
+            var presenter = new MenuFlyoutContent
             {
                 Content = content,
-                AllowFocusOnInteraction = false,
-                ShouldConstrainToRootBounds = false,
-                FlyoutPresenterStyle = BootStrapper.Current.Resources["AutocompleteFlyoutPresenterStyle"] as Style,
+                Padding = new Thickness(0)
             };
+
+            var style = new Style(typeof(MenuFlyoutPresenter));
+            style.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(0)));
+
+            var flyout = new MenuFlyout
+            {
+                AllowFocusOnInteraction = false,
+                MenuFlyoutPresenterStyle = style
+            };
+
+            flyout.Items.Add(presenter);
+
+            return flyout;
         }
 
-        /// <summary>The flyout's shadow, once it is open and its presenter exists.</summary>
-        public static ChatTextFlyout Elevate(object flyout)
+        /// <summary>Opens <paramref name="flyout"/> with its bottom-left corner at <paramref name="position"/>.</summary>
+        public static void ShowAt(MenuFlyout flyout, FrameworkElement target, Point position)
         {
-            if (flyout is Flyout { Content: ChatTextFlyout { Parent: FlyoutPresenter presenter } content })
+            // A menu ignores Placement and opens with its top-left corner at the point. Placement
+            // still picks the side it is pushed to out of the exclusion rect, so excluding the target
+            // from the point down lifts the menu above the point, and keeps it there as it resizes.
+            flyout.ShowAt(target, new FlyoutShowOptions
             {
-                if (VisualTreeHelper.GetChildrenCount(presenter) > 0 && VisualTreeHelper.GetChild(presenter, 0) is UIElement element)
-                {
-                    element.Translation = new Vector3(0, 0, 12);
-                    element.Shadow = new ThemeShadow();
-                }
+                Position = position,
+                ExclusionRect = new Rect(0, (float)position.Y, (float)target.ActualWidth, (float)Math.Max(1, target.ActualHeight - position.Y)),
+                Placement = FlyoutPlacementMode.TopEdgeAlignedLeft,
+                ShowMode = FlyoutShowMode.Transient
+            });
+        }
 
-                return content;
+        public static bool TryResolveFlyout(MenuFlyout flyout, out ChatTextFlyout presenter)
+        {
+            if (flyout?.Items.Count > 0 && flyout.Items[0] is MenuFlyoutContent content)
+            {
+                presenter = content.Content as ChatTextFlyout;
+                return presenter != null;
             }
 
-            return null;
+            presenter = null;
+            return false;
         }
 
         public IAutocompleteCollection ItemsSource

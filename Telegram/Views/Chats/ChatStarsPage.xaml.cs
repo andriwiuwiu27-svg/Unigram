@@ -7,6 +7,8 @@
 
 using Telegram.Controls.Cells;
 using Telegram.Controls.Cells.Revenue;
+using Telegram.Navigation;
+using Telegram.Navigation.Services;
 using Telegram.Td.Api;
 using Telegram.ViewModels.Chats;
 using Windows.UI.Xaml;
@@ -22,15 +24,16 @@ namespace Telegram.Views.Chats
         public ChatStarsPage()
         {
             InitializeComponent();
+            Transition = PageTransition.Entrance;
         }
 
-        protected override void OnNavigatedTo(NavigationEventArgs e)
+        protected override void OnNavigatedTo(NavigatedEventArgs e)
         {
             Withdraw.DataContext = DataContext;
             Withdraw.OnNavigatedTo(e);
         }
 
-        protected override void OnNavigatedFrom(NavigationEventArgs e)
+        protected override void OnNavigatedFrom(NavigatedEventArgs e)
         {
             Withdraw.OnNavigatedFrom(e);
         }

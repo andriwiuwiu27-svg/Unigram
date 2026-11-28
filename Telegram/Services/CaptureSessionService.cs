@@ -9,6 +9,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Telegram.Common;
+using Telegram.Controls;
 using Telegram.Native.Composition;
 using Telegram.Navigation;
 using Telegram.Views.Popups;
@@ -100,7 +101,7 @@ namespace Telegram.Services
             var popup = new ChooseCapturePopup(canShareAudio, excluded);
 
             var confirm = await popup.ShowQueuedAsync(xamlRoot);
-            if (confirm != ContentDialogResult.Primary)
+            if (confirm != ModalPopupResult.Primary)
             {
                 return null;
             }

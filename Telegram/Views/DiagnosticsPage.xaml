@@ -37,6 +37,13 @@
                         </controls:SettingsButton.Badge>
                     </controls:SettingsButton>
 
+                    <controls:SettingsButton Content="Call Indicator (next call)">
+                        <controls:SettingsButton.Badge>
+                            <controls:SettingsComboBox ItemsSource="{x:Bind ViewModel.CallIndicatorOptions}"
+                                                       SelectedIndex="{x:Bind ViewModel.CallIndicator, Mode=TwoWay}" />
+                        </controls:SettingsButton.Badge>
+                    </controls:SettingsButton>
+
                     <controls:SettingsButton Content="Native Text Input (restart)">
                         <controls:SettingsButton.Badge>
                             <controls:SettingsComboBox ItemsSource="{x:Bind ViewModel.NativeTextInputOptions}"
@@ -131,6 +138,10 @@
 
                     <CheckBox IsChecked="{x:Bind services:AppSettings.Diagnostics.ConnectedAnimationsDebug, Mode=TwoWay}"
                               Content="Connected Animations Debug"
+                              Style="{StaticResource SettingsCheckBoxStyle}" />
+
+                    <CheckBox IsChecked="{x:Bind services:AppSettings.Diagnostics.ParkChatPageDebug, Mode=TwoWay}"
+                              Content="Park Chat Page Debug"
                               Style="{StaticResource SettingsCheckBoxStyle}" />
 
                     <CheckBox IsChecked="{x:Bind services:AppSettings.Diagnostics.DirectTextDebug, Mode=TwoWay}"

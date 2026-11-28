@@ -151,7 +151,7 @@ namespace Telegram.Controls
             var device = ElementComposition.GetSharedDevice();
 
             var outer = CompositionPathParser.Parse(level.OuterPath);
-            var inner = CompositionPathParser.Parse(device, level.InnerPath);
+            using var inner = CompositionPathParser.Parse(device, level.InnerPath);
 
             using var format = new CanvasTextFormat
             {
@@ -164,8 +164,8 @@ namespace Telegram.Controls
 
             using var layout = new CanvasTextLayout(device, newValue < 0 ? "!" : newValue.ToString(), format, 72, 68);
 
-            var text = CanvasGeometry.CreateText(layout);
-            var group = inner.CombineWith(text, Matrix3x2.Identity, CanvasGeometryCombine.Xor);
+            using var text = CanvasGeometry.CreateText(layout);
+            using var group = inner.CombineWith(text, Matrix3x2.Identity, CanvasGeometryCombine.Xor);
 
             var outerShape = compositor.CreateSpriteShape(compositor.CreatePathGeometry(outer));
             outerShape.StrokeThickness = 0;

@@ -189,6 +189,28 @@ namespace Telegram.ViewModels
                         break;
                     }
 
+                case ChooseChatsConfigurationInviteToBot:
+                    SelectionMode = ListViewSelectionMode.Multiple;
+                    Options = new ChooseChatsOptions()
+                    {
+                        AllowChannelChats = false,
+                        AllowGroupChats = false,
+                        AllowBotChats = false,
+                        AllowUserChats = true,
+                        AllowSecretChats = false,
+                        AllowSelf = false,
+                        CanPostMessages = false,
+                        CanInviteUsers = false,
+                        CanShareContact = false,
+                        Mode = ChooseChatsMode.Chats,
+                        ShowMessages = false
+                    };
+                    PrimaryButtonText = Strings.Done;
+                    IsCommentEnabled = false;
+                    IsChatSelection = false;
+
+                    Title = Strings.BotInviteToBot;
+                    break;
                 case ChooseChatsConfigurationShareStory:
                     SelectionMode = ListViewSelectionMode.Multiple;
                     Options = ChooseChatsOptions.PostMessages;
@@ -308,6 +330,15 @@ namespace Telegram.ViewModels
 
                         break;
                     }
+                case ChooseChatsConfigurationDepositGift:
+                    SelectionMode = ListViewSelectionMode.None;
+                    Options = ChooseChatsOptions.UsersAndChannels;
+                    ShouldCloseOnCommit = false;
+                    IsCommentEnabled = false;
+                    IsChatSelection = false;
+
+                    Title = Strings.Gift2TransferShort;
+                    break;
 
                 case ChooseChatsConfigurationCreateGroupCall:
                     SelectionMode = ListViewSelectionMode.Multiple;
@@ -603,7 +634,7 @@ namespace Telegram.ViewModels
             if (_configuration != null)
             {
                 var confirm = await _configuration.ConfirmSelectionAsync(this, SelectedItems);
-                return confirm == ContentDialogResult.Primary;
+                return confirm == ModalPopupResult.Primary;
             }
 
             return true;
@@ -837,7 +868,7 @@ namespace Telegram.ViewModels
                 if (verification?.BotUserId == verifyChat.BotUserId)
                 {
                     var confirm = await VerifyChatPopup.ShowAsync(XamlRoot, ClientService, chat, true, false);
-                    if (confirm.Result == ContentDialogResult.Primary)
+                    if (confirm.Result == ModalPopupResult.Primary)
                     {
                         NavigationService.HidePopup(typeof(ChooseChatsPopup));
 
@@ -855,7 +886,7 @@ namespace Telegram.ViewModels
                 else
                 {
                     var confirm = await VerifyChatPopup.ShowAsync(XamlRoot, ClientService, chat, false, verifyChatFullInfo.BotInfo.VerificationParameters?.CanSetCustomDescription ?? false);
-                    if (confirm.Result == ContentDialogResult.Primary)
+                    if (confirm.Result == ModalPopupResult.Primary)
                     {
                         NavigationService.HidePopup(typeof(ChooseChatsPopup));
 
@@ -873,23 +904,16 @@ namespace Telegram.ViewModels
             }
             else if (_configuration is ChooseChatsConfigurationTransferGift transferGift)
             {
-                var confirm = await NavigationService.ShowPopupAsync(new TransferGiftPopup(ClientService, transferGift.Gift, chats[0], false));
-                if (confirm == ContentDialogResult.Primary)
+                if (await TransferGiftPopup.ConfirmTransferAsync(ClientService, NavigationService, transferGift.Gift, chats[0]))
                 {
                     NavigationService.HidePopup(typeof(ChooseChatsPopup));
-
-                    var response = await ClientService.SendAsync(new TransferGift(transferGift.Gift.ReceivedGiftId, chats[0].ToMessageSender(), transferGift.Gift.TransferStarCount));
-                    if (response is Ok && transferGift.Gift.Gift is SentGiftUpgraded upgraded)
-                    {
-                        Aggregator.Publish(new UpdateGiftIsSold(transferGift.Gift.ReceivedGiftId));
-
-                        ShowToast(string.Format(Strings.Gift2TransferredText, upgraded.Gift.ToName(), chats[0].Title));
-                    }
-                    else if (response is Error error)
-                    {
-                        ToastPopup.ShowError(XamlRoot, error);
-                    }
+                    await TransferGiftPopup.TransferAsync(ClientService, NavigationService, transferGift.Gift, chats[0]);
                 }
+            }
+            else if (_configuration is ChooseChatsConfigurationDepositGift depositGift)
+            {
+                NavigationService.HidePopup(typeof(ChooseChatsPopup));
+                await GiftOnChainHelper.DepositAsync(ClientService, NavigationService, depositGift.Gift, chats[0].ToMessageSender());
             }
             else if (_configuration is ChooseChatsConfigurationCreateGroupCall)
             {
@@ -907,6 +931,41 @@ namespace Telegram.ViewModels
             {
                 ClientService.Send(new SetChatTheme(chats[0].Id, new InputChatThemeGift(setTheme.Gift.Name)));
                 NavigationService.NavigateToChat(chats[0]);
+            }
+            else if (_configuration is ChooseChatsConfigurationInviteToBot inviteToBot && ClientService.TryGetUser(inviteToBot.BotUserId, out User bot))
+            {
+                var users = chats
+                    .Select(x => ClientService.GetUser(x))
+                    .Where(x => x != null)
+                    .ToList();
+
+                if (users.Count == 0)
+                {
+                    return;
+                }
+
+                var response = await ClientService.SendAsync(new InviteUsersToBot(bot.Id, users.Select(x => x.Id).ToVector()));
+                if (response is Ok)
+                {
+                    ShowToast(users.Count == 1
+                        ? string.Format(Strings.BotInviteDone, users[0].FullName(), bot.FirstName)
+                        : Locale.Declension(Strings.R.BotInviteDoneMany, users.Count, bot.FirstName), ToastPopupIcon.Success);
+                }
+                else if (response is Error error)
+                {
+                    // The errors are not documented: one that says the chat already exists is told
+                    // apart by its text, anything else is a refusal.
+                    if (error.Message.Contains("ALREADY"))
+                    {
+                        ShowToast(users.Count == 1
+                            ? string.Format(Strings.BotInviteErrorAlreadyStarted, users[0].FullName(), bot.FirstName)
+                            : string.Format(Strings.BotInviteErrorAlreadyStartedMany, bot.FirstName), ToastPopupIcon.Info);
+                    }
+                    else
+                    {
+                        ShowToast(string.Format(Strings.BotInviteErrorFailed, bot.FirstName), ToastPopupIcon.Error);
+                    }
+                }
             }
             else if (_configuration is ChooseChatsConfigurationInviteToChat inviteToChat && ClientService.TryGetChat(inviteToChat.ChatId, out Chat chat))
             {

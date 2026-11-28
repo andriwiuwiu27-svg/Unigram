@@ -487,13 +487,13 @@ namespace Telegram.Navigation
         {
             Logger.Info($"{nameof(backButton)}: {backButton}");
 
-            return NavigationServiceFactory(session, window, backButton, new Frame(), id, root);
+            return NavigationServiceFactory(session, window, backButton, new NavigationFrame(), id, root);
         }
 
         /// <summary>
         /// Creates the NavigationService instance for given Frame.
         /// </summary>
-        protected virtual INavigationService CreateNavigationService(ISession session, WindowContext window, Frame frame, string id, bool root)
+        protected virtual INavigationService CreateNavigationService(ISession session, WindowContext window, NavigationFrame frame, string id, bool root)
         {
             Logger.Info($"Frame: {frame}");
 
@@ -504,14 +504,16 @@ namespace Telegram.Navigation
         /// Creates a NavigationService for the given Frame. The caller owns it: the window reaches
         /// it only through the INavigationHost that shows the frame.
         /// </summary>
-        public INavigationService NavigationServiceFactory(ISession session, WindowContext window, BackButton backButton, Frame frame, string id, bool root)
+        public INavigationService NavigationServiceFactory(ISession session, WindowContext window, BackButton backButton, NavigationFrame frame, string id, bool root)
         {
             Logger.Info($"{nameof(backButton)}: {backButton} {nameof(frame)}: {frame}");
 
-            frame.Content = null;
-
             var navigationService = CreateNavigationService(session, window, frame, id, root);
-            navigationService.FrameFacade.BackButtonHandling = backButton;
+
+            if (navigationService is NavigationService service)
+            {
+                service.BackButtonHandling = backButton;
+            }
 
             return navigationService;
         }

@@ -88,6 +88,13 @@ namespace Telegram.ViewModels.Gallery
             CanBeSaved = !protectedChat && !secret;
             CanBeShared = CanBeSaved;
             CanBeCopied = CanBeSaved && IsPhoto;
+
+            // The edit is sent back to the chat as a reply, so the chat has to take new messages.
+            CanBeEdited = CanBeSaved
+                && content is MessagePhoto or MessageVideo or MessageAnimation
+                && _message.SchedulingState == null
+                && chat != null
+                && clientService.CanPostMessages(chat);
         }
 
         public GalleryMessage(IClientService clientService, MessageWithOwner message, MessageProperties properties)

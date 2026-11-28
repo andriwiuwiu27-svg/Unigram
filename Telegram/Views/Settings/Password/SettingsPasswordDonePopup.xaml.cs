@@ -9,7 +9,7 @@ using Telegram.Controls;
 
 namespace Telegram.Views.Settings
 {
-    public sealed partial class SettingsPasswordDonePopup : ContentPopup
+    public sealed partial class SettingsPasswordDonePopup : ModalPopup
     {
         public SettingsPasswordDonePopup()
         {

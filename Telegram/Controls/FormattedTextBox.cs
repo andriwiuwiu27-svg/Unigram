@@ -125,15 +125,22 @@ namespace Telegram.Controls
                 Icon = MenuFlyoutHelper.CreateIcon(Icons.TextFont)
             };
 
-            SelectionFlyout = new Flyout
+            var style = new Style(typeof(MenuFlyoutPresenter));
+            style.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(0)));
+
+            var selectionFlyout = new MenuFlyout
+            {
+                MenuFlyoutPresenterStyle = style,
+                AllowFocusOnInteraction = false,
+                ShowMode = FlyoutShowMode.TransientWithDismissOnPointerMoveAway
+            };
+            selectionFlyout.Items.Add(new MenuFlyoutContent
             {
                 Content = _selectionFlyout = new FormattedTextFlyout(this),
+                Padding = new Thickness(0)
+            });
 
-                AllowFocusOnInteraction = false,
-                ShouldConstrainToRootBounds = false,
-                ShowMode = FlyoutShowMode.TransientWithDismissOnPointerMoveAway,
-                FlyoutPresenterStyle = BootStrapper.Current.Resources["CommandFlyoutPresenterStyle"] as Style,
-            };
+            SelectionFlyout = selectionFlyout;
             SelectionFlyout.Opening += OnSelectionFlyoutOpening;
             SelectionFlyout.Closing += OnSelectionFlyoutClosing;
 

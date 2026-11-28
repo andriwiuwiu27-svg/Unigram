@@ -16,6 +16,7 @@ using Telegram.Controls.Chats;
 using Telegram.Navigation;
 using Telegram.Navigation.Services;
 using Telegram.Services;
+using Telegram.Services.Updates;
 using Telegram.Td.Api;
 using Telegram.Views;
 #if WINUI3
@@ -46,7 +47,7 @@ namespace Telegram.Controls
     {
         private MasterDetailPanel AdaptivePanel;
         private ContentControl MasterFrame;
-        private Frame DetailFrame;
+        private NavigationFrame DetailFrame;
         private Grid DetailHeaderPresenter2;
         private Grid DetailRoot;
         private Grid DetailPresenter;
@@ -61,7 +62,7 @@ namespace Telegram.Controls
 
         public ViewModelBase ViewModel { get; private set; }
         public NavigationService NavigationService { get; private set; }
-        public Frame ParentFrame { get; private set; }
+        public INavigationService ParentService { get; private set; }
 
         private HostedPage _titlePage;
 
@@ -84,31 +85,38 @@ namespace Telegram.Controls
 
         #region Initialize
 
-        public void Initialize(NavigationService service, Frame parent, ViewModelBase viewModel, bool hasMaster)
+        public void Initialize(NavigationService service, INavigationService parent, ViewModelBase viewModel, bool hasMaster)
         {
             NavigationService = service;
             ViewModel = viewModel;
             DetailFrame = service.Frame;
-            ParentFrame = parent;
+            ParentService = parent;
 
             HasMaster = hasMaster;
 
-            // The handlers read ParentFrame, which only a master provides.
+            // The handlers read ParentService, which only a master provides.
             if (hasMaster)
             {
-                service.FrameFacade.BackRequested += OnBackRequested;
+                // The empty pane is what the history starts from, so back from a first page shows it.
+                service.RootPageType = BlankPageType;
+
+                service.BackRequested += OnBackRequested;
                 service.BackStackChanged += OnBackStackChanged;
                 service.Navigated += OnNavigated;
             }
+
+            DetailFrame.TransitionStarting += OnTransitionStarting;
+            DetailFrame.Released += OnReleased;
 
             // With or without a master: a standalone window has none, and its title is this too.
             service.Navigated += OnWindowTitleNavigated;
 
             _windowTitleSession = service.Session;
             _windowTitleSession.PropertyChanged += OnWindowTitleSessionChanged;
+            _windowTitleSession.Aggregator.Subscribe<UpdateWindowTitleDetails>(this, Handle);
 
             // A standalone window has navigated before it gets here.
-            WatchWindowTitle(DetailFrame.Content as HostedPage);
+            WatchWindowTitle(service.Content as HostedPage);
         }
 
         public bool HasMaster { get; private set; }
@@ -119,15 +127,24 @@ namespace Telegram.Controls
 
             if (NavigationService != null)
             {
-                NavigationService.FrameFacade.BackRequested -= OnBackRequested;
+                NavigationService.BackRequested -= OnBackRequested;
                 NavigationService.BackStackChanged -= OnBackStackChanged;
                 NavigationService.Navigated -= OnNavigated;
                 NavigationService.Navigated -= OnWindowTitleNavigated;
             }
 
+            if (DetailFrame != null)
+            {
+                DetailFrame.TransitionStarting -= OnTransitionStarting;
+                DetailFrame.Released -= OnReleased;
+            }
+
+            _transition = null;
+
             if (_windowTitleSession != null)
             {
                 _windowTitleSession.PropertyChanged -= OnWindowTitleSessionChanged;
+                _windowTitleSession.Aggregator.Unsubscribe<UpdateWindowTitleDetails>(this);
                 _windowTitleSession = null;
             }
 
@@ -154,7 +171,7 @@ namespace Telegram.Controls
             NavigationService = null;
             ViewModel = null;
             DetailFrame = null;
-            ParentFrame = null;
+            ParentService = null;
         }
 
         private void OnBackRequested(object sender, BackRequestedRoutedEventArgs args)
@@ -166,7 +183,7 @@ namespace Telegram.Controls
             //    _backStack.RemoveLast();
             //}
 
-            if (ParentFrame.Content is INavigatingPage masterPaging && CurrentState != MasterDetailState.Minimal)
+            if (ParentService?.Content is INavigatingPage masterPaging && CurrentState != MasterDetailState.Minimal)
             {
                 masterPaging.OnBackRequesting(args);
                 if (args.Handled)
@@ -188,16 +205,16 @@ namespace Telegram.Controls
             // but if it is 0 it means that the control is not loaded, and the event shouldn't be handled
             if (CanGoBack && ActualWidth > 0 /*&& type == BackStackType.Navigation*/)
             {
-                NavigationTransitionInfo transitionInfoOverride = null;
-                if (CurrentState == MasterDetailState.Minimal && DetailFrame.BackStackDepth == 1)
-                {
-                    transitionInfoOverride = new SuppressNavigationTransitionInfo();
-                }
+                // Back to the empty pane in a single column shows the chat list, which does not slide.
+                var transition = CurrentState == MasterDetailState.Minimal && NavigationService.BackStack.Count == 1
+                    ? PageTransition.None
+                    : PageTransition.Default;
 
-                DetailFrame.GoBack(transitionInfoOverride);
+                NavigationService.GoBack(transition: transition);
+
                 args.Handled = true;
             }
-            else if (ParentFrame.Content is INavigablePage masterPage /*&& type == BackStackType.Hamburger*/)
+            else if (ParentService?.Content is INavigablePage masterPage /*&& type == BackStackType.Hamburger*/)
             {
                 masterPage.OnBackRequested(args);
                 if (args.Handled)
@@ -205,9 +222,9 @@ namespace Telegram.Controls
                     return;
                 }
             }
-            else if (ParentFrame.CanGoBack && ActualWidth > 0)
+            else if (ParentService is { CanGoBack: true } && ActualWidth > 0)
             {
-                ParentFrame.GoBack();
+                ParentService.GoBack();
                 args.Handled = true;
             }
         }
@@ -224,7 +241,7 @@ namespace Telegram.Controls
 
         private void UpdateMasterVisibility()
         {
-            if (CurrentState == MasterDetailState.Minimal && DetailFrame?.CurrentSourcePageType == BlankPageType)
+            if (CurrentState == MasterDetailState.Minimal && NavigationService?.CurrentPageType == BlankPageType)
             {
                 MasterVisibility = Visibility.Visible;
             }
@@ -240,6 +257,24 @@ namespace Telegram.Controls
 
         private BackgroundKind _backgroundType = BackgroundKind.Background;
 
+        // The detail page's transition while it runs: the background follows its progress, so the
+        // chrome and the page move as one.
+        private PageTransitionContext _transition;
+        private ExpressionAnimation _chromeIn;
+        private ExpressionAnimation _chromeOut;
+        private bool _chromeBound;
+
+        private void OnTransitionStarting(object sender, PageTransitionContext e)
+        {
+            _transition = e.Transition == PageTransition.None ? null : e;
+        }
+
+        private void OnReleased(object sender, NavigationPageReleasedEventArgs e)
+        {
+            _transition = null;
+            SettleBackground();
+        }
+
         public void ShowHideBackground(BackgroundKind show, bool animate)
         {
             if (_backgroundType == show || BackgroundPart == null)
@@ -252,100 +287,133 @@ namespace Telegram.Controls
 
             _backgroundType = show;
 
+            ShowHideDetailHeader(show == BackgroundKind.Material && _showDetailHeader, _showDetailHeaderBackground);
+
+            // Without a transition running there is nothing to follow, and the page cut too.
+            if (animate is false || _transition == null)
+            {
+                SettleBackground(true);
+                return;
+            }
+
             var visual = ElementComposition.GetElementVisual(BackgroundPart);
             var border = ElementComposition.GetElementVisual(BorderPart);
             var material = ElementComposition.GetElementVisual(MaterialPart);
             var bread = ElementComposition.GetElementVisual(DetailHeaderPresenter);
             var button = ElementComposition.GetElementVisual(BackButton);
-            var buttonVisible = _showDetailHeader;
 
-            ShowHideDetailHeader(show == BackgroundKind.Material && _showDetailHeader, _showDetailHeaderBackground);
+            BackgroundPart.Visibility = Visibility.Visible;
+            BorderPart.Visibility = Visibility.Visible;
+            MaterialPart.Visibility = Visibility.Visible;
+            DetailHeaderPresenter.Visibility = Visibility.Visible;
+            BackButton.Visibility = _showDetailHeader ? Visibility.Visible : Visibility.Collapsed;
 
-            if (animate)
+            var compositor = visual.Compositor;
+            _chromeIn ??= compositor.CreateExpressionAnimation("P.Progress");
+            _chromeOut ??= compositor.CreateExpressionAnimation("1 - P.Progress");
+            _chromeIn.SetReferenceParameter("P", _transition.Properties);
+            _chromeOut.SetReferenceParameter("P", _transition.Properties);
+
+            var fadeIn = _chromeIn;
+            var fadeOut = _chromeOut;
+
+            _chromeBound = true;
+
+            if (show == BackgroundKind.Background)
             {
-                BackgroundPart.Visibility = Visibility.Visible;
-                BorderPart.Visibility = Visibility.Visible;
-                MaterialPart.Visibility = Visibility.Visible;
-                DetailHeaderPresenter.Visibility = Visibility.Visible;
-                BackButton.Visibility = buttonVisible ? Visibility.Visible : Visibility.Collapsed;
+                visual.StartAnimation("Opacity", fadeIn);
 
-                var batch = visual.Compositor.CreateScopedBatch(CompositionBatchTypes.Animation);
-                batch.Completed += (s, args) =>
+                if (type == BackgroundKind.None)
                 {
-                    BackgroundPart.Visibility = show == BackgroundKind.Background ? Visibility.Visible : Visibility.Collapsed;
-                    BorderPart.Visibility = show != BackgroundKind.None ? Visibility.Visible : Visibility.Collapsed;
-                    MaterialPart.Visibility = show == BackgroundKind.Material ? Visibility.Visible : Visibility.Collapsed;
-                    DetailHeaderPresenter.Visibility = show == BackgroundKind.Material ? Visibility.Visible : Visibility.Collapsed;
-                    BackButton.Visibility = show == BackgroundKind.Material && _showDetailHeader ? Visibility.Visible : Visibility.Collapsed;
-                };
-
-                var fadeOut = visual.Compositor.CreateScalarKeyFrameAnimation();
-                fadeOut.InsertKeyFrame(0, 1);
-                fadeOut.InsertKeyFrame(1, 0);
-
-                var fadeIn = visual.Compositor.CreateScalarKeyFrameAnimation();
-                fadeIn.InsertKeyFrame(0, 0);
-                fadeIn.InsertKeyFrame(1, 1);
-
-                if (show == BackgroundKind.Background)
-                {
-                    visual.StartAnimation("Opacity", fadeIn);
-
-                    if (type == BackgroundKind.None)
-                    {
-                        border.StartAnimation("Opacity", fadeIn);
-                    }
-                    else if (type == BackgroundKind.Material)
-                    {
-                        material.StartAnimation("Opacity", fadeOut);
-                        bread.StartAnimation("Opacity", fadeOut);
-                        button.StartAnimation("Opacity", fadeOut);
-                    }
+                    border.StartAnimation("Opacity", fadeIn);
                 }
-                else if (show == BackgroundKind.Material)
+                else if (type == BackgroundKind.Material)
                 {
-                    material.StartAnimation("Opacity", fadeIn);
-                    bread.StartAnimation("Opacity", fadeIn);
-                    button.StartAnimation("Opacity", fadeIn);
-
-                    if (type == BackgroundKind.None)
-                    {
-                        border.StartAnimation("Opacity", fadeIn);
-                    }
-                    else if (type == BackgroundKind.Background)
-                    {
-                        visual.StartAnimation("Opacity", fadeOut);
-                    }
+                    material.StartAnimation("Opacity", fadeOut);
+                    bread.StartAnimation("Opacity", fadeOut);
+                    button.StartAnimation("Opacity", fadeOut);
                 }
-                else if (show == BackgroundKind.None)
-                {
-                    border.StartAnimation("Opacity", fadeOut);
-
-                    if (type == BackgroundKind.Background)
-                    {
-                        visual.StartAnimation("Opacity", fadeOut);
-                    }
-                    else
-                    {
-                        material.StartAnimation("Opacity", fadeOut);
-                        bread.StartAnimation("Opacity", fadeOut);
-                        button.StartAnimation("Opacity", fadeOut);
-                    }
-                }
-
-                batch.End();
             }
-            else
+            else if (show == BackgroundKind.Material)
             {
-                visual.Opacity = show == BackgroundKind.Background ? 1 : 0;
-                border.Opacity = show != BackgroundKind.None ? 1 : 0;
-                material.Opacity = show == BackgroundKind.Material ? 1 : 0;
-                bread.Opacity = show == BackgroundKind.Material ? 1 : 0;
+                material.StartAnimation("Opacity", fadeIn);
+                bread.StartAnimation("Opacity", fadeIn);
+                button.StartAnimation("Opacity", fadeIn);
 
-                BackgroundPart.Visibility = show == BackgroundKind.Background ? Visibility.Visible : Visibility.Collapsed;
-                BorderPart.Visibility = show != BackgroundKind.None ? Visibility.Visible : Visibility.Collapsed;
-                MaterialPart.Visibility = show == BackgroundKind.Material ? Visibility.Visible : Visibility.Collapsed;
-                DetailHeaderPresenter.Visibility = show == BackgroundKind.Material ? Visibility.Visible : Visibility.Collapsed;
+                if (type == BackgroundKind.None)
+                {
+                    border.StartAnimation("Opacity", fadeIn);
+                }
+                else if (type == BackgroundKind.Background)
+                {
+                    visual.StartAnimation("Opacity", fadeOut);
+                }
+            }
+            else if (show == BackgroundKind.None)
+            {
+                border.StartAnimation("Opacity", fadeOut);
+
+                if (type == BackgroundKind.Background)
+                {
+                    visual.StartAnimation("Opacity", fadeOut);
+                }
+                else
+                {
+                    material.StartAnimation("Opacity", fadeOut);
+                    bread.StartAnimation("Opacity", fadeOut);
+                    button.StartAnimation("Opacity", fadeOut);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Brings the background to rest at <see cref="_backgroundType"/>: once the transition it
+        /// followed is over, or at once when <paramref name="force"/> is set.
+        /// </summary>
+        private void SettleBackground(bool force = false)
+        {
+            if (BackgroundPart == null || (_chromeBound is false && force is false))
+            {
+                return;
+            }
+
+            var show = _backgroundType;
+
+            var visual = ElementComposition.GetElementVisual(BackgroundPart);
+            var border = ElementComposition.GetElementVisual(BorderPart);
+            var material = ElementComposition.GetElementVisual(MaterialPart);
+            var bread = ElementComposition.GetElementVisual(DetailHeaderPresenter);
+
+            // A value set under a running animation is dropped. The back button is only settled
+            // here when it was animated: otherwise it is ShowHideDetailHeader's.
+            var button = _chromeBound;
+            if (_chromeBound)
+            {
+                _chromeBound = false;
+
+                var visualButton = ElementComposition.GetElementVisual(BackButton);
+                visualButton.StopAnimation("Opacity");
+                visualButton.Opacity = show == BackgroundKind.Material ? 1 : 0;
+
+                visual.StopAnimation("Opacity");
+                border.StopAnimation("Opacity");
+                material.StopAnimation("Opacity");
+                bread.StopAnimation("Opacity");
+            }
+
+            visual.Opacity = show == BackgroundKind.Background ? 1 : 0;
+            border.Opacity = show != BackgroundKind.None ? 1 : 0;
+            material.Opacity = show == BackgroundKind.Material ? 1 : 0;
+            bread.Opacity = show == BackgroundKind.Material ? 1 : 0;
+
+            BackgroundPart.Visibility = show == BackgroundKind.Background ? Visibility.Visible : Visibility.Collapsed;
+            BorderPart.Visibility = show != BackgroundKind.None ? Visibility.Visible : Visibility.Collapsed;
+            MaterialPart.Visibility = show == BackgroundKind.Material ? Visibility.Visible : Visibility.Collapsed;
+            DetailHeaderPresenter.Visibility = show == BackgroundKind.Material ? Visibility.Visible : Visibility.Collapsed;
+
+            if (button)
+            {
+                BackButton.Visibility = show == BackgroundKind.Material && _showDetailHeader ? Visibility.Visible : Visibility.Collapsed;
             }
         }
 
@@ -412,24 +480,17 @@ namespace Telegram.Controls
                 {
                     DetailPresenter.Children.Add(DetailFrame);
 
-                    if (DetailFrame.Content is Page page)
+                    if (DetailFrame.Content != null)
                     {
                         OnNavigated(null, new NavigatedEventArgs
                         {
-                            Content = page
+                            Content = DetailFrame.Content
                         });
                     }
 
-                    if (HasMaster && !NavigationService.IsNavigating)
+                    if (HasMaster && !NavigationService.IsNavigating && NavigationService.CurrentPageType == null)
                     {
-                        if (NavigationService.CurrentPageType == null)
-                        {
-                            NavigationService.Navigate(BlankPageType);
-                        }
-                        else
-                        {
-                            NavigationService.InsertToBackStack(0, BlankPageType);
-                        }
+                        NavigationService.Navigate(BlankPageType);
                     }
                 }
                 catch { }
@@ -498,9 +559,9 @@ namespace Telegram.Controls
             var batch = banner.Compositor.CreateScopedBatch(CompositionBatchTypes.Animation);
             batch.Completed += (s, args) =>
             {
-                if (DetailFrame?.Content is IChatPage chatPage)
+                if (NavigationService?.Content is IChatPage chatPage)
                 {
-                    chatPage.CompleteBannerAnimation(false);
+                    chatPage.CompleteBannerAnimation();
                 }
 
                 detail.Properties.InsertVector3("Translation", Vector3.Zero);
@@ -523,7 +584,7 @@ namespace Telegram.Controls
 
             banner.StartAnimation("Translation.Y", translate);
 
-            if (CurrentState == MasterDetailState.Minimal && DetailFrame?.CurrentSourcePageType == BlankPageType)
+            if (CurrentState == MasterDetailState.Minimal && NavigationService?.CurrentPageType == BlankPageType)
             {
                 //translate.InsertKeyFrame(show ? 0 : 1, -48);
 
@@ -535,9 +596,9 @@ namespace Telegram.Controls
                 var detailVisual = ElementComposition.GetElementVisual(DetailPresenter);
                 detailVisual.Clip = detailVisual.Compositor.CreateInsetClip(0, -40, 0, 0);
 
-                if (DetailFrame.Content is IChatPage chatPage)
+                if (NavigationService.Content is IChatPage chatPage)
                 {
-                    chatPage.StartBannerAnimation(translate, false);
+                    chatPage.StartBannerAnimation(translate);
                 }
                 else
                 {
@@ -570,11 +631,6 @@ namespace Telegram.Controls
             // Released here rather than on Navigating: that fires before NavigationService can
             // cancel the navigation, which would leave the page that stays without its scroller.
             ReleaseScrollingHost();
-
-            if (HasMaster && !NavigationService.CanGoBack && NavigationService.CurrentPageType != BlankPageType)
-            {
-                NavigationService.InsertToBackStack(0, BlankPageType);
-            }
 
             // The container that was driving the chip may have gone with the page, in which case
             // its tracker never reaches idle and nothing else would release the binding.
@@ -893,6 +949,12 @@ namespace Telegram.Controls
             }
         }
 
+        private void Handle(UpdateWindowTitleDetails update)
+        {
+            // Published from the settings page, whose window need not be this one.
+            this.BeginOnUIThread(UpdateWindowTitle);
+        }
+
         /// <summary>
         /// Shown as the whole window title while set; null goes back to the account and chat.
         /// </summary>
@@ -920,9 +982,9 @@ namespace Telegram.Controls
                 return;
             }
 
-            if (!session.ClientService.TryGetUser(session.UserId, out User user))
+            if (!AppSettings.ShowWindowTitleDetails || !session.ClientService.TryGetUser(session.UserId, out User user))
             {
-                // Clears a connection state that ended before the user arrived.
+                // Also clears a connection state that ended before the user arrived.
                 NavigationService.Window.Title = string.Empty;
                 return;
             }
@@ -1240,7 +1302,7 @@ namespace Telegram.Controls
                 return;
             }
 
-            if (DetailFrame is not { CanGoBack: true } || !AppSettings.SwipeToGoBack)
+            if (NavigationService is not { CanGoBack: true } || !AppSettings.SwipeToGoBack)
             {
                 return;
             }
@@ -1486,18 +1548,11 @@ namespace Telegram.Controls
                 batch.End();
             }
 
-            if (DetailFrame is { CanGoBack: true })
+            if (NavigationService is { CanGoBack: true })
             {
-                // FromRight, and it does slide in from the left: the frame inverts the effect on a
-                // back navigation, so this is the same value TLNavigationService passes going
-                // forward. The default entrance transition reads as unrelated to the finger that
-                // asked for it.
-                //
-                // Gated on the policy because FrameFacade only applies it to Navigate, not GoBack,
-                // so nothing else would stop this one from animating.
-                NavigationService?.GoBack(null, PowerSavingPolicy.AreSmoothTransitionsEnabled
-                    ? new SlideNavigationTransitionInfo { Effect = SlideNavigationTransitionEffect.FromRight }
-                    : null);
+                // Always the slide, even from a page that came in without one: the finger asked for
+                // the page to go, and a cut reads as unrelated to it.
+                NavigationService.GoBack(transition: PageTransition.Backward);
             }
         }
 
@@ -1627,7 +1682,7 @@ namespace Telegram.Controls
         {
             get
             {
-                return DetailFrame.CanGoBack;
+                return NavigationService?.CanGoBack ?? false;
 
                 // BEFORE BACK NAVIGATION IN FILLED (WIDE) STATE FIX.
                 // return DetailFrame.CanGoBack && AdaptiveStates.CurrentState.Name == NarrowState;

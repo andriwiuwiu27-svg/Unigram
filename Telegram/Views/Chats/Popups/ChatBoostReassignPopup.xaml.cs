@@ -20,7 +20,7 @@ using Windows.UI.Xaml.Controls.Primitives;
 
 namespace Telegram.Views.Chats.Popups
 {
-    public sealed partial class ChatBoostReassignPopup : ContentPopup
+    public sealed partial class ChatBoostReassignPopup : ModalPopup
     {
         private readonly IClientService _clientService;
         private readonly Chat _chat;
@@ -154,8 +154,9 @@ namespace Telegram.Views.Chats.Popups
             }
         }
 
-        private void OnUnloaded(object sender, RoutedEventArgs args)
+        protected override void OnUnloaded()
         {
+            base.OnUnloaded();
             _cooldownTimer?.Stop();
         }
     }

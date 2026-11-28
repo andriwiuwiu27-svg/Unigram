@@ -6,43 +6,21 @@
 //
 
 using System;
-using Windows.UI.Xaml.Controls;
-using Windows.UI.Xaml.Navigation;
 
 namespace Telegram.Navigation.Services
 {
-    // DOCS: https://github.com/Windows-XAML/Template10/wiki/Docs-%7C-NavigationService
+    /// <summary>
+    /// SourcePageType and Parameter are the page being navigated to, as they are on the platform's
+    /// own arguments; Content is the page being left.
+    /// </summary>
     public partial class NavigatingEventArgs : NavigatedEventArgs
     {
-        public NavigatingEventArgs()
-        {
+        public bool Cancel { get; set; }
 
-        }
+        public bool Suspending { get; set; }
 
-        public NavigatingEventArgs(NavigatingCancelEventArgs e, Page page, Type targetPageType, object parameter, object targetPageParameter)
-        {
-            NavigationMode = e.NavigationMode;
-            NavigationTransitionInfo = e.NavigationTransitionInfo;
-            SourcePageType = e.SourcePageType;
-            Content = page;
-            Parameter = parameter;
-            TargetPageType = targetPageType;
-            TargetPageParameter = targetPageParameter;
-        }
-
-        public NavigatingEventArgs(Type targetPageType, object parameter, object state, object targetPageParameter)
-        {
-            NavigationMode = NavigationMode.New;
-            SourcePageType = null;
-            Content = null;
-            Parameter = parameter;
-            TargetPageType = targetPageType;
-            TargetPageParameter = state;
-        }
-
-        public bool Cancel { get; set; } = false;
-        public bool Suspending { get; set; } = false;
         public Type TargetPageType { get; set; }
+
         public object TargetPageParameter { get; set; }
     }
 }

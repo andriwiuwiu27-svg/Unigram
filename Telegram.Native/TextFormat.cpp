@@ -234,6 +234,98 @@ namespace winrt::Telegram::Native::implementation
         return com_array<Windows::Foundation::Rect>(lines.begin(), lines.end());
     }
 
+    // Where the given line has to end for reserve DIPs to fit after it, inside width: its own
+    // end, trailing whitespace and newline left out, when they already fit, otherwise the first
+    // cluster the reserved space overlaps. -1 when the text has no such line. The cut is a
+    // cluster boundary, as HitTestPoint answers in clusters, so it never splits a surrogate
+    // pair or an emoji sequence; whitespace before it is the caller's to trim, as the layout
+    // does not hold the text.
+    int32_t TextFormat::TrimLine(double fontSize, double width, bool rtl, int32_t line, double reserve)
+    {
+        HRESULT result;
+
+        if (m_textLayout == nullptr || line < 0)
+        {
+            return -1;
+        }
+
+        if (FAILED(result = Configure(fontSize, width, rtl, true)))
+        {
+            return -1;
+        }
+
+        DWRITE_TEXT_METRICS metrics;
+        if (FAILED(result = m_textLayout->GetMetrics(&metrics)))
+        {
+            return -1;
+        }
+
+        if (static_cast<UINT32>(line) >= metrics.lineCount)
+        {
+            return -1;
+        }
+
+        std::vector<DWRITE_LINE_METRICS> lines(metrics.lineCount);
+        UINT32 actualLineCount;
+        if (FAILED(result = m_textLayout->GetLineMetrics(lines.data(), metrics.lineCount, &actualLineCount)))
+        {
+            return -1;
+        }
+
+        int32_t start = 0;
+        float top = 0;
+
+        for (int32_t i = 0; i < line; i++)
+        {
+            start += lines[i].length;
+            top += lines[i].height;
+        }
+
+        const DWRITE_LINE_METRICS& current = lines[line];
+        const int32_t end = start + current.length - current.trailingWhitespaceLength - current.newlineLength;
+
+        if (end <= start)
+        {
+            return start;
+        }
+
+        std::vector<Windows::Foundation::Rect> rects;
+        if (FAILED(result = HitTestRange(start, end - start, rects)))
+        {
+            return -1;
+        }
+
+        float left = FLT_MAX;
+        float right = -FLT_MAX;
+
+        for (const Windows::Foundation::Rect& rect : rects)
+        {
+            left = std::min(left, rect.X);
+            right = std::max(right, rect.X + rect.Width);
+        }
+
+        // A line reads from its leading edge, so the reserved space is at the far one: the
+        // right for left to right text, the left for right to left.
+        const float limit = rtl ? (float)reserve : (float)(width - reserve);
+
+        if (rects.empty() || (rtl ? left >= limit : right <= limit))
+        {
+            return end;
+        }
+
+        // The cluster under the limit goes whichever half of it is hit: keeping it would put
+        // the part of it past the limit under the reserved space.
+        BOOL isTrailingHit;
+        BOOL isInside;
+        DWRITE_HIT_TEST_METRICS hit;
+        if (FAILED(result = m_textLayout->HitTestPoint(limit, top + current.height / 2, &isTrailingHit, &isInside, &hit)))
+        {
+            return -1;
+        }
+
+        return std::clamp((int32_t)hit.textPosition, start, end);
+    }
+
     // maxLines is the control's own, 0 for uncapped: past that line the text is not on screen,
     // so a range there has no geometry to answer with. The cut has to come from the line the
     // layout wraps at rather than from the width, or it lands mid word where the control broke

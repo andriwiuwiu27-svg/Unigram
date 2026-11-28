@@ -128,30 +128,38 @@
                                       Glyph="&#xEAD6;"
                                       TabIndex="2" />
 
+                <controls:GlyphButton x:Name="EditMedia"
+                                      x:Load="{x:Bind ViewModel.SelectedItem.CanBeEdited, Mode=OneWay}"
+                                      Click="{x:Bind ViewModel.Edit}"
+                                      AutomationProperties.Name="{CustomResource Edit}"
+                                      ToolTipService.ToolTip="{CustomResource Edit}"
+                                      Glyph="&#xF7BC;"
+                                      TabIndex="3" />
+
                 <controls:GlyphButton x:Name="ZoomOut"
                                       Click="ZoomOut_Click"
                                       AutomationProperties.Name="{CustomResource MediaZoomOut}"
                                       ToolTipService.ToolTip="{CustomResource MediaZoomOut}"
                                       Glyph="&#xE96A;"
-                                      TabIndex="3" />
+                                      TabIndex="4" />
 
                 <controls:GlyphButton x:Name="ZoomIn"
                                       Click="ZoomIn_Click"
                                       AutomationProperties.Name="{CustomResource MediaZoomIn}"
                                       ToolTipService.ToolTip="{CustomResource MediaZoomIn}"
                                       Glyph="&#xE969;"
-                                      TabIndex="4" />
+                                      TabIndex="5" />
 
                 <controls:GlyphButton x:Name="Rotate"
                                       Click="Rotate_Click"
                                       AutomationProperties.Name="{CustomResource AccDescrRotate}"
                                       ToolTipService.ToolTip="{CustomResource AccDescrRotate}"
                                       Glyph="&#xEA5B;"
-                                      TabIndex="5" />
+                                      TabIndex="6" />
 
                 <controls:MoreButton Click="Menu_ContextRequested"
                                      HorizontalAlignment="Right"
-                                     TabIndex="6" />
+                                     TabIndex="7" />
             </StackPanel>
 
             <StackPanel Padding="12"

@@ -347,12 +347,12 @@ namespace Telegram.Views.Popups
 
         private void Cancel_Click(object sender, RoutedEventArgs e)
         {
-            Hide(ContentDialogResult.Secondary);
+            Hide(ModalPopupResult.Secondary);
         }
 
         private void Primary_Click(object sender, RoutedEventArgs e)
         {
-            Hide(ContentDialogResult.Primary);
+            Hide(ModalPopupResult.Primary);
             ViewModel.Done(true);
         }
 
@@ -364,7 +364,7 @@ namespace Telegram.Views.Popups
                 return;
             }
 
-            Hide(ContentDialogResult.Primary);
+            Hide(ModalPopupResult.Primary);
             ViewModel.Done(false);
         }
 

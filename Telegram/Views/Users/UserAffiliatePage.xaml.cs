@@ -9,6 +9,8 @@ using System;
 using System.ComponentModel;
 using Telegram.Common;
 using Telegram.Converters;
+using Telegram.Navigation;
+using Telegram.Navigation.Services;
 using Telegram.Td.Api;
 using Telegram.ViewModels.Users;
 using Windows.UI.Xaml;
@@ -23,6 +25,7 @@ namespace Telegram.Views.Users
         public UserAffiliatePage()
         {
             InitializeComponent();
+            Transition = PageTransition.Entrance;
             Title = Strings.BotAffiliateProgramTitle;
 
             SliderHelper.InitializeTicks(Commission, CommissionTicks, 2, ConvertCommissionTicks);
@@ -55,7 +58,7 @@ namespace Telegram.Views.Users
             };
         }
 
-        protected override void OnNavigatedTo(NavigationEventArgs e)
+        protected override void OnNavigatedTo(NavigatedEventArgs e)
         {
             ViewModel.PropertyChanged += OnPropertyChanged;
 
@@ -64,7 +67,7 @@ namespace Telegram.Views.Users
             UpdateMinimumDuration(ViewModel.MinimumDuration);
         }
 
-        protected override void OnNavigatedFrom(NavigationEventArgs e)
+        protected override void OnNavigatedFrom(NavigatedEventArgs e)
         {
             ViewModel.PropertyChanged -= OnPropertyChanged;
         }

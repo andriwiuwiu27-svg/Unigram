@@ -9,6 +9,7 @@ using System;
 using Telegram.Common;
 using Telegram.Converters;
 using Telegram.Native;
+using Telegram.Navigation;
 using Telegram.Services;
 using Telegram.Td;
 using Telegram.Td.Api;
@@ -25,6 +26,7 @@ namespace Telegram.Views
         public DiagnosticsPage()
         {
             InitializeComponent();
+            Transition = PageTransition.Entrance;
             Title = "Diagnostics";
 
 #if !WINUI3

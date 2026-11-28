@@ -89,7 +89,7 @@ namespace Telegram.ViewModels
             var popup = new SupergroupEventLogFiltersPopup(ClientService, NavigationService, supergroup.Id, _filters, _userIds);
 
             var confirm = await ShowPopupAsync(popup);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 Filters = popup.Filters;
                 UserIds = popup.UserIds;

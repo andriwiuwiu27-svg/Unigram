@@ -24,9 +24,9 @@ namespace Telegram.Services
     {
         public static readonly TimeSpan Duration = TimeSpan.FromSeconds(5);
 
-        public static FormattedText FormatSent(IClientService clientService, long pendingCount)
+        public static FormattedText FormatSent(IClientService clientService, long pendingCount, PaidReactionType type)
         {
-            var title = clientService.Options.IsPaidReactionAnonymous
+            var title = (type ?? clientService.DefaultPaidReactionType) is PaidReactionTypeAnonymous
                 ? Strings.StarsSentAnonymouslyTitle
                 : Strings.StarsSentTitle;
 
@@ -88,7 +88,7 @@ namespace Telegram.Services
             _pendingCount += starCount;
             await _clientService.SendAsync(new AddPendingPaidMessageReaction(_chatId, _messageId, starCount, type));
 
-            var text = PaidReactionToast.FormatSent(_clientService, _pendingCount);
+            var text = PaidReactionToast.FormatSent(_clientService, _pendingCount, type);
 
             if (_pendingToast != null && _pendingToast.IsOpen)
             {
@@ -200,7 +200,7 @@ namespace Telegram.Services
             _pendingCount += starCount;
             _ = _clientService.SendAsync(new AddPendingLiveStoryReaction(_groupCallId, starCount));
 
-            var text = PaidReactionToast.FormatSent(_clientService, _pendingCount);
+            var text = PaidReactionToast.FormatSent(_clientService, _pendingCount, type);
 
             if (_pendingToast != null && _pendingToast.IsOpen)
             {

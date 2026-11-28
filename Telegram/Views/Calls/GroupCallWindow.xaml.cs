@@ -102,6 +102,12 @@ namespace Telegram.Views.Calls
             };
 
             _call = call;
+
+            // Before the subscriptions: they are raised on other threads, and OnJoinedStateChanged
+            // binds _participants.Load there, while this constructor may still be running.
+            _participants = new GroupCallParticipantsCollection(_call.Participants, _dispatcherQueue);
+            _participants.ParticipantChanged += OnParticipantChanged;
+
             _call.NetworkStateChanged += OnNetworkStateChanged;
             _call.JoinedStateChanged += OnJoinedStateChanged;
             _call.VerificationStateChanged += OnVerificationStateChanged;
@@ -109,9 +115,6 @@ namespace Telegram.Views.Calls
             _call.AudioLevelsUpdated += OnAudioLevelsUpdated;
             _call.MutedChanged += OnMutedChanged;
             _call.Changed += OnChanged;
-
-            _participants = new GroupCallParticipantsCollection(_call.Participants, _dispatcherQueue);
-            _participants.ParticipantChanged += OnParticipantChanged;
 
             ScrollingHost.ItemsSource = _participants;
 
@@ -964,7 +967,7 @@ namespace Telegram.Views.Calls
                 };
 
                 var confirm = await popup.ShowQueuedAsync(XamlRoot);
-                if (confirm == ContentDialogResult.Primary)
+                if (confirm == ModalPopupResult.Primary)
                 {
                     _call.Discard(popup.IsChecked == true);
                 }
@@ -985,7 +988,7 @@ namespace Telegram.Views.Calls
             popup.SecondaryButtonText = Strings.Cancel;
 
             var confirm = await popup.ShowQueuedAsync(XamlRoot);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 _call.Discard(true);
             }
@@ -1529,7 +1532,7 @@ namespace Telegram.Views.Calls
             input.MinLength = 0;
 
             var confirm = await input.ShowQueuedAsync(XamlRoot);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 _call.ClientService.Send(new SetVideoChatTitle(_call.Id, input.Text));
             }
@@ -1541,7 +1544,7 @@ namespace Telegram.Views.Calls
             input.RequestedTheme = ElementTheme.Dark;
 
             var confirm = await input.ShowQueuedAsync(XamlRoot);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 _call.ClientService.Send(new StartGroupCallRecording(_call.Id, input.FileName, input.RecordVideo, input.UsePortraitOrientation));
             }
@@ -1557,7 +1560,7 @@ namespace Telegram.Views.Calls
             popup.SecondaryButtonText = Strings.Cancel;
 
             var confirm = await popup.ShowQueuedAsync(XamlRoot);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 _call.ClientService.Send(new EndGroupCallRecording(_call.Id));
             }
@@ -2063,7 +2066,7 @@ namespace Telegram.Views.Calls
             popup.SecondaryButtonText = Strings.Cancel;
 
             var confirm = await popup.ShowQueuedAsync(XamlRoot);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 _call.ClientService.Send(new SetChatMemberStatus(_call.Chat.Id, participant.ParticipantId, new ChatMemberStatusBanned()));
             }

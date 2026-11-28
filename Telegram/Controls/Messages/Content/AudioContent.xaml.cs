@@ -17,7 +17,7 @@ using Windows.UI.Xaml.Controls;
 namespace Telegram.Controls.Messages.Content
 {
     // TODO: turn the whole control into a Button
-    public sealed partial class AudioContent : FileButton, IContent
+    public sealed partial class AudioContent : FileButton, IContent, IContentWithWrap
     {
         private MessageViewModel _message;
         public MessageViewModel Message => _message;
@@ -41,6 +41,7 @@ namespace Telegram.Controls.Messages.Content
         private AutomaticDragHelper ButtonDrag;
 
         private FileButton Button => this;
+        private Grid Icon;
         private Grid DownloadPanel;
         private FileButton Download;
         private TextBlock Title;
@@ -52,6 +53,7 @@ namespace Telegram.Controls.Messages.Content
         {
             base.OnApplyTemplate();
 
+            Icon = GetTemplateChild(nameof(Icon)) as Grid;
             DownloadPanel = GetTemplateChild(nameof(DownloadPanel)) as Grid;
             Download = GetTemplateChild(nameof(Download)) as FileButton;
             Title = GetTemplateChild(nameof(Title)) as TextBlock;
@@ -368,13 +370,22 @@ namespace Telegram.Controls.Messages.Content
             }
         }
 
+        public float ContentEnd()
+        {
+            if (!_templateApplied)
+            {
+                return -1;
+            }
+
+            return (float)(Icon.DesiredSize.Width + Subtitle.DesiredSize.Width);
+        }
+
         public bool IsValid(MessageContent content, bool primary)
         {
             return content switch
             {
                 MessageAudio => true,
                 MessageText text when text.LinkPreview != null && !primary => text.LinkPreview.Type is LinkPreviewTypeAudio or LinkPreviewTypeEmbeddedAudioPlayer { Audio: not null },
-                MessagePoll poll when poll.Media is PollMediaAudio && !primary => true,
                 _ => false,
             };
         }
@@ -404,8 +415,6 @@ namespace Telegram.Controls.Messages.Content
 
                         break;
                     }
-                case MessagePoll poll when poll.Media is PollMediaAudio pollAudio:
-                    return pollAudio.Audio;
             }
 
             return null;

@@ -82,6 +82,11 @@
                                           Grid.Column="2" />
                 </Grid>
 
+                <controls:SettingsSuggestionCard x:Name="SuggestionCard"
+                                                 x:Load="False"
+                                                 NoClick="SuggestionCard_NoClick"
+                                                 YesClick="SuggestionCard_YesClick" />
+
                 <StackPanel x:Name="AccountsRoot">
                     <ListView x:Name="Accounts"
                               IsItemClickEnabled="True"

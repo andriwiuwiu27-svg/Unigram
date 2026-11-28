@@ -10,6 +10,7 @@ using System.Runtime.InteropServices.WindowsRuntime;
 using System.Threading.Tasks;
 using Telegram.Common;
 using Telegram.Controls;
+using Telegram.Navigation;
 using Telegram.ViewModels.Delegates;
 using Windows.Foundation;
 using Windows.UI.Xaml;
@@ -33,7 +34,7 @@ namespace Telegram.Views
 
     public record HostedPageListViewPosition(object DataContext, double ScrollPosition, string RelativeScrollPosition) : HostedPagePositionBase;
 
-    public partial class HostedPage : PageEx
+    public partial class HostedPage : NavigationPage
     {
         #region ShowHeader
 

@@ -31,7 +31,7 @@ namespace Telegram.Common
 
             while (current != null)
             {
-                if (current is ContentPopup or ModalPopup)
+                if (current is ModalPopup)
                 {
                     return true;
                 }
@@ -51,8 +51,13 @@ namespace Telegram.Common
         /// element's own space, so it turns with any render transform the element
         /// carries.
         /// </param>
+        /// <param name="mask">
+        /// The shape the shadow takes. Unless given, a rectangle casts its rounded outline and
+        /// anything else its bounds: text casts through <see cref="TextShadow"/>, and an element
+        /// is never asked for its alpha mask (see <see cref="OutlineMask"/>).
+        /// </param>
         public static SpriteVisual DropShadow(UIElement element, float radius = 20, float opacity = 0.25f,
-            UIElement target = null, Color? color = null, Vector3 offset = default)
+            UIElement target = null, Color? color = null, Vector3 offset = default, CompositionBrush mask = null)
         {
             var compositor = BootStrapper.Current.Compositor;
 
@@ -68,17 +73,13 @@ namespace Telegram.Common
             visual.Offset = new Vector3(0, 0, 0);
             visual.RelativeSizeAdjustment = Vector2.One;
 
-            switch (element)
+            if (mask != null)
             {
-                case Image image:
-                    shadow.Mask = image.GetAlphaMask();
-                    break;
-                case Shape shape:
-                    shadow.Mask = shape.GetAlphaMask();
-                    break;
-                case TextBlock textBlock:
-                    shadow.Mask = textBlock.GetAlphaMask();
-                    break;
+                shadow.Mask = mask;
+            }
+            else if (element is Rectangle rectangle)
+            {
+                shadow.Mask = OutlineMask.FromRectangle(rectangle);
             }
 
             ElementCompositionPreview.SetElementChildVisual(target ?? element, visual);
@@ -280,9 +281,7 @@ namespace Telegram.Common
             }
             catch (Exception ex)
             {
-                // Swallowing this drops the callback with no trace, and callers rely on it running:
-                // ContentPopup completes the task its ShowQueuedAsync awaits from here, so a lost
-                // subscription leaves every dialog on this view awaiting forever.
+                // Swallowing this drops the callback with no trace, and callers rely on it running.
                 Logger.Error(ex.ToString());
             }
         }

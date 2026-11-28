@@ -20,7 +20,7 @@ using Windows.UI.Xaml.Media;
 
 namespace Telegram.Views.Grams.Popups
 {
-    public sealed partial class TonReceiptPopup : ContentPopup
+    public sealed partial class TonReceiptPopup : ModalPopup
     {
         private readonly string _transactionId;
 
@@ -177,7 +177,7 @@ namespace Telegram.Views.Grams.Popups
         {
             if (string.IsNullOrEmpty(_explorerUrl))
             {
-                Hide(ContentDialogResult.Primary);
+                Hide(ModalPopupResult.Primary);
                 return;
             }
 

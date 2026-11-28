@@ -6,6 +6,7 @@
 //
 
 using Telegram.Common;
+using Telegram.Navigation.Services;
 using Telegram.Td;
 using Telegram.ViewModels.Settings;
 using Telegram.ViewModels.Settings.Privacy;
@@ -24,7 +25,7 @@ namespace Telegram.Views.Settings.Privacy
             Title = Strings.PrivacyVoiceMessages;
         }
 
-        protected override void OnNavigatedTo(NavigationEventArgs e)
+        protected override void OnNavigatedTo(NavigatedEventArgs e)
         {
             if (ViewModel.IsPremium)
             {

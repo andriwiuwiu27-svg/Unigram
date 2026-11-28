@@ -23,6 +23,18 @@ namespace Telegram.Services.Factories
 
         public static async Task<Object> CreatePhotoAsync(StoragePhoto photo, FormattedText caption, bool highQuality, bool captionAboveMedia, bool spoiler, MessageSelfDestructType ttl, long starCount, bool grouped = false)
         {
+            if (photo.OriginalFile != null && !photo.IsEdited)
+            {
+                var remote = new InputFileId(photo.OriginalFile.Id);
+
+                if (starCount > 0)
+                {
+                    return new InputPaidMedia(new InputPaidMediaTypePhoto(), remote, null, null, photo.Width, photo.Height);
+                }
+
+                return new InputMessagePhoto(new InputPhoto(remote, null, null, null, photo.Width, photo.Height), caption, captionAboveMedia, ttl, spoiler);
+            }
+
             var conversionType = ConversionType.Compress;
             var file = photo.File;
 
@@ -156,9 +168,23 @@ namespace Telegram.Services.Factories
                 videoHeight = (int)output.Height;
             }
 
-            var serialized = JsonSerializer.Serialize(generation, GenerationJsonContext.Default.VideoGeneration);
-            var generated = await GenerationService.PrepareAsync(video.File, ConversionType.Transcode, serialized);
-            var thumbnail = await GenerationService.PrepareVideoThumbnailAsync(video, generation, serialized);
+            InputFile generated;
+            InputThumbnail thumbnail = null;
+
+            var sendsAnimation = animated && ttl == null && starCount == 0;
+
+            // Only while it goes out as what it already is: a video muted, or an animation sent
+            // as a video, is a different file.
+            if (video.OriginalFile != null && !generation.Transcode && sendsAnimation == video.IsOriginalAnimation)
+            {
+                generated = new InputFileId(video.OriginalFile.Id);
+            }
+            else
+            {
+                var serialized = JsonSerializer.Serialize(generation, GenerationJsonContext.Default.VideoGeneration);
+                generated = await GenerationService.PrepareAsync(video.File, ConversionType.Transcode, serialized);
+                thumbnail = await GenerationService.PrepareVideoThumbnailAsync(video, generation, serialized);
+            }
 
             if (starCount > 0)
             {

@@ -208,15 +208,16 @@ namespace Telegram.Views.Popups
 
         private async void ToLanguage_Click(Hyperlink sender, HyperlinkClickEventArgs args)
         {
-            Hide();
-
             var popup = new TranslateToPopup();
 
-            var confirm = await popup.ShowQueuedAsync(XamlRoot);
-            if (confirm == ContentDialogResult.Primary && popup.SelectedItem != null)
+            // Not queued: this popup usually is, and the picker would wait for it to close.
+            var confirm = await popup.ShowAsync(XamlRoot);
+            if (confirm == ModalPopupResult.Primary && popup.SelectedItem != null)
             {
                 var settings = _clientService.Session.Resolve<ISettingsService>();
                 settings.Translate.To = popup.SelectedItem;
+
+                Hide();
 
                 if (_message != null)
                 {

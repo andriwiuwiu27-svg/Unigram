@@ -9,9 +9,15 @@
                 xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
                 xmlns:f="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
                 xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
-                xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities">
+                xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+                xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+                xmlns:com="http://schemas.microsoft.com/appx/manifest/com/windows10"
+                exclude-result-prefixes="f uap rescap">
 
   <xsl:output method="xml" indent="yes" />
+
+  <!-- ToastActivator's CLSID for this identity; without one the manifest declares no activator. -->
+  <xsl:param name="ToastActivatorClsid" />
 
   <xsl:template match="@*|node()">
     <xsl:copy>
@@ -25,6 +31,29 @@
     is on the list to retire here anyway (item 2.5), so it goes rather than being ported.
   -->
   <xsl:template match="uap:Extension[@Category='windows.appService']" />
+
+  <!--
+    A full trust process gets no in-process background activation, so a toast's buttons reach it
+    only through a COM activator: the shell calls the class the process registers, or starts the
+    ExeServer for it when the app is not running. Arguments is ToastActivator.CommandLineArgument.
+  -->
+  <xsl:template match="f:Application/f:Extensions">
+    <xsl:copy>
+      <xsl:apply-templates select="@*|node()" />
+      <xsl:if test="$ToastActivatorClsid != ''">
+        <desktop:Extension Category="windows.toastNotificationActivation">
+          <desktop:ToastNotificationActivation ToastActivatorCLSID="{$ToastActivatorClsid}" />
+        </desktop:Extension>
+        <com:Extension Category="windows.comServer">
+          <com:ComServer>
+            <com:ExeServer Executable="Telegram.exe" Arguments="-ToastActivated" DisplayName="Unigram">
+              <com:Class Id="{$ToastActivatorClsid}" />
+            </com:ExeServer>
+          </com:ComServer>
+        </com:Extension>
+      </xsl:if>
+    </xsl:copy>
+  </xsl:template>
 
   <!--
     The UWP app model capabilities, which mean nothing outside an AppContainer: a full trust app

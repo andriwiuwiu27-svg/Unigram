@@ -10,14 +10,6 @@
                   xmlns:drawers="using:Telegram.Controls.Drawers"
                   mc:Ignorable="d">
 
-    <Page.Transitions>
-        <TransitionCollection>
-            <NavigationThemeTransition>
-                <SlideNavigationTransitionInfo Effect="FromRight" />
-            </NavigationThemeTransition>
-        </TransitionCollection>
-    </Page.Transitions>
-
     <local:HostedPage.Action>
         <Button Content="{CustomResource Done}"
                 Click="{x:Bind ViewModel.Continue}"

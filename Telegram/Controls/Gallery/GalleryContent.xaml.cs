@@ -658,7 +658,7 @@ namespace Telegram.Controls.Gallery
                 WatchDog.TrackEvent("TextRecognizer", new Properties { { "Status", "Downloading" } });
 
                 var confirm = await viewModel.ShowPopupAsync(new TextRecognitionDownloadPopup(viewModel.ClientService, viewModel.Aggregator, downloading.Document), requestedTheme: ElementTheme.Dark);
-                if (confirm != ContentDialogResult.Primary)
+                if (confirm != ModalPopupResult.Primary)
                 {
                     return;
                 }

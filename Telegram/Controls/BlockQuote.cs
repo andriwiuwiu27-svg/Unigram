@@ -8,6 +8,8 @@
 using Telegram.Common;
 using Telegram.Controls.Media;
 using Windows.UI.Xaml;
+using Windows.UI.Xaml.Automation;
+using Windows.UI.Xaml.Automation.Peers;
 using Windows.UI.Xaml.Controls;
 
 namespace Telegram.Controls
@@ -31,11 +33,9 @@ namespace Telegram.Controls
                 Header?.Visibility = Visibility.Visible;
             }
 
-            if (ComputedIsExpandable)
+            if (IsExpandable)
             {
-                Expand = GetTemplateChild(nameof(Expand)) as HyperlinkButton;
-                Expand.Click += Expand_Click;
-                Expand?.Visibility = Visibility.Visible;
+                LoadExpand();
             }
 
             base.OnApplyTemplate();
@@ -55,13 +55,17 @@ namespace Telegram.Controls
                 newBlock.IsTextTrimmableChanged += OnIsTextTrimmableChanged;
             }
 
-            OnExpandableChanged(this, null);
+            if (IsExpandable)
+            {
+                LoadExpand();
+            }
+
             base.OnContentChanged(oldContent, newContent);
         }
 
         private void OnIsTextTrimmableChanged(object sender, System.EventArgs e)
         {
-            OnExpandableChanged(this, null);
+            UpdateExpand();
         }
 
         private void Header_Click(object sender, RoutedEventArgs e)
@@ -90,8 +94,41 @@ namespace Telegram.Controls
                     Expand.Content = Icons.ChevronUp16;
                 }
 
-                OnExpandableChanged(this, null);
+                UpdateExpand();
             }
+        }
+
+        // Loaded with the quote rather than once its content turns out to be cut short, which
+        // the content finds out in its measure: adding the button to the tree from there would
+        // invalidate the pass it is called from.
+        private void LoadExpand()
+        {
+            if (Expand == null)
+            {
+                Expand = GetTemplateChild(nameof(Expand)) as HyperlinkButton;
+                Expand?.Click += Expand_Click;
+            }
+
+            UpdateExpand();
+        }
+
+        // Called from the content's measure, so nothing that takes part in layout changes here.
+        // The button lies over the content and is shorter than a line of it, so being measured
+        // while hidden changes no size.
+        private void UpdateExpand()
+        {
+            if (Expand == null)
+            {
+                return;
+            }
+
+            var expandable = ComputedIsExpandable;
+
+            Expand.Opacity = expandable ? 1 : 0;
+            Expand.IsHitTestVisible = expandable;
+            Expand.IsTabStop = expandable;
+
+            AutomationProperties.SetAccessibilityView(Expand, expandable ? AccessibilityView.Content : AccessibilityView.Raw);
         }
 
         #region Glyph
@@ -153,17 +190,13 @@ namespace Telegram.Controls
         private static void OnExpandableChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
             var sender = d as BlockQuote;
-            if (sender?.Expand != null || sender.ComputedIsExpandable)
+            if ((bool)e.NewValue)
             {
-                if (sender.Expand == null)
-                {
-                    sender.Expand = sender.GetTemplateChild(nameof(sender.Expand)) as HyperlinkButton;
-                    sender.Expand?.Click += sender.Expand_Click;
-                }
-
-                sender.Expand?.Visibility = sender.ComputedIsExpandable
-                    ? Visibility.Visible
-                    : Visibility.Collapsed;
+                sender.LoadExpand();
+            }
+            else
+            {
+                sender.UpdateExpand();
             }
         }
 

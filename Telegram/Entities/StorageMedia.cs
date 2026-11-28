@@ -57,6 +57,12 @@ namespace Telegram.Entities
 
         public bool IsScreenshot { get; set; }
 
+        /// <summary>
+        /// The Telegram file this media was read from, which is sent by its identifier for as long
+        /// as nothing would change it.
+        /// </summary>
+        public File OriginalFile { get; set; }
+
         public virtual int Width { get; }
         public virtual int Height { get; }
 
@@ -194,12 +200,15 @@ namespace Telegram.Entities
         /// </summary>
         public static async Task<IReadOnlyList<FileItem>> GetFilesAsync(DataPackageView package)
         {
-            var items = await package.GetStorageItemsAsync();
+            var items = await package.GetStorageItemsAsync().ToFileSystemItemsAsync();
             var files = new List<FileItem>(items.Count);
 
-            foreach (StorageFile file in items.OfType<StorageFile>())
+            foreach (var item in items)
             {
-                files.Add(file.ToFileItem());
+                if (item is FileItem file)
+                {
+                    files.Add(file);
+                }
             }
 
             return files;

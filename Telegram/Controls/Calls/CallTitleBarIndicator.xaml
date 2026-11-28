@@ -1,0 +1,164 @@
+﻿<controls:UserControlEx x:Class="Telegram.Controls.Calls.CallTitleBarIndicator"
+                        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                        xmlns:controls="using:Telegram.Controls"
+                        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+                        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+                        mc:Ignorable="d"
+                        VerticalAlignment="Center"
+                        d:DesignHeight="24"
+                        d:DesignWidth="160">
+
+    <UserControl.Resources>
+        <!-- The call colours, a quarter of the way along each lens gradient. Fixed on every
+             theme, as the gradients are. -->
+        <SolidColorBrush x:Key="CallTitleBarUnmutedBrush"
+                         Color="#26BC71" />
+        <SolidColorBrush x:Key="CallTitleBarMutedBrush"
+                         Color="#008BFF" />
+        <SolidColorBrush x:Key="CallTitleBarCantSpeakBrush"
+                         Color="#614ECE" />
+        <SolidColorBrush x:Key="CallTitleBarLateBrush"
+                         Color="#BB5298" />
+
+        <Style x:Key="CallTitleBarButtonStyle"
+               TargetType="HyperlinkButton">
+            <Setter Property="Background"
+                    Value="Transparent" />
+            <Setter Property="Padding"
+                    Value="0" />
+            <Setter Property="CornerRadius"
+                    Value="12" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="HyperlinkButton">
+                        <Grid x:Name="RootGrid"
+                              Background="{TemplateBinding Background}"
+                              CornerRadius="{TemplateBinding CornerRadius}">
+                            <VisualStateManager.VisualStateGroups>
+                                <VisualStateGroup x:Name="CommonStates">
+                                    <VisualState x:Name="Normal" />
+                                    <VisualState x:Name="PointerOver">
+                                        <VisualState.Setters>
+                                            <Setter Target="RootGrid.Background"
+                                                    Value="{ThemeResource SubtleFillColorSecondaryBrush}" />
+                                        </VisualState.Setters>
+                                    </VisualState>
+                                    <VisualState x:Name="Pressed">
+                                        <VisualState.Setters>
+                                            <Setter Target="RootGrid.Background"
+                                                    Value="{ThemeResource SubtleFillColorTertiaryBrush}" />
+                                        </VisualState.Setters>
+                                    </VisualState>
+                                    <VisualState x:Name="Disabled" />
+                                </VisualStateGroup>
+                            </VisualStateManager.VisualStateGroups>
+                            <ContentPresenter Content="{TemplateBinding Content}"
+                                              Padding="{TemplateBinding Padding}" />
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+
+        <VisualStateManager.VisualStateGroups>
+            <VisualStateGroup x:Name="CallStates">
+                <VisualState x:Name="Unmuted" />
+                <VisualState x:Name="Muted">
+                    <VisualState.Setters>
+                        <Setter Target="Tint.Background"
+                                Value="{StaticResource CallTitleBarMutedBrush}" />
+                    </VisualState.Setters>
+                </VisualState>
+                <VisualState x:Name="CantSpeak">
+                    <VisualState.Setters>
+                        <Setter Target="Tint.Background"
+                                Value="{StaticResource CallTitleBarCantSpeakBrush}" />
+                    </VisualState.Setters>
+                </VisualState>
+                <VisualState x:Name="Late">
+                    <VisualState.Setters>
+                        <Setter Target="Tint.Background"
+                                Value="{StaticResource CallTitleBarLateBrush}" />
+                    </VisualState.Setters>
+                </VisualState>
+                <!-- The muted badge grey is too faint for the lens, so the lens takes NeutralInk
+                     and the grey stays in the fill. -->
+                <VisualState x:Name="Connecting">
+                    <VisualState.Setters>
+                        <Setter Target="Tint.Background"
+                                Value="{ThemeResource ChatUnreadBadgeMutedBrush}" />
+                        <Setter Target="Tint.Opacity"
+                                Value="0.35" />
+                    </VisualState.Setters>
+                </VisualState>
+            </VisualStateGroup>
+        </VisualStateManager.VisualStateGroups>
+
+        <!-- Never shown: it carries the theme colour the lens takes while the call connects. -->
+        <Border x:Name="NeutralInk"
+                Background="{ThemeResource TextFillColorSecondaryBrush}"
+                Visibility="Collapsed" />
+
+        <Border x:Name="Tint"
+                Background="{StaticResource CallTitleBarUnmutedBrush}"
+                Opacity="0.12"
+                CornerRadius="12"
+                Grid.ColumnSpan="2" />
+
+        <HyperlinkButton x:Name="Root"
+                         Click="Root_Click"
+                         Style="{StaticResource CallTitleBarButtonStyle}"
+                         Height="24"
+                         Margin="0,0,-4,0">
+            <StackPanel Orientation="Horizontal"
+                        Padding="8,0,8,0">
+                <Border x:Name="Lens"
+                        Width="28"
+                        Height="16"
+                        VerticalAlignment="Center"
+                        Margin="0,0,8,0" />
+                <TextBlock x:Name="TitleLabel"
+                           Foreground="{ThemeResource TextFillColorPrimaryBrush}"
+                           Style="{StaticResource CaptionTextBlockStyle}"
+                           TextWrapping="NoWrap"
+                           TextTrimming="CharacterEllipsis"
+                           VerticalAlignment="Center"
+                           MaxWidth="140" />
+                <!-- Spaced by margins: a TextBlock drops the spaces around a lone separator. -->
+                <TextBlock x:Name="Separator"
+                           Text="&#x2022;"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                           Style="{StaticResource CaptionTextBlockStyle}"
+                           VerticalAlignment="Center"
+                           Margin="4,0" />
+                <TextBlock x:Name="StatusLabel"
+                           Foreground="{ThemeResource TextFillColorPrimaryBrush}"
+                           Style="{StaticResource CaptionTextBlockStyle}"
+                           Typography.NumeralAlignment="Tabular"
+                           TextWrapping="NoWrap"
+                           VerticalAlignment="Center" />
+            </StackPanel>
+        </HyperlinkButton>
+
+        <controls:AnimatedGlyphToggleButton x:Name="Audio"
+                                            Click="Audio_Click"
+                                            Glyph="&#xEA98;"
+                                            CheckedGlyph="&#xEA9A;"
+                                            IsOneWay="True"
+                                            FontSize="16"
+                                            CornerRadius="12"
+                                            VerticalAlignment="Center"
+                                            Width="24"
+                                            Height="24"
+                                            Padding="0"
+                                            Grid.Column="1" />
+    </Grid>
+</controls:UserControlEx>

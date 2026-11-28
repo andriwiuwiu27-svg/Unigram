@@ -48,10 +48,10 @@ namespace Telegram.Views.Host
             var aggregator = navigationService.Session.Resolve<IEventAggregator>();
 
             MasterDetail.Initialize(navigationService as NavigationService, null, new StandaloneViewModel(_clientService, settingsService, aggregator), false);
-            MasterDetail.NavigationService.FrameFacade.Navigating += OnNavigating;
-            MasterDetail.NavigationService.FrameFacade.ShortcutInvoked += OnShortcutInvoked;
+            MasterDetail.NavigationService.Navigated += OnNavigated;
+            MasterDetail.NavigationService.ShortcutInvoked += OnShortcutInvoked;
 
-            OnNavigating(null, new NavigatingEventArgs(null, null, null, null)
+            OnNavigated(null, new NavigatedEventArgs
             {
                 SourcePageType = MasterDetail.NavigationService.CurrentPageType
             });
@@ -61,7 +61,8 @@ namespace Telegram.Views.Host
 
         protected override UIElement TitleBarElement => TitleBarHandle;
 
-        private void OnNavigating(object sender, NavigatingEventArgs e)
+        // On Navigated, once the page's transition has started: the background follows it.
+        private void OnNavigated(object sender, NavigatedEventArgs e)
         {
             var allowed = e.SourcePageType == typeof(ChatPage) ||
                 e.SourcePageType == typeof(ChatPinnedPage) ||
@@ -97,8 +98,8 @@ namespace Telegram.Views.Host
 
         protected override void OnWindowClosed()
         {
-            MasterDetail.NavigationService.FrameFacade.Navigating -= OnNavigating;
-            MasterDetail.NavigationService.FrameFacade.ShortcutInvoked -= OnShortcutInvoked;
+            MasterDetail.NavigationService.Navigated -= OnNavigated;
+            MasterDetail.NavigationService.ShortcutInvoked -= OnShortcutInvoked;
             MasterDetail.Dispose();
 
             base.OnWindowClosed();
@@ -137,7 +138,7 @@ namespace Telegram.Views.Host
         {
             if (command == ShortcutCommand.Search)
             {
-                if (_navigationService.Frame.Content is ISearchablePage child)
+                if (_navigationService.Content is ISearchablePage child)
                 {
                     child.Search();
                 }

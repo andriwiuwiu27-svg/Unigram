@@ -8,6 +8,7 @@
 using System.Collections.Generic;
 using Telegram.Common;
 using Telegram.Controls;
+using Telegram.Navigation.Services;
 using Telegram.Streams;
 using Telegram.ViewModels.Authorization;
 using Windows.UI.Xaml;
@@ -36,13 +37,13 @@ namespace Telegram.Views.Authorization
             Header.Play();
         }
 
-        protected override void OnNavigatedTo(NavigationEventArgs e)
+        protected override void OnNavigatedTo(NavigatedEventArgs e)
         {
             ViewModel.Window.SetTitleBar(TitleBar);
             ViewModel.PropertyChanged += OnPropertyChanged;
         }
 
-        protected override void OnNavigatedFrom(NavigationEventArgs e)
+        protected override void OnNavigatedFrom(NavigatedEventArgs e)
         {
             ViewModel.Window.SetTitleBar(null);
             ViewModel.PropertyChanged -= OnPropertyChanged;

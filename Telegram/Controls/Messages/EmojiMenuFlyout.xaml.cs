@@ -607,7 +607,7 @@ namespace Telegram.Controls.Messages
             var popup = new ChooseStatusDurationPopup();
 
             var confirm = await popup.ShowQueuedAsync(XamlRoot);
-            if (confirm == ContentDialogResult.Primary && _mode == EmojiDrawerMode.EmojiStatus)
+            if (confirm == ModalPopupResult.Primary && _mode == EmojiDrawerMode.EmojiStatus)
             {
                 _clientService.Send(new SetEmojiStatus(new EmojiStatus(sticker.EmojiStatusType, DateTime.Now.ToUnixTimeSeconds() + popup.Value)));
             }
@@ -670,7 +670,7 @@ namespace Telegram.Controls.Messages
                     var popup = new ReactPopup(message.ClientService, message);
 
                     var confirm = await popup.ShowQueuedAsync(XamlRoot);
-                    if (confirm != ContentDialogResult.Primary)
+                    if (confirm != ModalPopupResult.Primary)
                     {
                         return;
                     }

@@ -16,6 +16,12 @@ namespace Telegram.Native.Calls
         Boolean IsConference;
         Boolean IsNoiseSuppressionEnabled;
 
+        // GroupInstanceReferenceImpl, the PeerConnection engine, instead of GroupInstanceCustomImpl.
+        Boolean IsReferenceImpl;
+
+        // An RTMP stream: no engine, nothing sent, only the stream played.
+        Boolean IsStream;
+
         Int64 AudioProcessId;
     }
 }

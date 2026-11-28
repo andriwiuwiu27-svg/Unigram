@@ -77,7 +77,7 @@ namespace Telegram.Views.Gifts.Popups
         public GiftForResaleOrder Order => _order;
     }
 
-    public sealed partial class GiftCraftChoosePopup : ContentPopup, IResoldGiftsPopup
+    public sealed partial class GiftCraftChoosePopup : ModalPopup, IResoldGiftsPopup
     {
         private readonly IClientService _clientService;
         private readonly INavigationService _navigationService;
@@ -111,7 +111,7 @@ namespace Telegram.Views.Gifts.Popups
             Title = upgraded.Gift.Title;
             //Subtitle.Text = Locale.Declension(Strings.R.Gift2ResaleCount, valueInfo.TelegramListedGiftCount);
 
-            _gifts = new ResoldGiftsCollection(clientService, this, upgraded.Gift.RegularGiftId);
+            _gifts = new ResoldGiftsCollection(clientService, this, upgraded.Gift.RegularGiftId, GiftResaleCurrencies.ForCrafting());
             ScrollingHost.ItemsSource = _gifts;
 
             ScrollingHost2.ItemsSource = new GiftsForCraftingCollection(clientService, upgraded.Gift.RegularGiftId, crafting);
@@ -134,7 +134,7 @@ namespace Telegram.Views.Gifts.Popups
 
         public ReceivedGift SelectedGift { get; private set; }
 
-        private void OnOpened(ContentDialog sender, ContentDialogOpenedEventArgs args)
+        private void OnOpened(ModalPopup sender, ModalPopupOpenedEventArgs args)
         {
             ShowHideSkeleton();
         }
@@ -205,63 +205,37 @@ namespace Telegram.Views.Gifts.Popups
             {
                 var chat = await _clientService.GetChatFromMessageSenderAsync(null);
 
-                var confirm = await _navigationService.ShowPopupAsync(new TransferGiftPopup(_clientService, giftForResale, chat));
-                if (confirm == ContentDialogResult.Primary)
+                var response = await TransferGiftPopup.BuyAsync(_clientService, _navigationService, giftForResale.Gift, chat, _clientService.MyId, string.Empty.AsFormattedText(), false);
+                if (response is GiftResaleResultOk ok)
                 {
-                    GiftResalePrice price;
-                    if (giftForResale.Gift.ResaleParameters.GramOnly)
-                    {
-                        price = new GiftResalePriceGram(giftForResale.Gift.ResaleParameters.GramCentCount);
-                    }
-                    else
-                    {
-                        price = new GiftResalePriceStar(giftForResale.Gift.ResaleParameters.StarCount);
-                    }
+                    //_aggregator.Publish(new UpdateGiftIsSold(_gift.ReceivedGiftId));
+                    SelectedGift = new ReceivedGift(ok.ReceivedGiftId, null, null, 0, false, false, false, false, false, false, false, 0, new SentGiftUpgraded(giftForResale.Gift), Array.Empty<int>(), 0, 0, false, 0, 0, 0, 0, 0, string.Empty, 0); ;
+                    Hide(ModalPopupResult.Primary);
 
-                    // TODO: text, isPrivate
-                    var response = await _clientService.SendPaymentAsync(giftForResale.Gift.ResaleParameters.StarCount, new SendResoldGift(giftForResale.Gift.Name, _clientService.MyId, price, string.Empty.AsFormattedText(), false));
-                    if (response is GiftResaleResultOk ok)
-                    {
-                        //_aggregator.Publish(new UpdateGiftIsSold(_gift.ReceivedGiftId));
-                        SelectedGift = new ReceivedGift(ok.ReceivedGiftId, null, null, 0, false, false, false, false, false, false, false, 0, new SentGiftUpgraded(giftForResale.Gift), Array.Empty<int>(), 0, 0, false, 0, 0, 0, 0, 0, string.Empty, 0); ;
-                        Hide(ContentDialogResult.Primary);
-
-                        //if (chat != null)
-                        //{
-                        //    _navigationService.NavigateToChat(chat.Id);
-                        //    ToastPopup.Show(XamlRoot, string.Format("**{0}**\n{1}", Strings.BoughtResoldGiftToTitle, string.Format(Strings.BoughtResoldGiftToText, chat.Title)), new DelayedFileSource(_clientService, upgraded.Gift.Model.Sticker));
-                        //}
-                        //else
-                        //{
-                        //    ToastPopup.Show(XamlRoot, string.Format("**{0}**\n{1}", Strings.BoughtResoldGiftTitle, string.Format(Strings.BoughtResoldGiftText, upgraded.Gift.ToName())), new DelayedFileSource(_clientService, upgraded.Gift.Model.Sticker));
-                        //}
-                    }
-                    else if (response is Error error)
-                    {
-                        ToastPopup.ShowError(XamlRoot, error);
-                    }
-                    else if (response is ErrorStarsNeeded)
-                    {
-                        Hide();
-                        await _navigationService.ShowPopupAsync(new BuyPopup(), BuyStarsArgs.ForChannel(giftForResale.Gift.ResaleParameters.StarCount, 0));
-                    }
+                    //if (chat != null)
+                    //{
+                    //    _navigationService.NavigateToChat(chat.Id);
+                    //    ToastPopup.Show(XamlRoot, string.Format("**{0}**\n{1}", Strings.BoughtResoldGiftToTitle, string.Format(Strings.BoughtResoldGiftToText, chat.Title)), new DelayedFileSource(_clientService, upgraded.Gift.Model.Sticker));
+                    //}
+                    //else
+                    //{
+                    //    ToastPopup.Show(XamlRoot, string.Format("**{0}**\n{1}", Strings.BoughtResoldGiftTitle, string.Format(Strings.BoughtResoldGiftText, upgraded.Gift.ToName())), new DelayedFileSource(_clientService, upgraded.Gift.Model.Sticker));
+                    //}
                 }
-
-                //Hide(ContentDialogResult.Primary);
-
-                //var receivedGift = new ReceivedGift(giftForResale.ReceivedGiftId, null, null, 0, false, false, false, false, false, false, 0, new SentGiftUpgraded(giftForResale.Gift), Array.Empty<int>(), 0, 0, false, 0, 0, 0, 0, 0, string.Empty, 0);
-
-                //var confirm = await _navigationService.ShowPopupAsync(new ReceivedGiftPopup(_clientService, _navigationService, receivedGift, giftForResale.Gift.OwnerId, _receiverId));
-                //if (confirm == ContentDialogResult.Primary && _receiverId == null)
-                //{
-                //    _gifts.Remove(giftForResale);
-                //    await this.ShowQueuedAsync(XamlRoot);
-                //}
+                else if (response is Error error)
+                {
+                    ToastPopup.ShowError(XamlRoot, error);
+                }
+                else if (response is ErrorStarsNeeded)
+                {
+                    Hide();
+                    await _navigationService.ShowPopupAsync(new BuyPopup(), BuyStarsArgs.ForChannel(giftForResale.Gift.ResaleParameters.StarCount, 0));
+                }
             }
             else if (e.ClickedItem is ReceivedGift receivedGift)
             {
                 SelectedGift = receivedGift;
-                Hide(ContentDialogResult.Primary);
+                Hide(ModalPopupResult.Primary);
             }
         }
 
@@ -337,7 +311,7 @@ namespace Telegram.Views.Gifts.Popups
 
         public void UpdateItems(GiftForResaleOrder order, Vector<UpgradedGiftAttributeId> attributes)
         {
-            _gifts = new ResoldGiftsCollection(_clientService, this, _giftId, order, attributes);
+            _gifts = new ResoldGiftsCollection(_clientService, this, _giftId, order, attributes, GiftResaleCurrencies.ForCrafting());
             ScrollingHost.ItemsSource = _gifts;
             ShowHideSkeleton();
         }

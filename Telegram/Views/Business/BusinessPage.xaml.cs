@@ -9,6 +9,8 @@ using Telegram.Common;
 using Telegram.Controls;
 using Telegram.Controls.Media;
 using Telegram.Converters;
+using Telegram.Navigation;
+using Telegram.Navigation.Services;
 using Telegram.Td.Api;
 using Telegram.ViewModels.Business;
 using Telegram.Views.Premium.Popups;
@@ -26,12 +28,13 @@ namespace Telegram.Views.Business
         public BusinessPage()
         {
             InitializeComponent();
+            Transition = PageTransition.Entrance;
             Title = Strings.TelegramBusiness;
 
             TextBlockHelper.SetMarkdown(Headline, Strings.TelegramBusinessSubtitle);
         }
 
-        protected override void OnNavigatedTo(NavigationEventArgs e)
+        protected override void OnNavigatedTo(NavigatedEventArgs e)
         {
             TextBlockHelper.SetMarkdown(Headline, ViewModel.IsPremium
                 ? Strings.TelegramBusinessSubscribedSubtitleTemp

@@ -19,6 +19,7 @@ using Telegram.Common;
 using Telegram.Controls.Cells;
 using Telegram.Controls.Media;
 using Telegram.Controls.Messages;
+using Telegram.Controls.Messages.Service;
 using Telegram.Controls.Stories.Widgets;
 using Telegram.Converters;
 using Telegram.Native;
@@ -81,14 +82,30 @@ namespace Telegram.Controls.Stories
 
             _messagesVisual = CompositionDevice.GetElementLayerVisual(MessagesHost);
 
+            // Handled ones too: a press on a link or on selectable text is handled by the text
+            // before it gets here, and every press still has to stop short of ActiveRoot.
+            CaptionPanel.AddHandler(PointerPressedEvent, new PointerEventHandler(CaptionPanel_PointerPressed), true);
+            ElementComposition.GetElementVisual(CaptionOverlay).Opacity = 0;
+
             SizeChanged += OnSizeChanged;
             Disconnected += OnUnloaded;
         }
 
         private void OnTick(object sender, EventArgs e)
         {
+            if (IsLooping)
+            {
+                _timer.Start();
+                Progress.Restart();
+                return;
+            }
+
             Completed?.Invoke(this, EventArgs.Empty);
         }
+
+        // A story still being posted or edited, or whose post failed, plays again rather than
+        // moving on, so that its state stays on screen until it settles.
+        private bool IsLooping => _viewModel?.SelectedItem is { IsBeingPosted: true } or { IsBeingEdited: true } or { IsPostFailed: true };
 
         public event EventHandler<StoryEventArgs> MoreClick;
 
@@ -105,10 +122,14 @@ namespace Telegram.Controls.Stories
                 _player.VideoOut -= OnVout;
                 _player.Buffering -= OnBuffering;
                 _player.EndReached -= OnEndReached;
+                _player.PositionChanged -= OnPositionChanged;
                 _player.Close();
             }
 
             DiscardGroupCall();
+
+            _captionSelection?.Detach();
+            _captionSelection = null;
         }
 
         private void DiscardGroupCall()
@@ -136,14 +157,21 @@ namespace Telegram.Controls.Stories
 
         private void CollapseCaption()
         {
-            Overflow.MaxLines = 1;
-            ShowMore.Visibility = Overflow.MaxLines == 1 && Caption.HasOverflowContent
-                ? Visibility.Visible
-                : Visibility.Collapsed;
+            _captionExpanded = false;
+            _captionAnimate = false;
+            _state &= ~StoryPauseSource.Caption;
 
-            Grid.SetRow(CaptionExpand, 1);
+            CaptionScroll.Visibility = Visibility.Collapsed;
+            CaptionCollapsed.IsHitTestVisible = true;
+            CaptionOverlay.IsHitTestVisible = false;
 
-            CaptionOverlay.Visibility = Visibility.Collapsed;
+            var collapsed = ElementComposition.GetElementVisual(CaptionCollapsed);
+            collapsed.StopAnimation("Opacity");
+            collapsed.Opacity = 1;
+
+            var overlay = ElementComposition.GetElementVisual(CaptionOverlay);
+            overlay.StopAnimation("Opacity");
+            overlay.Opacity = 0;
         }
 
         private void OnSizeChanged(object sender, SizeChangedEventArgs e)
@@ -160,6 +188,11 @@ namespace Telegram.Controls.Stories
             if (_loading)
             {
                 ShowSkeleton();
+            }
+
+            if (_captionExpanded)
+            {
+                UpdateCaptionMaxHeight();
             }
 
             UpdateAreas();
@@ -360,6 +393,9 @@ namespace Telegram.Controls.Stories
 
         private void UpdateSubtitle(StoryViewModel story)
         {
+            SourceButton.Visibility = Visibility.Collapsed;
+            Subtitle.Visibility = Visibility.Visible;
+
             if (story.Content is StoryContentLive live && story.ClientService.TryGetGroupCall(live.GroupCallId, out GroupCall groupCall))
             {
                 LiveBadge.Visibility = Visibility.Visible;
@@ -375,13 +411,167 @@ namespace Telegram.Controls.Stories
                 LiveBadge.Visibility = Visibility.Collapsed;
                 Subtitle.Text = Strings.UploadingStory;
             }
+            else if (story.Date == 0)
+            {
+                LiveBadge.Visibility = Visibility.Collapsed;
+                Subtitle.Text = string.Format("{0}/{1}", 1 + ViewModel.Items.IndexOf(story), ViewModel.Items.Count);
+            }
+            else if (UpdateSource(story))
+            {
+                LiveBadge.Visibility = Visibility.Collapsed;
+            }
             else
             {
                 LiveBadge.Visibility = Visibility.Collapsed;
-                Subtitle.Text = story.Date != 0
-                    ? Locale.FormatRelativeShort(story.Date)
-                    : string.Format("{0}/{1}", 1 + ViewModel.Items.IndexOf(story), ViewModel.Items.Count);
+                Subtitle.Text = story.IsEdited
+                    ? Locale.FormatRelativeShort(story.Date) + " · " + Strings.EditedMessage
+                    : Locale.FormatRelativeShort(story.Date);
             }
+
+            PinnedIcon.Visibility = ViewModel.IsPinned?.Invoke(story) == true
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+
+            if (ViewModel.TotalCount != null)
+            {
+                Position.Text = string.Format("{0}/{1}", 1 + ViewModel.Items.IndexOf(story), ViewModel.TotalCount());
+                Position.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                Position.Visibility = Visibility.Collapsed;
+            }
+        }
+
+        // Where the story came from takes the date's place under the poster's name: the story
+        // it reposts, the channel post it shares, or, in a group, the member who posted it.
+        private bool UpdateSource(StoryViewModel story)
+        {
+            var clientService = story.ClientService;
+            var repost = true;
+
+            string name = null;
+            ProfilePictureSource photo = null;
+
+            if (story.RepostInfo?.Origin is StoryOriginPublicStory publicStory)
+            {
+                if (clientService.TryGetChat(publicStory.ChatId, out Chat chat))
+                {
+                    name = clientService.GetTitle(chat);
+                    photo = ProfilePictureSource.Chat(clientService, chat);
+                }
+                else
+                {
+                    name = string.Empty;
+                }
+            }
+            else if (story.RepostInfo?.Origin is StoryOriginHiddenUser hiddenUser)
+            {
+                name = hiddenUser.PosterName;
+            }
+            else if (TryGetPostArea(story, out Chat postChat, out _))
+            {
+                name = clientService.GetTitle(postChat);
+                photo = ProfilePictureSource.Chat(clientService, postChat);
+            }
+            else if (story.PosterId != null && story.Chat?.Type is ChatTypeSupergroup { IsChannel: false })
+            {
+                repost = false;
+                name = clientService.GetTitle(story.PosterId);
+                photo = ProfilePictureSource.MessageSender(clientService, story.PosterId);
+            }
+
+            if (name == null)
+            {
+                return false;
+            }
+
+            SourceIcon.Visibility = repost
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+
+            SourcePhoto.Visibility = photo != null
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+
+            SourcePhoto.Source = photo;
+            SourceText.Text = name + " · " + Locale.FormatRelativeShort(story.Date);
+
+            SourceButton.Visibility = Visibility.Visible;
+            Subtitle.Visibility = Visibility.Collapsed;
+            return true;
+        }
+
+        // A story that shares a channel post carries it as an area; only one whose chat is known counts.
+        private static bool TryGetPostArea(StoryViewModel story, out Chat chat, out StoryAreaTypeMessage post)
+        {
+            post = null;
+
+            if (story.Areas != null)
+            {
+                foreach (var area in story.Areas)
+                {
+                    if (area.Type is StoryAreaTypeMessage typeMessage)
+                    {
+                        post = typeMessage;
+                    }
+                }
+            }
+
+            chat = null;
+            return post != null && story.ClientService.TryGetChat(post.ChatId, out chat);
+        }
+
+        private void Source_Click(object sender, RoutedEventArgs e)
+        {
+            var story = _viewModel?.SelectedItem;
+            if (story == null)
+            {
+                return;
+            }
+
+            if (story.RepostInfo?.Origin is StoryOriginPublicStory publicStory)
+            {
+                OpenSender(new MessageSenderChat(publicStory.ChatId));
+            }
+            else if (story.RepostInfo?.Origin is StoryOriginHiddenUser)
+            {
+                ShowHiddenAccount(SourceButton, ToastPlacementMode.BottomLeft);
+            }
+            else if (TryGetPostArea(story, out _, out StoryAreaTypeMessage post))
+            {
+                OpenPost(post);
+            }
+            else if (story.PosterId != null)
+            {
+                OpenSender(story.PosterId);
+            }
+        }
+
+        private void OpenSender(MessageSender sender)
+        {
+            var parent = this.GetParent<StoriesWindow>();
+            if (parent != null)
+            {
+                parent.TryHide(ModalPopupResult.Primary);
+                ViewModel.NavigationService.NavigateToSender(sender);
+            }
+        }
+
+        private void OpenPost(StoryAreaTypeMessage post)
+        {
+            var parent = this.GetParent<StoriesWindow>();
+            if (parent != null)
+            {
+                parent.TryHide(ModalPopupResult.Primary);
+                ViewModel.NavigationService.NavigateToChat(post.ChatId, message: post.MessageId);
+            }
+        }
+
+        private void ShowHiddenAccount(FrameworkElement element, ToastPlacementMode placement)
+        {
+            var window = element.GetParent<StoriesWindow>();
+            window?.ShowToast(element, Strings.StoryHidAccount, placement);
         }
 
         private void Update(StoryViewModel story)
@@ -444,17 +634,54 @@ namespace Telegram.Controls.Stories
                 Mute.Visibility = Visibility.Collapsed;
                 MutePlaceholder.Visibility = Visibility.Collapsed;
             }
+            else if (story.Content is StoryContentUnsupported)
+            {
+                UpdateUnsupported(story);
 
-            if (string.IsNullOrEmpty(story.Caption?.Text))
-            {
-                CaptionRoot.Visibility = Visibility.Collapsed;
-                Caption.Clear();
+                Mute.Visibility = Visibility.Collapsed;
+                MutePlaceholder.Visibility = Visibility.Collapsed;
             }
-            else
+
+            if (story.Content is StoryContentUnsupported)
             {
+                FindName(nameof(UnsupportedPanel));
+                UnsupportedPanel.Visibility = Visibility.Visible;
+            }
+            else if (UnsupportedPanel != null)
+            {
+                UnsupportedPanel.Visibility = Visibility.Collapsed;
+            }
+
+            var empty = string.IsNullOrEmpty(story.Caption?.Text);
+            var repost = UpdateRepostPanel(story, empty);
+
+            if (empty)
+            {
+                CaptionRoot.Visibility = repost
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
+
+                Caption.Clear();
+                CaptionCollapsed.Clear();
+
+                _captionSource = null;
+                _captionText = null;
+                _captionTrimmed = false;
+            }
+            else if (story.Caption != _captionSource)
+            {
+                _captionSource = story.Caption;
+                _captionText = TextStyleRun.GetText(story.Caption);
+                _captionClientService = story.ClientService;
+                _captionWidth = 0;
+
                 CaptionRoot.Visibility = Visibility.Visible;
-                Caption.SetText(story.ClientService, story.Caption);
-                Overflow.LayoutUpdated += Overflow_LayoutUpdated;
+                Caption.SetText(story.ClientService, _captionText);
+
+                // Before the panel has a width there is nothing to cut against, and the
+                // previous story's caption must not show meanwhile: the first SizeChanged cuts it.
+                CaptionCollapsed.Clear();
+                UpdateCollapsedCaption(CaptionPanel.ActualWidth - CaptionPanel.Padding.Left - CaptionPanel.Padding.Right);
             }
 
             UpdateAreas();
@@ -491,7 +718,7 @@ namespace Telegram.Controls.Stories
                         Style = Resources["SuggestedReactionButtonStyle"] as Style
                     };
 
-                    LoadButton(story, button, suggestedReaction);
+                    button.SetSuggestedReaction(story, suggestedReaction.ReactionType);
 
                     widget.Child = new Viewbox
                     {
@@ -540,37 +767,22 @@ namespace Telegram.Controls.Stories
             }
         }
 
-        private async void LoadButton(StoryViewModel story, StoryReactionButton button, StoryAreaTypeSuggestedReaction suggestedReaction)
+        /// <summary>
+        /// Redraws the suggested reactions of the story shown, in place, so that an effect playing
+        /// on one carries on.
+        /// </summary>
+        public void UpdateSuggestedReactions(StoryViewModel story)
         {
-            var reactionType = suggestedReaction.ReactionType;
-            if (reactionType is ReactionTypeEmoji emoji)
+            if (story != _viewModel?.SelectedItem)
             {
-                if (story.ClientService.TryGetCachedReaction(emoji.Emoji, out EmojiReaction reaction))
-                {
-                    button.SetReaction(story, reactionType, reaction, null);
-                }
-                else
-                {
-                    var response = await story.ClientService.SendAsync(new GetEmojiReaction(emoji.Emoji));
-                    if (response is EmojiReaction reaction2)
-                    {
-                        button.SetReaction(story, reactionType, reaction2, null);
-                    }
-                }
+                return;
             }
-            else if (reactionType is ReactionTypeCustomEmoji customEmoji)
+
+            foreach (var element in AreasPanel.Children)
             {
-                if (EmojiCache.TryGet(customEmoji.CustomEmojiId, out Sticker sticker))
+                if (element is StoryReactionWidget widget && widget.Child is Viewbox { Child: StoryReactionButton button } && widget.Tag is StoryArea { Type: StoryAreaTypeSuggestedReaction suggestedReaction })
                 {
-                    button.SetReaction(story, reactionType, sticker, null);
-                }
-                else
-                {
-                    var response = await EmojiCache.GetAsync(story.ClientService, customEmoji.CustomEmojiId);
-                    if (response is Sticker sticker2)
-                    {
-                        button.SetReaction(story, reactionType, sticker2, null);
-                    }
+                    button.SetSuggestedReaction(story, suggestedReaction.ReactionType);
                 }
             }
         }
@@ -593,7 +805,7 @@ namespace Telegram.Controls.Stories
                     var window = element.GetParent<StoriesWindow>();
                     var result = await window?.ShowActionAsync(target, text, ToastPlacementMode.Top);
 
-                    if (result == ContentDialogResult.Primary)
+                    if (result == ModalPopupResult.Primary)
                     {
                         try
                         {
@@ -624,7 +836,7 @@ namespace Telegram.Controls.Stories
                     var window = element.GetParent<StoriesWindow>();
                     var result = await window?.ShowActionAsync(target, text, ToastPlacementMode.Top);
 
-                    if (result == ContentDialogResult.Primary)
+                    if (result == ModalPopupResult.Primary)
                     {
                         ViewModel.NavigationService.NavigateToChat(typeMessage.ChatId, message: typeMessage.MessageId);
                     }
@@ -649,7 +861,7 @@ namespace Telegram.Controls.Stories
                     var window = element.GetParent<StoriesWindow>();
                     var result = await window?.ShowActionAsync(target, text, ToastPlacementMode.Top);
 
-                    if (result == ContentDialogResult.Primary)
+                    if (result == ModalPopupResult.Primary)
                     {
                         MessageHelper.OpenUrl(ViewModel.ClientService, ViewModel.NavigationService, typeLink.Url);
                     }
@@ -666,7 +878,7 @@ namespace Telegram.Controls.Stories
                     var window = element.GetParent<StoriesWindow>();
                     var result = await window?.ShowActionAsync(target, text, ToastPlacementMode.Top);
 
-                    if (result == ContentDialogResult.Primary)
+                    if (result == ModalPopupResult.Primary)
                     {
                         MessageHelper.OpenTelegramUrl(ViewModel.ClientService, ViewModel.NavigationService, new InternalLinkTypeUpgradedGift(typeUpgradedGift.GiftName));
                     }
@@ -767,11 +979,16 @@ namespace Telegram.Controls.Stories
             CollapseCaption();
             DiscardGroupCall();
 
+            _buffering = false;
+
             if (story.Content is StoryContentVideo videoContent && !_unloaded)
             {
                 var video = SelectVideoFile(videoContent);
 
-                Progress.Update(_viewModel.Items.IndexOf(_viewModel.SelectedItem), _viewModel.Items.Count, video.Duration);
+                _progressStarted = false;
+
+                UpdateProgress(video.Duration);
+                Progress.Suspend();
                 Play(video);
 
                 MessagesRoot.Visibility = Visibility.Collapsed;
@@ -818,10 +1035,40 @@ namespace Telegram.Controls.Stories
             {
                 _timer.Stop();
                 _timer.Start();
-                Progress.Update(_viewModel.Items.IndexOf(_viewModel.SelectedItem), _viewModel.Items.Count, 5);
+                UpdateProgress(StoryContentPhotoTimer.Duration);
 
                 MessagesRoot.Visibility = Visibility.Collapsed;
             }
+        }
+
+        private void UpdateProgress(double duration)
+        {
+            var items = _viewModel.Items;
+            var index = items.IndexOf(_viewModel.SelectedItem);
+
+            var group = _viewModel.SegmentGroup;
+            if (group == null || index == -1)
+            {
+                Progress.Update(index, items.Count, duration);
+                return;
+            }
+
+            // Lists are in date order with pinned stories first, so a group is one run of the list.
+            var key = group(items[index]);
+            var first = index;
+            var last = index;
+
+            while (first > 0 && group(items[first - 1]) == key)
+            {
+                first--;
+            }
+
+            while (last < items.Count - 1 && group(items[last + 1]) == key)
+            {
+                last++;
+            }
+
+            Progress.Update(index - first, last - first + 1, duration);
         }
 
         private void OnFrameReceived(VoipVideoOutputSink sender, FrameReceivedEventArgs args)
@@ -1001,8 +1248,8 @@ namespace Telegram.Controls.Stories
             var parent = this.GetParent<StoriesWindow>();
             if (parent != null)
             {
-                parent.TryHide(ContentDialogResult.Primary);
-                parent.ViewModel.NavigationService.NavigateToChat(ViewModel.Chat);
+                parent.TryHide(ModalPopupResult.Primary);
+                parent.ViewModel.OpenPoster(ViewModel);
             }
         }
 
@@ -1135,6 +1382,31 @@ namespace Telegram.Controls.Stories
             }
 
             _type = StoryType.Photo;
+        }
+
+        // Nothing to draw, so nothing of the story before may stay on screen: it runs on the
+        // photo timer, as a story that can't be played still has its turn.
+        private void UpdateUnsupported(StoryViewModel story)
+        {
+            UpdateManager.Unsubscribe(this, ref _fileToken);
+
+            _fileId = 0;
+
+            Texture1.Source = null;
+            Texture2.Source = null;
+
+            _player?.Stop();
+            _player?.Context.Clear();
+
+            UpdateThumbnail(story, null, null, true);
+            HideSkeleton();
+
+            _type = StoryType.Photo;
+        }
+
+        private void Unsupported_Click(object sender, RoutedEventArgs e)
+        {
+            _ = MessageUnsupportedContent.CheckForUpdatesAsync(XamlRoot, _viewModel?.ClientService);
         }
 
         private StoryType _type;
@@ -1391,7 +1663,7 @@ namespace Telegram.Controls.Stories
                 //translation.Duration = TimeSpan.FromSeconds(5);
 
                 var entranceY = compositor.CreateScalarKeyFrameAnimation();
-                entranceY.InsertKeyFrame(show ? 0 : 1, -Caption.ActualSize.Y * 5);
+                entranceY.InsertKeyFrame(show ? 0 : 1, -CaptionCollapsed.ActualSize.Y * 5);
                 entranceY.InsertKeyFrame(show ? 1 : 0, 0);
                 //entranceY.Duration = TimeSpan.FromSeconds(5);
 
@@ -1450,7 +1722,7 @@ namespace Telegram.Controls.Stories
                 //translation.Duration = TimeSpan.FromSeconds(5);
 
                 var entranceY = compositor.CreateScalarKeyFrameAnimation();
-                entranceY.InsertKeyFrame(show ? 0 : 1, -Caption.ActualSize.Y * 5);
+                entranceY.InsertKeyFrame(show ? 0 : 1, -CaptionCollapsed.ActualSize.Y * 5);
                 entranceY.InsertKeyFrame(show ? 1 : 0, 0);
                 //entranceY.Duration = TimeSpan.FromSeconds(5);
 
@@ -1485,7 +1757,7 @@ namespace Telegram.Controls.Stories
             {
                 CreateSwapChain = true,
                 Mute = AppSettings.VolumeMuted,
-                Volume = 1,
+                Volume = AppSettings.VolumeLevel,
             };
 
             try
@@ -1504,6 +1776,7 @@ namespace Telegram.Controls.Stories
             _player.VideoOut += OnVout;
             _player.Buffering += OnBuffering;
             _player.EndReached += OnEndReached;
+            _player.PositionChanged += OnPositionChanged;
 
             _player.Context.Attach(Video, true);
         }
@@ -1518,6 +1791,17 @@ namespace Telegram.Controls.Stories
 
         private void OnEndReached(AsyncMediaPlayer sender, object e)
         {
+            if (IsLooping)
+            {
+                // Play restarts an ended player by itself.
+                sender.Play();
+
+                _progressStarted = false;
+                Progress.Restart();
+                Progress.Suspend();
+                return;
+            }
+
             Completed?.Invoke(this, EventArgs.Empty);
         }
 
@@ -1544,7 +1828,59 @@ namespace Telegram.Controls.Stories
             {
                 ShowSkeleton();
             }
+
+            // The progress is a timed animation, so it has to stop while the video does and
+            // pick up from where the player really is.
+            if (e.Cache == 100)
+            {
+                if (_buffering)
+                {
+                    _buffering = false;
+
+                    if (_state == StoryPauseSource.None && _progressStarted)
+                    {
+                        SynchronizeProgress();
+                        Progress.Resume();
+                    }
+                }
+            }
+            else if (!_buffering)
+            {
+                _buffering = true;
+                Progress.Suspend();
+            }
         }
+
+        // Each report comes with a frame the player rendered, about four a second, so the bar
+        // starts only once the video does: while the player opens and prerolls it reports no
+        // buffering, and nothing else says it hasn't started. In between reports the timed
+        // animation fills in, and each report puts it back where the video is.
+        private void OnPositionChanged(AsyncMediaPlayer sender, AsyncMediaPlayerPositionChangedEventArgs e)
+        {
+            if (_type != StoryType.Video || sender.Duration <= 0)
+            {
+                return;
+            }
+
+            Progress.Seek(e.Position / sender.Duration);
+
+            if (!_progressStarted && !_buffering && _state == StoryPauseSource.None)
+            {
+                _progressStarted = true;
+                Progress.Resume();
+            }
+        }
+
+        private void SynchronizeProgress()
+        {
+            if (_player != null && _player.Duration > 0)
+            {
+                Progress.Seek(_player.Position / _player.Duration);
+            }
+        }
+
+        private bool _buffering;
+        private bool _progressStarted;
 
         private Image _texture;
 
@@ -1631,13 +1967,17 @@ namespace Telegram.Controls.Stories
                 if (_type == StoryType.Video)
                 {
                     _player?.Pause(false);
+                    SynchronizeProgress();
                 }
                 else
                 {
                     _timer.Start();
                 }
 
-                Progress.Resume();
+                if (!_buffering && (_type != StoryType.Video || _progressStarted))
+                {
+                    Progress.Resume();
+                }
             }
         }
 
@@ -1660,87 +2000,478 @@ namespace Telegram.Controls.Stories
             _player?.Mute = AppSettings.VolumeMuted;
         }
 
-        private void Caption_Click(object sender, RoutedEventArgs e)
+        /// <summary>
+        /// Steps the shared playback volume of a video with sound. While muted, any step unmutes
+        /// instead, and stepping down to nothing mutes at full volume, as the gallery does.
+        /// </summary>
+        public void ChangeVolume(double amount)
         {
-            Overflow.MaxLines = Overflow.MaxLines == 0 ? 1 : 0;
-            ShowMore.Visibility = Overflow.MaxLines == 1 && Caption.HasOverflowContent
-                ? Visibility.Visible
-                : Visibility.Collapsed;
-
-            Grid.SetRow(CaptionExpand, Overflow.MaxLines == 0 ? 0 : 1);
-
-            CaptionOverlay.Visibility = Visibility.Visible;
-
-            CaptionPanel.SizeChanged -= CaptionPanel_SizeChanged_1;
-            CaptionPanel.SizeChanged += CaptionPanel_SizeChanged_1;
-
-            if (Overflow.MaxLines == 0)
+            if (_player == null || Mute.Visibility != Visibility.Visible || !Mute.IsEnabled)
             {
-                Suspend(StoryPauseSource.Caption);
+                return;
+            }
+
+            var volume = AppSettings.VolumeLevel;
+            var muted = false;
+
+            if (!AppSettings.VolumeMuted)
+            {
+                volume = Math.Clamp(Math.Round(volume + amount, 1), 0, 1);
+
+                if (volume == 0)
+                {
+                    volume = 1;
+                    muted = true;
+                }
+            }
+
+            AppSettings.VolumeLevel = volume;
+            AppSettings.VolumeMuted = muted;
+
+            _player.Volume = volume;
+            _player.Mute = muted;
+
+            Mute.IsChecked = !muted;
+        }
+
+        #region Caption
+
+        private const int CaptionMaxLines = 3;
+
+        // How far below the top of the story an open caption stops, scrolling past that.
+        private const double CaptionExpandedInset = 64;
+
+        // What a quote or a code block takes from the width of its text: the 3 px bar of
+        // BlockQuote's template and the 8 + 24 horizontal padding MessageTextBlock gives it.
+        private const double CaptionBlockChrome = 3 + 8 + 24;
+
+        // DirectWrite measures the cut and XAML draws it, and the two round differently: a
+        // token that fits to the pixel in one can wrap in the other.
+        private const double CaptionTokenSlack = 2;
+
+        private FormattedText _captionSource;
+        private StyledText _captionText;
+        private IClientService _captionClientService;
+        private double _captionWidth;
+        private bool _captionTrimmed;
+        private bool _captionExpanded;
+        private bool _captionAnimate;
+        private bool _captionEntityClicked;
+        private TextSelectionManager _captionSelection;
+
+        private void UpdateCollapsedCaption(double width)
+        {
+            if (_captionText == null || width <= 0 || width == _captionWidth)
+            {
+                return;
+            }
+
+            _captionWidth = width;
+
+            var trimmed = TrimCaption(_captionText, width, CaptionMaxLines);
+            _captionTrimmed = trimmed != null;
+
+            if (trimmed != null)
+            {
+                CaptionCollapsed.SetText(_captionClientService, trimmed);
             }
             else
             {
-                Resume(StoryPauseSource.Caption);
+                CaptionCollapsed.SetText(_captionClientService, _captionText);
             }
         }
 
-        private void SizeMore_SizeChanged(object sender, SizeChangedEventArgs e)
+        // The caption cut to maxLines lines, the last of them ending in "… Show more", or null
+        // when it fits. Every line of text costs one wherever it is, a quote's included; a code
+        // block's language header is not a line. The block the cut falls in keeps its box, and
+        // the token goes inside it, at the end of that block's last visible line.
+        private static FormattedText TrimCaption(StyledText styled, double width, int maxLines)
         {
-            //CaptionPanel.ColumnDefinitions[0].MaxWidth = ActualWidth - ShowMore.ActualWidth;
-            //CaptionPanel.ColumnDefinitions[1].MinWidth = ShowMore.ActualWidth;
+            var scale = BootStrapper.Current.TextScaleFactor;
+            var messageSize = AppSettings.Appearance.MessageFontSize * scale;
+            var quoteSize = AppSettings.Appearance.CaptionFontSize * scale;
 
-            var visual = ElementComposition.GetElementVisual(ShowMore);
-            ElementCompositionPreview.SetIsTranslationEnabled(ShowMore, true);
+            var paragraphs = styled.Paragraphs;
+            var remaining = maxLines;
 
-            var width = CaptionPanel.ActualSize.X - 24;
-            var offset = width - ShowMore.ActualSize.X;
+            for (int i = 0; i < paragraphs.Count; i++)
+            {
+                var paragraph = paragraphs[i];
+                var size = paragraph.Type is TextParagraphTypeQuote ? quoteSize : messageSize;
+                var layoutWidth = paragraph.Type != null ? width - CaptionBlockChrome : width;
+                var rtl = paragraph.Direction == TextDirectionality.RightToLeft;
 
-            var diff = offset - Overflow.ActualSize.X;
+                TextFormat format = null;
+                var lines = 1;
 
-            visual.Properties.InsertVector3("Translation", new Vector3(-diff, 0, 0));
+                if (paragraph.Length > 0)
+                {
+                    format = Direct2D.Current.CreateTextFormat2(paragraph.Text, paragraph.Parts ?? TextStyleRun.NoParts, size, layoutWidth);
+                    lines = Math.Max(1, format.LineMetrics(0, paragraph.Length, size, layoutWidth, rtl, true).Length);
+                }
+
+                if (lines < remaining || (lines == remaining && i == paragraphs.Count - 1))
+                {
+                    remaining -= lines;
+                    continue;
+                }
+
+                var monospace = paragraph.Type is TextParagraphTypeMonospace;
+                var reserve = MeasureCaptionToken(size, monospace) + CaptionTokenSlack;
+
+                var cut = format?.TrimLine(size, layoutWidth, rtl, remaining - 1, reserve) ?? 0;
+                if (cut < 0)
+                {
+                    cut = paragraph.Length;
+                }
+
+                while (cut > 0 && char.IsWhiteSpace(paragraph.Text[cut - 1]))
+                {
+                    cut--;
+                }
+
+                return AppendCaptionToken(styled.Substring(0, paragraph.Offset + cut), cut == 0);
+            }
+
+            return null;
         }
 
-        private void Overflow_LayoutUpdated(object sender, object e)
+        private static FormattedText AppendCaptionToken(FormattedText text, bool emptyLine)
         {
-            Overflow.LayoutUpdated -= Overflow_LayoutUpdated;
+            var ellipsis = emptyLine ? string.Empty : "… ";
+            var token = ellipsis + Strings.ShowMore;
+            var end = text.Text.Length;
 
-            var visual = ElementComposition.GetElementVisual(ShowMore);
-            ElementCompositionPreview.SetIsTranslationEnabled(ShowMore, true);
+            var entities = new MutableVector<TextEntity>(text.Entities.Count + 1);
 
-            var width = CaptionPanel.ActualSize.X - 24;
-            var offset = width - ShowMore.ActualSize.X;
+            foreach (var entity in text.Entities)
+            {
+                // The quote or code block the cut ends in has to hold the token, or the token
+                // would be a paragraph of its own under the box.
+                if (entity.Offset + entity.Length == end && entity.Type is TextEntityTypeBlockQuote or TextEntityTypeExpandableBlockQuote or TextEntityTypePre or TextEntityTypePreCode)
+                {
+                    entities.Add(new TextEntity(entity.Offset, entity.Length + token.Length, entity.Type));
+                }
+                else
+                {
+                    entities.Add(entity);
+                }
+            }
 
-            var diff = offset - Overflow.ActualSize.X;
+            entities.Add(new TextEntity(end + ellipsis.Length, Strings.ShowMore.Length, new TextEntityTypeBold()));
 
-            visual.Properties.InsertVector3("Translation", new Vector3(-diff, 0, 0));
+            return new FormattedText(text.Text + token, entities);
+        }
 
-            ShowMore.Visibility = Overflow.MaxLines == 1 && Caption.HasOverflowContent
+        private static double MeasureCaptionToken(double fontSize, bool monospace)
+        {
+            var ellipsis = "… ";
+            var token = ellipsis + Strings.ShowMore;
+
+            var parts = new List<TextStylePart>(2)
+            {
+                new TextStylePart
+                {
+                    Offset = ellipsis.Length,
+                    Length = Strings.ShowMore.Length,
+                    Type = monospace ? TextStyle.Bold | TextStyle.Monospace : TextStyle.Bold
+                }
+            };
+
+            if (monospace)
+            {
+                parts.Add(new TextStylePart
+                {
+                    Offset = 0,
+                    Length = ellipsis.Length,
+                    Type = TextStyle.Monospace
+                });
+            }
+
+            var format = Direct2D.Current.CreateTextFormat2(token, parts, fontSize, 100000);
+            return format.ContentWidths(fontSize, 100000, false).Y;
+        }
+
+        private void UpdateCaptionMaxHeight()
+        {
+            var padding = CaptionPanel.Padding;
+            var repost = RepostPanel.Visibility == Visibility.Visible
+                ? RepostPanel.ActualHeight + RepostPanel.Margin.Bottom
+                : 0;
+
+            CaptionScroll.MaxHeight = Math.Max(0, CaptionRoot.ActualHeight - CaptionExpandedInset - padding.Top - padding.Bottom - repost);
+        }
+
+        private StoryRepostInfo _repostInfo;
+
+        // A repost names its source above the caption, in a pill that grows to a quote of the
+        // original caption once that has loaded. A story sharing a channel post names the channel.
+        private bool UpdateRepostPanel(StoryViewModel story, bool emptyCaption)
+        {
+            var clientService = story.ClientService;
+            string title = null;
+
+            if (story.RepostInfo?.Origin is StoryOriginPublicStory publicStory)
+            {
+                title = clientService.TryGetChat(publicStory.ChatId, out Chat chat)
+                    ? GetRepostIcon(chat) + Icons.Spacing + clientService.GetTitle(chat)
+                    : Icons.PersonFilled16;
+            }
+            else if (story.RepostInfo?.Origin is StoryOriginHiddenUser hiddenUser)
+            {
+                title = Icons.PersonFilled16 + Icons.Spacing + hiddenUser.PosterName;
+            }
+            else if (TryGetPostArea(story, out Chat postChat, out _))
+            {
+                title = GetRepostIcon(postChat) + Icons.Spacing + clientService.GetTitle(postChat);
+            }
+
+            if (title == null)
+            {
+                _repostInfo = null;
+                RepostPanel.Visibility = Visibility.Collapsed;
+                return false;
+            }
+
+            RepostPanel.Margin = new Thickness(0, 0, 0, emptyCaption ? 0 : 8);
+            RepostPanel.Visibility = Visibility.Visible;
+            RepostTitle.Text = title;
+
+            // TDLib hands out a new info with every change to the story, the only time the
+            // original's caption has to be fetched again.
+            if (story.RepostInfo == null)
+            {
+                _repostInfo = null;
+                UpdateRepostText(null);
+            }
+            else if (story.RepostInfo != _repostInfo)
+            {
+                _repostInfo = story.RepostInfo;
+                UpdateRepostText(null);
+
+                if (story.RepostInfo.Origin is StoryOriginPublicStory origin)
+                {
+                    LoadRepostText(story, origin);
+                }
+            }
+
+            return true;
+        }
+
+        private static string GetRepostIcon(Chat chat)
+        {
+            return chat.Type switch
+            {
+                ChatTypeSupergroup { IsChannel: true } => Icons.MegaphoneFilled16,
+                ChatTypeSupergroup or ChatTypeBasicGroup => Icons.PeopleFilled16,
+                _ => Icons.PersonFilled16
+            };
+        }
+
+        private async void LoadRepostText(StoryViewModel story, StoryOriginPublicStory origin)
+        {
+            var response = await story.ClientService.SendAsync(new GetStory(origin.ChatId, origin.StoryId, false));
+            if (response is Story source && story.RepostInfo?.Origin == origin && _viewModel?.SelectedItem == story && !string.IsNullOrEmpty(source.Caption?.Text))
+            {
+                // The panel grows at the top, as the caption does when it opens.
+                _captionAnimate = true;
+
+                UpdateRepostText(source.Caption.Text);
+                FadeCaptionPart(RepostText, true);
+            }
+        }
+
+        private void UpdateRepostText(string text)
+        {
+            var large = text != null;
+
+            RepostText.Text = text ?? string.Empty;
+            RepostText.Visibility = large
                 ? Visibility.Visible
                 : Visibility.Collapsed;
+
+            RepostBackground.Height = large ? 42 : 22;
+            RepostBackground.CornerRadius = new CornerRadius(large ? 5 : 11);
+            RepostBackground.BorderThickness = new Thickness(large ? 3 : 0, 0, 0, 0);
         }
 
-        private void CaptionPanel_SizeChanged_1(object sender, SizeChangedEventArgs e)
+        private async void RepostPanel_Click(object sender, RoutedEventArgs e)
         {
-            CaptionPanel.SizeChanged -= CaptionPanel_SizeChanged_1;
-            ElementCompositionPreview.SetIsTranslationEnabled(CaptionPanel, true);
+            // Inside the caption, a click that opens the caption too otherwise.
+            _captionEntityClicked = true;
 
-            var prev = e.PreviousSize.ToVector2();
-            var next = e.NewSize.ToVector2();
+            var story = _viewModel?.SelectedItem;
+            if (story == null)
+            {
+                return;
+            }
 
-            var overlay = ElementComposition.GetElementVisual(CaptionOverlay);
-            var visual = ElementComposition.GetElementVisual(CaptionPanel);
+            if (story.RepostInfo?.Origin is StoryOriginPublicStory origin)
+            {
+                var response = await story.ClientService.SendAsync(new GetStory(origin.ChatId, origin.StoryId, false));
+                if (response is Story source)
+                {
+                    var parent = this.GetParent<StoriesWindow>();
+                    var navigationService = ViewModel?.NavigationService;
+
+                    if (parent != null && navigationService != null)
+                    {
+                        parent.TryHide(ModalPopupResult.Primary);
+                        StoriesWindow.ShowStory(navigationService, source, StoryOpenOrigin.Card, Windows.Foundation.Rect.Empty, null);
+                    }
+                }
+                else
+                {
+                    var window = RepostPanel.GetParent<StoriesWindow>();
+                    window?.ShowToast(RepostPanel, Strings.StoryNotFound, ToastPlacementMode.Top);
+                }
+            }
+            else if (story.RepostInfo != null)
+            {
+                ShowHiddenAccount(RepostPanel, ToastPlacementMode.Top);
+            }
+            else if (TryGetPostArea(story, out _, out StoryAreaTypeMessage post))
+            {
+                OpenPost(post);
+            }
+        }
+
+        private void ExpandCaption()
+        {
+            if (_captionExpanded || !_captionTrimmed)
+            {
+                return;
+            }
+
+            _captionExpanded = true;
+
+            UpdateCaptionMaxHeight();
+            CaptionScroll.ChangeView(null, 0, null, true);
+            CaptionScroll.Visibility = Visibility.Visible;
+            CaptionCollapsed.IsHitTestVisible = false;
+            CaptionOverlay.IsHitTestVisible = true;
+
+            _captionSelection ??= new TextSelectionManager(this, Caption, handleContextMenu: true);
+
+            AnimateCaption(true);
+            Suspend(StoryPauseSource.Caption);
+        }
+
+        /// <summary>
+        /// Closes the caption if it is open, which is what going back does first.
+        /// </summary>
+        public bool TryCollapseCaption()
+        {
+            if (!_captionExpanded)
+            {
+                return false;
+            }
+
+            _captionExpanded = false;
+
+            CaptionScroll.Visibility = Visibility.Collapsed;
+            CaptionCollapsed.IsHitTestVisible = true;
+            CaptionOverlay.IsHitTestVisible = false;
+
+            AnimateCaption(false);
+            Resume(StoryPauseSource.Caption);
+            return true;
+        }
+
+        // The two copies share their first lines, so fading one into the other while the panel
+        // slides to its new height reads as the text staying put and the rest appearing.
+        private void AnimateCaption(bool expand)
+        {
+            _captionAnimate = true;
+
+            FadeCaptionPart(CaptionOverlay, expand);
+            FadeCaptionPart(CaptionCollapsed, !expand);
+
+            if (expand)
+            {
+                FadeCaptionPart(CaptionScroll, true);
+            }
+        }
+
+        private static void FadeCaptionPart(UIElement element, bool show)
+        {
+            var visual = ElementComposition.GetElementVisual(element);
 
             var opacity = visual.Compositor.CreateScalarKeyFrameAnimation();
-            opacity.InsertKeyFrame(0, Overflow.MaxLines == 0 ? 0 : 1);
-            opacity.InsertKeyFrame(0, Overflow.MaxLines == 0 ? 1 : 0);
+            opacity.InsertKeyFrame(0, show ? 0 : 1);
+            opacity.InsertKeyFrame(1, show ? 1 : 0);
+            opacity.Duration = TimeSpan.FromMilliseconds(250);
 
-            var translation = visual.Compositor.CreateScalarKeyFrameAnimation();
-            translation.InsertKeyFrame(0, next.Y - prev.Y);
-            translation.InsertKeyFrame(1, 0);
-
-            overlay.StartAnimation("Opacity", opacity);
-            visual.StartAnimation("Translation.Y", translation);
+            visual.StartAnimation("Opacity", opacity);
         }
+
+        private void CaptionPanel_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            var padding = CaptionPanel.Padding;
+            UpdateCollapsedCaption(e.NewSize.Width - padding.Left - padding.Right);
+
+            if (_captionAnimate)
+            {
+                _captionAnimate = false;
+
+                // Anchored at the bottom, the panel grows and shrinks at the top: it starts
+                // where its top was and slides there.
+                ElementCompositionPreview.SetIsTranslationEnabled(CaptionPanel, true);
+
+                var visual = ElementComposition.GetElementVisual(CaptionPanel);
+
+                var translation = visual.Compositor.CreateScalarKeyFrameAnimation();
+                translation.InsertKeyFrame(0, (float)(e.NewSize.Height - e.PreviousSize.Height));
+                translation.InsertKeyFrame(1, 0);
+                translation.Duration = TimeSpan.FromMilliseconds(250);
+
+                visual.StartAnimation("Translation.Y", translation);
+            }
+        }
+
+        private void CaptionPanel_PointerPressed(object sender, PointerRoutedEventArgs e)
+        {
+            _captionEntityClicked = false;
+
+            // Held anywhere else on the story, a press hides its chrome until released.
+            e.Handled = true;
+        }
+
+        private void CaptionPanel_PointerWheelChanged(object sender, PointerRoutedEventArgs e)
+        {
+            // The window moves between stories on the wheel. Over an open caption the wheel
+            // scrolls it, and at either end of it does nothing rather than leave the story.
+            if (_captionExpanded)
+            {
+                e.Handled = true;
+            }
+        }
+
+        private void CaptionPanel_Tapped(object sender, TappedRoutedEventArgs e)
+        {
+            // Open, a click on the text is the start or the end of a selection. Tapped follows
+            // the Click of the link under the pointer, which has opened it.
+            if (_captionExpanded || _captionEntityClicked)
+            {
+                _captionEntityClicked = false;
+                return;
+            }
+
+            ExpandCaption();
+        }
+
+        private void CaptionOverlay_PointerPressed(object sender, PointerRoutedEventArgs e)
+        {
+            e.Handled = true;
+        }
+
+        private void CaptionOverlay_Tapped(object sender, TappedRoutedEventArgs e)
+        {
+            TryCollapseCaption();
+            e.Handled = true;
+        }
+
+        #endregion
 
         private void InactivePanel_SizeChanged(object sender, SizeChangedEventArgs e)
         {
@@ -1750,7 +2481,7 @@ namespace Telegram.Controls.Stories
 
         public void CopyLink(StoryViewModel story)
         {
-            if (story.ClientService.TryGetUser(story.Chat, out User user) && user.HasActiveUsername(out string username))
+            if (story.TryGetLinkUsername(out string username))
             {
                 MessageHelper.CopyLink(story.ClientService, XamlRoot, new InternalLinkTypeStory(username, story.Id));
             }
@@ -1758,6 +2489,8 @@ namespace Telegram.Controls.Stories
 
         private void Caption_TextEntityClick(object sender, TextEntityClickEventArgs e)
         {
+            _captionEntityClicked = true;
+
             if (e.Type is TextEntityTypeBotCommand && e.Text is string command)
             {
                 ViewModel.Delegate.SendBotCommand(command);
@@ -1884,9 +2617,9 @@ namespace Telegram.Controls.Stories
             popup.RequestedTheme = ElementTheme.Dark;
 
             var confirm = await ViewModel.ShowPopupAsync(popup);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
-                if (popup.DeleteAll.Any())
+                if (popup.DeleteAllMessages.Any())
                 {
                     ViewModel.ClientService.Send(new DeleteGroupCallMessagesBySender(_call.Id, message.SenderId, popup.ReportSpam.Any()));
                 }
@@ -1917,8 +2650,10 @@ namespace Telegram.Controls.Stories
             }
             else if (args.ItemContainer.ContentTemplateRoot is LiveStoryMessageCell content && args.Item is GroupCallMessage message)
             {
+                // Not _call: Deactivate discards it while this list stays in the tree and keeps
+                // realizing containers through the move to the next story.
                 _topDonors.TryGetValue(message.SenderId, out int position);
-                content.Update(_call.ClientService, message, position);
+                content.Update(_viewModel.ClientService, message, position);
             }
         }
 
@@ -1969,7 +2704,7 @@ namespace Telegram.Controls.Stories
             else if (args.ItemContainer.ContentTemplateRoot is LiveStoryPinnedMessageCell content && args.Item is GroupCallMessage message)
             {
                 _topDonors.TryGetValue(message.SenderId, out int position);
-                content.Update(_call.ClientService, message, position);
+                content.Update(_viewModel.ClientService, message, position);
             }
         }
 
@@ -2051,6 +2786,11 @@ namespace Telegram.Controls.Stories
 
     public partial class StoryContentPhotoTimer
     {
+        /// <summary>
+        /// How long a photo story stays on screen, in seconds.
+        /// </summary>
+        public const double Duration = 10;
+
         private readonly Stopwatch _watch;
         private readonly DispatcherTimer _timer;
 
@@ -2058,7 +2798,7 @@ namespace Telegram.Controls.Stories
 
         public StoryContentPhotoTimer()
         {
-            _interval = TimeSpan.FromSeconds(5);
+            _interval = TimeSpan.FromSeconds(Duration);
 
             _watch = new Stopwatch();
 
@@ -2086,7 +2826,7 @@ namespace Telegram.Controls.Stories
             _watch.Reset();
 
             _timer.Stop();
-            _timer.Interval = TimeSpan.FromSeconds(5);
+            _timer.Interval = _interval;
         }
 
         public event EventHandler Tick;
@@ -2113,16 +2853,54 @@ namespace Telegram.Controls.Stories
             _progressController?.Resume();
         }
 
+        public void Seek(double progress)
+        {
+            _progressController?.Progress = (float)Math.Clamp(progress, 0, 1);
+        }
+
+        private double _duration;
+
+        /// <summary>
+        /// Plays the current segment again from the start.
+        /// </summary>
+        public void Restart()
+        {
+            if (_progressPropertySet != null)
+            {
+                _progressPropertySet.InsertScalar("Progress", 0);
+                StartProgress();
+            }
+        }
+
+        private void StartProgress()
+        {
+            var compositor = _progressPropertySet.Compositor;
+
+            var animation = compositor.CreateScalarKeyFrameAnimation();
+            animation.InsertKeyFrame(1.0f, 1.0f, compositor.CreateLinearEasingFunction());
+            animation.Duration = TimeSpan.FromSeconds(_duration);
+
+            _progressPropertySet.StartAnimation("Progress", animation);
+            _progressController = _progressPropertySet.TryGetAnimationController("Progress");
+        }
+
         public void Update(int index, int count, double duration)
         {
+            _duration = duration;
+
             Children.Clear();
             ColumnDefinitions.Clear();
+
+            // The gaps narrow as the segments do, down to a single physical pixel past 100.
+            var gap = count > 100
+                ? 1 / (XamlRoot?.RasterizationScale ?? 1)
+                : count >= 50 ? 1 : 2;
 
             for (int i = 0; i < count; i++)
             {
                 var rectangle = new Rectangle
                 {
-                    Margin = new Thickness(0, 2, 2, 2),
+                    Margin = new Thickness(i == 0 ? 0 : gap, 2, 0, 2),
                     Height = 2,
                     RadiusX = 1,
                     RadiusY = 1,
@@ -2166,14 +2944,7 @@ namespace Telegram.Controls.Stories
                     // Apply the expression to the point visual's Offset property
                     ellipse.StartAnimation("Size", expression);
 
-                    // Start the animation by incrementing the progress value
-                    var easing = compositor.CreateLinearEasingFunction();
-                    var compositorAnimation = compositor.CreateScalarKeyFrameAnimation();
-                    compositorAnimation.InsertKeyFrame(1.0f, 1.0f, easing);
-                    compositorAnimation.Duration = TimeSpan.FromSeconds(duration); // Adjust duration as needed
-
-                    _progressPropertySet.StartAnimation("Progress", compositorAnimation);
-                    _progressController = _progressPropertySet.TryGetAnimationController("Progress");
+                    StartProgress();
                 }
 
                 ColumnDefinitions.Add(new ColumnDefinition());

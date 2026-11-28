@@ -8,6 +8,7 @@
 using System;
 using System.Runtime.InteropServices;
 using Telegram.Host;
+using Telegram.Services;
 
 namespace Telegram.Common
 {
@@ -33,7 +34,7 @@ namespace Telegram.Common
                 return;
             }
 
-            _wndProc = Win32.DefWindowProcW;
+            _wndProc = OnMessage;
 
             var className = Marshal.StringToHGlobalUni("TelegramHiddenWindow");
             var wc = new WNDCLASSEXW
@@ -56,6 +57,30 @@ namespace Telegram.Common
             {
                 Logger.Error($"CreateWindowExW failed: {Marshal.GetLastPInvokeError()}");
             }
+        }
+
+        /// <summary>
+        /// Being top level and never destroyed, this is the one window sure to hear that the
+        /// session is ending, with or without a main window or the notification area icon. Windows
+        /// may end the process any time after WM_ENDSESSION returns, and Main never resumes, so
+        /// TDLib is closed before it does.
+        /// </summary>
+        private static IntPtr OnMessage(IntPtr hwnd, uint msg, IntPtr wParam, IntPtr lParam)
+        {
+            if (msg == Win32.WM_ENDSESSION && wParam != IntPtr.Zero)
+            {
+                // An exception cannot cross back into user32.
+                try
+                {
+                    LifetimeService.Current.CloseAll();
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error(ex);
+                }
+            }
+
+            return Win32.DefWindowProcW(hwnd, msg, wParam, lParam);
         }
     }
 }

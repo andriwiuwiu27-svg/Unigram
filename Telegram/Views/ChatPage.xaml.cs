@@ -24,7 +24,15 @@ namespace Telegram.Views
         public ChatPage()
         {
             InitializeComponent();
-            NavigationCacheMode = ApiInfo.NavigationCacheMode;
+
+            // Resident, it stays in the tree between chats and while the pane is empty, so a chat
+            // opens without the page being loaded again.
+            Retention = ApiInfo.IsXbox
+                ? PageRetention.Discard
+                : AppSettings.Diagnostics.ParkChatPageDebug
+                ? PageRetention.Resident
+                : PageRetention.Cache;
+            Transition = PageTransition.None;
         }
 
         public override string GetTitle()
@@ -47,7 +55,7 @@ namespace Telegram.Views
             View.Search();
         }
 
-        protected override void OnNavigatedTo(NavigationEventArgs e)
+        protected override void OnNavigatedTo(NavigatedEventArgs e)
         {
             if (PowerSavingPolicy.AreSmoothTransitionsEnabled && AppSettings.Diagnostics.ConnectedAnimationsDebug)
             {
@@ -55,7 +63,7 @@ namespace Telegram.Views
             }
         }
 
-        protected override void OnNavigatingFrom(NavigatingCancelEventArgs e)
+        protected override void OnNavigatingFrom(NavigatingEventArgs e)
         {
             if (PowerSavingPolicy.AreSmoothTransitionsEnabled && AppSettings.Diagnostics.ConnectedAnimationsDebug && e.SourcePageType == typeof(ProfilePage) && ViewModel.NavigationService.TryGetChatFromParameter(e.Parameter, out ChatMessageTopic nextTopic))
             {
@@ -90,6 +98,11 @@ namespace Telegram.Views
             View.Activate(viewModel);
         }
 
+        protected override void OnParked()
+        {
+            View.Park();
+        }
+
         public void PopupOpened()
         {
             View.PopupOpened();
@@ -100,14 +113,14 @@ namespace Telegram.Views
             View.PopupClosed();
         }
 
-        public void StartBannerAnimation(ScalarKeyFrameAnimation translate, bool title)
+        public void StartBannerAnimation(ScalarKeyFrameAnimation translate)
         {
-            View.StartBannerAnimation(translate, title);
+            View.StartBannerAnimation(translate);
         }
 
-        public void CompleteBannerAnimation(bool title)
+        public void CompleteBannerAnimation()
         {
-            View.CompleteBannerAnimation(title);
+            View.CompleteBannerAnimation();
         }
     }
 }

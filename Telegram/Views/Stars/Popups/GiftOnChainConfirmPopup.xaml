@@ -1,0 +1,29 @@
+<controls:ModalPopup x:Class="Telegram.Views.Stars.Popups.GiftOnChainConfirmPopup"
+                     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+                     xmlns:controls="using:Telegram.Controls"
+                     mc:Ignorable="d"
+                     PrimaryButtonStyle="{StaticResource AccentButtonStyle}"
+                     PrimaryButtonClick="OnPrimaryButtonClick"
+                     DefaultButton="Primary">
+
+    <StackPanel>
+        <TextBlock x:Name="MessageText"
+                   Style="{StaticResource BodyTextBlockStyle}" />
+
+        <controls:TableView x:Name="Table"
+                            Margin="-8,12,-8,0"
+                            Visibility="Collapsed" />
+
+        <TextBlock x:Name="NoteText"
+                   Style="{StaticResource InfoCaptionTextBlockStyle}"
+                   Margin="0,8,0,0"
+                   Visibility="Collapsed" />
+        <TextBlock x:Name="FeeText"
+                   Style="{StaticResource InfoCaptionTextBlockStyle}"
+                   Margin="0,8,0,0"
+                   Visibility="Collapsed" />
+    </StackPanel>
+</controls:ModalPopup>

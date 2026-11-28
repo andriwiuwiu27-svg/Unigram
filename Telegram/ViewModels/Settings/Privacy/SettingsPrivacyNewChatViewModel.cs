@@ -67,11 +67,11 @@ namespace Telegram.ViewModels.Settings.Privacy
                 args.Cancel = true;
 
                 var confirm = await ShowPopupAsync(Strings.PrivacySettingsChangedAlert, Strings.UnsavedChanges, Strings.ApplyTheme, Strings.PassportDiscard);
-                if (confirm == ContentDialogResult.Primary)
+                if (confirm == ModalPopupResult.Primary)
                 {
                     ContinueImpl(args);
                 }
-                else if (confirm == ContentDialogResult.Secondary)
+                else if (confirm == ModalPopupResult.Secondary)
                 {
                     _completed = true;
                     NavigationService.GoBack(args);
@@ -174,7 +174,7 @@ namespace Telegram.ViewModels.Settings.Privacy
                     if (await CheckAllowAllAsync(new UserPrivacySettingAllowCalls()))
                     {
                         var confirm = await ShowPopupAsync(Strings.CheckPrivacyCallsText, Strings.CheckPrivacyCallsTitle, Strings.CheckPrivacyReview, Strings.Cancel);
-                        if (confirm == ContentDialogResult.Primary)
+                        if (confirm == ModalPopupResult.Primary)
                         {
                             NavigationService.Navigate(typeof(SettingsPrivacyAllowCallsPage));
                         }
@@ -182,7 +182,7 @@ namespace Telegram.ViewModels.Settings.Privacy
                     else if (await CheckAllowAllAsync(new UserPrivacySettingAllowChatInvites()))
                     {
                         var confirm = await ShowPopupAsync(Strings.CheckPrivacyInviteText, Strings.CheckPrivacyInviteTitle, Strings.CheckPrivacyReview, Strings.Cancel);
-                        if (confirm == ContentDialogResult.Primary)
+                        if (confirm == ModalPopupResult.Primary)
                         {
                             NavigationService.Navigate(typeof(SettingsPrivacyAllowChatInvitesPage));
                         }

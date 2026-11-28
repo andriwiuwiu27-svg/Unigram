@@ -9,14 +9,6 @@
                   xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
                   mc:Ignorable="d">
 
-    <Page.Transitions>
-        <TransitionCollection>
-            <NavigationThemeTransition>
-                <SlideNavigationTransitionInfo Effect="FromRight" />
-            </NavigationThemeTransition>
-        </TransitionCollection>
-    </Page.Transitions>
-
     <local:HostedPage.Action>
         <Button Content="{CustomResource Done}"
                 Click="{x:Bind ViewModel.Continue}"
@@ -179,6 +171,7 @@
                                                         Grid.ColumnSpan="4" />
 
                             <Slider x:Name="Price"
+                                    AutomationProperties.Name="{CustomResource GroupMessagesPriceHeader}"
                                     Value="{x:Bind ViewModel.PaidMessageStarCount, Mode=TwoWay}"
                                     Maximum="9000"
                                     Minimum="1"
@@ -203,6 +196,7 @@
                             </Grid.RowDefinitions>
 
                             <Slider x:Name="Slowmode"
+                                    AutomationProperties.Name="{CustomResource Slowmode}"
                                     Value="{x:Bind ConvertSlowMode(ViewModel.SlowModeDelay), Mode=TwoWay, BindBack=ConvertSlowModeBack}"
                                     Maximum="6"
                                     Minimum="0"
@@ -234,6 +228,8 @@
                             </Grid.RowDefinitions>
 
                             <Slider x:Name="Boosters"
+                                    AutomationProperties.Name="{CustomResource Boosts}"
+                                    AutomationProperties.HelpText="{CustomResource GroupNotRestrictBoostersInfo2}"
                                     Value="{x:Bind ViewModel.UnrestrictBoostCount, Mode=TwoWay}"
                                     Maximum="5"
                                     Minimum="1"

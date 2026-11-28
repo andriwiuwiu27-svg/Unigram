@@ -323,7 +323,7 @@ namespace Telegram.ViewModels.Chats
             //}
 
             //var confirm = await ShowPopupAsync(new TransferPopup(Address, AvailableAmount));
-            //if (confirm == ContentDialogResult.Primary)
+            //if (confirm == ModalPopupResult.Primary)
             //{
 
             //}

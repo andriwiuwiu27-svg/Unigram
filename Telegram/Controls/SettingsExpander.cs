@@ -27,6 +27,8 @@ namespace Telegram.Controls
 
         protected override void OnApplyTemplate()
         {
+            ActionButton?.Click -= OnClick;
+
             ActionButton = GetTemplateChild(nameof(ActionButton)) as SettingsButton;
             ActionButton.Click += OnClick;
             ActionButton.ChevronGlyph = IsExpanded ? Icons.ChevronUp16 : Icons.ChevronDown16;
@@ -45,10 +47,23 @@ namespace Telegram.Controls
 
         private void OnClick(object sender, RoutedEventArgs e)
         {
-            IsExpanded = !IsExpanded;
+            IsExpanded = !IsExpanded && IsExpandable;
         }
 
         public event EventHandler ExpandedChanged;
+
+        #region IsExpandable
+
+        public bool IsExpandable
+        {
+            get { return (bool)GetValue(IsExpandableProperty); }
+            set { SetValue(IsExpandableProperty, value); }
+        }
+
+        public static readonly DependencyProperty IsExpandableProperty =
+            DependencyProperty.Register(nameof(IsExpandable), typeof(bool), typeof(SettingsExpander), new PropertyMetadata(true));
+
+        #endregion
 
         #region IsExpanded
 

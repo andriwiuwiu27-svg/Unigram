@@ -3290,9 +3290,15 @@ namespace Telegram.Controls
                 }
             }
 
-            return builder != null
-                ? CanvasGeometry.CreatePath(builder)
-                : null;
+            if (builder == null)
+            {
+                return null;
+            }
+
+            using (builder)
+            {
+                return CanvasGeometry.CreatePath(builder);
+            }
         }
 
         private static void AlignEdges(List<Rect> block, double tolerance)

@@ -85,8 +85,8 @@ namespace Telegram.Views.Popups
 
                 _completed = true;
                 Hide(result is Ok
-                    ? ContentDialogResult.Primary
-                    : ContentDialogResult.Secondary);
+                    ? ModalPopupResult.Primary
+                    : ModalPopupResult.Secondary);
             }
             else
             {

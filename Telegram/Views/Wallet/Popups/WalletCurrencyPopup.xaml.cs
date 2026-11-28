@@ -134,7 +134,7 @@ namespace Telegram.Views.Wallet.Popups
             if (e.Key == VirtualKey.Enter && _diff.Count > 0)
             {
                 SelectedItem = _diff[0].Code;
-                Hide(ContentDialogResult.Primary);
+                Hide(ModalPopupResult.Primary);
             }
         }
 
@@ -174,7 +174,7 @@ namespace Telegram.Views.Wallet.Popups
             if (e.ClickedItem is WalletCurrency currency)
             {
                 SelectedItem = currency.Code;
-                Hide(ContentDialogResult.Primary);
+                Hide(ModalPopupResult.Primary);
             }
         }
 

@@ -7,6 +7,7 @@
 
 using System;
 using System.Threading.Tasks;
+using Telegram.Navigation;
 using Telegram.Navigation.Services;
 using Telegram.Td.Api;
 using Telegram.ViewModels;
@@ -21,7 +22,7 @@ namespace Telegram.Common
     {
         public static void RemoveSkip(this INavigationService service, int count)
         {
-            while (service.Frame.BackStackDepth > count)
+            while (service.BackStack.Count > count)
             {
                 service.RemoveFromBackStack(count);
             }
@@ -31,15 +32,15 @@ namespace Telegram.Common
         {
             if (service.CanGoBack)
             {
-                service.RemoveFromBackStack(service.Frame.BackStackDepth - 1);
+                service.RemoveFromBackStack(service.BackStack.Count - 1);
             }
         }
 
         public static void RemoveLastIf(this INavigationService service, Type type)
         {
-            if (service.CanGoBack && service.Frame.BackStack[service.Frame.BackStackDepth - 1].SourcePageType == type)
+            if (service.CanGoBack && service.BackStack[^1].SourcePageType == type)
             {
-                service.RemoveFromBackStack(service.Frame.BackStackDepth - 1);
+                service.RemoveFromBackStack(service.BackStack.Count - 1);
             }
         }
 
@@ -115,11 +116,11 @@ namespace Telegram.Common
             }
         }
 
-        public static void NavigateToSender(this INavigationService service, MessageSender sender, NavigationState state = null, NavigationTransitionInfo infoOverride = null)
+        public static void NavigateToSender(this INavigationService service, MessageSender sender, NavigationState state = null, PageTransition transition = PageTransition.Default)
         {
             if (service is TLNavigationService serviceEx)
             {
-                serviceEx.NavigateToSender(sender, state, infoOverride);
+                serviceEx.NavigateToSender(sender, state, transition);
             }
         }
 
@@ -166,18 +167,30 @@ namespace Telegram.Common
 
         public static void NavigateToMain(this INavigationService service, string parameter)
         {
-            void handler(object s, NavigationEventArgs args)
-            {
-                service.Frame.Navigated -= handler;
+            service.Navigated += new MainActivation(service, parameter).OnNavigated;
+            service.Navigate(typeof(MainPage));
+        }
 
-                if (args.Content is MainPage page)
-                {
-                    page.Activate(parameter);
-                }
+        private sealed class MainActivation
+        {
+            private readonly INavigationService _service;
+            private readonly string _parameter;
+
+            public MainActivation(INavigationService service, string parameter)
+            {
+                _service = service;
+                _parameter = parameter;
             }
 
-            service.Frame.Navigated += handler;
-            service.Navigate(typeof(MainPage));
+            public void OnNavigated(object sender, NavigatedEventArgs e)
+            {
+                _service.Navigated -= OnNavigated;
+
+                if (e.Content is MainPage page)
+                {
+                    page.Activate(_parameter);
+                }
+            }
         }
 
         public static void NavigateToPasscode(this INavigationService service)
@@ -188,11 +201,11 @@ namespace Telegram.Common
             }
         }
 
-        public static Task<PasswordState> NavigateToPasswordSetupAsync(this INavigationService service)
+        public static Task<PasswordState> NavigateToPasswordSetupAsync(this INavigationService service, int authorizationDelay = 0)
         {
             if (service is TLNavigationService serviceEx)
             {
-                return serviceEx.NavigateToPasswordSetupAsync();
+                return serviceEx.NavigateToPasswordSetupAsync(authorizationDelay);
             }
 
             return Task.FromResult<PasswordState>(null);
@@ -263,9 +276,9 @@ namespace Telegram.Common
             ChatMessageTopic peer;
             bool found = false;
 
-            for (int i = 0; i < service.Frame.BackStackDepth; i++)
+            for (int i = 0; i < service.BackStack.Count; i++)
             {
-                var entry = service.Frame.BackStack[i];
+                var entry = service.BackStack[i];
                 if (TryGetChatFromParameter(service, entry.Parameter, out peer))
                 {
                     found = peer.ChatId == target;
@@ -283,7 +296,7 @@ namespace Telegram.Common
                 if (peer.ChatId == target)
                 {
                     service.GoBack();
-                    service.Frame.ForwardStack.Clear();
+                    service.ClearForwardStack();
                 }
             }
         }
@@ -322,9 +335,9 @@ namespace Telegram.Common
             //    }
             //}
 
-            for (int i = service.Frame.BackStackDepth - 1; i >= 0; i--)
+            for (int i = service.BackStack.Count - 1; i >= 0; i--)
             {
-                var entry = service.Frame.BackStack[i];
+                var entry = service.BackStack[i];
                 if (entry.SourcePageType == typeof(ChatPage))
                 {
                     if (TryGetChatFromParameter(service, entry.Parameter, out ChatMessageTopic chatId))
@@ -346,11 +359,6 @@ namespace Telegram.Common
 
         public static bool TryGetChatFromParameter(this INavigationService service, object parameter, out ChatMessageTopic chatId)
         {
-            if (parameter is string cacheKey && service.CacheKeyToParameter.TryGetValue(cacheKey, out object value))
-            {
-                parameter = value;
-            }
-
             if (parameter is long)
             {
                 chatId = new ChatMessageTopic((long)parameter, null);
@@ -368,46 +376,28 @@ namespace Telegram.Common
 
         public static void ReplaceChatInBackStack(this INavigationService service, long oldChatId, long newChatId)
         {
-            for (int i = service.Frame.BackStackDepth - 1; i >= 0; i--)
+            for (int i = service.BackStack.Count - 1; i >= 0; i--)
             {
-                var item = service.Frame.BackStack[i];
+                var item = service.BackStack[i];
 
-                if (service.TryGetChatFromParameter(item.Parameter, out ChatMessageTopic chatId))
+                if (service.TryGetChatFromParameter(item.Parameter, out ChatMessageTopic chatId) && chatId.ChatId == oldChatId)
                 {
-                    if (chatId.ChatId == oldChatId)
-                    {
-                        if (item.Parameter is string cacheKey && service.CacheKeyToParameter.ContainsKey(cacheKey))
-                        {
-                            service.CacheKeyToParameter[cacheKey] = newChatId;
-                        }
-                        else
-                        {
-                            service.Frame.BackStack[i] = new PageStackEntry(item.SourcePageType, newChatId, item.NavigationTransitionInfo);
-                        }
-                    }
+                    item.Parameter = newChatId;
                 }
             }
         }
 
+        // Chat pages only: pages such as SupergroupEditPage read their parameter as a long, and handing
+        // them a topic is an InvalidCastException when the user goes back to one.
         public static void ReplaceChatInBackStack(this INavigationService service, long oldChatId, ChatMessageTopic newChatId)
         {
-            for (int i = service.Frame.BackStackDepth - 1; i >= 0; i--)
+            for (int i = service.BackStack.Count - 1; i >= 0; i--)
             {
-                var item = service.Frame.BackStack[i];
+                var item = service.BackStack[i];
 
-                if (service.TryGetChatFromParameter(item.Parameter, out ChatMessageTopic chatId))
+                if (item.SourcePageType == typeof(ChatPage) && service.TryGetChatFromParameter(item.Parameter, out ChatMessageTopic chatId) && chatId.ChatId == oldChatId)
                 {
-                    if (chatId.ChatId == oldChatId)
-                    {
-                        if (item.Parameter is string cacheKey && service.CacheKeyToParameter.ContainsKey(cacheKey))
-                        {
-                            service.CacheKeyToParameter[cacheKey] = newChatId;
-                        }
-                        else
-                        {
-                            service.Frame.BackStack[i] = new PageStackEntry(item.SourcePageType, newChatId, item.NavigationTransitionInfo);
-                        }
-                    }
+                    item.Parameter = newChatId;
                 }
             }
         }

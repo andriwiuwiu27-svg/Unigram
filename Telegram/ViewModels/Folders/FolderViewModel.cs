@@ -173,11 +173,11 @@ namespace Telegram.ViewModels.Folders
                 args.Cancel = true;
 
                 var confirm = await ShowPopupAsync(message, title, primary, Strings.PassportDiscard);
-                if (confirm == ContentDialogResult.Primary)
+                if (confirm == ModalPopupResult.Primary)
                 {
                     ContinueImpl(args);
                 }
-                else if (confirm == ContentDialogResult.Secondary)
+                else if (confirm == ModalPopupResult.Secondary)
                 {
                     _completed = true;
                     NavigationService.GoBack(args);
@@ -509,7 +509,7 @@ namespace Telegram.ViewModels.Folders
             var popup = new ShareFolderPopup();
 
             var confirm = await ShowPopupAsync(popup, Tuple.Create(Id.Value, link));
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 Object response;
                 if (link != null)

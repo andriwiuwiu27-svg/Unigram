@@ -71,7 +71,8 @@
                             <RowDefinition />
                             <RowDefinition />
                         </Grid.RowDefinitions>
-                        <Grid Control.IsTemplateFocusTarget="True"
+                        <Grid x:Name="Icon"
+                              Control.IsTemplateFocusTarget="True"
                               Background="{TemplateBinding Background}"
                               CornerRadius="24"
                               Width="48"

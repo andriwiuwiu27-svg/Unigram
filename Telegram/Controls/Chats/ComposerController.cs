@@ -15,6 +15,7 @@ using Telegram.Controls.RichEditor;
 using Telegram.Navigation;
 using Telegram.Td.Api;
 using Telegram.ViewModels;
+using Telegram.Views.Popups;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.UI.Text;
 using Windows.UI.Xaml;
@@ -65,6 +66,7 @@ namespace Telegram.Controls.Chats
                 {
                     CancelInlineBotToken();
                     CancelOffer();
+                    CancelRewrite();
 
                     _viewModel = value;
                     _isMenuExpanded = false;
@@ -79,9 +81,17 @@ namespace Telegram.Controls.Chats
         /// <summary>The message effect sent with the text.</summary>
         public MessageEffect Effect { get; set; }
 
+        /// <summary>The button that shows a rewrite is in flight.</summary>
+        public ChatSendButton SendButton { get; set; }
+
+        /// <summary>Where the rewritten text replaces the typed one, if anywhere.</summary>
+        public ComposerRewriteTransition Transition { get; set; }
+
         public void Detach()
         {
             ViewModel = null;
+            SendButton = null;
+            Transition = null;
 
             _input.SelectionChanged -= OnSelectionChanged;
             _input.ContentChanged -= OnContentChanged;
@@ -102,7 +112,7 @@ namespace Telegram.Controls.Chats
         public async void Send(bool disableNotification = false)
         {
             var viewModel = _viewModel;
-            if (viewModel == null)
+            if (viewModel == null || _rewriting)
             {
                 return;
             }
@@ -130,6 +140,10 @@ namespace Telegram.Controls.Chats
             else if (viewModel.Type == DialogType.ScheduledMessages && viewModel.ComposerHeader?.Editing == null)
             {
                 Schedule(false);
+                return;
+            }
+            else if (TryRewrite(viewModel, disableNotification))
+            {
                 return;
             }
 
@@ -160,6 +174,142 @@ namespace Telegram.Controls.Chats
         }
 
         // =====================================================================================
+        // Rewriting
+        // =====================================================================================
+
+        // Bumped by every rewrite and every cancel: TDLib cannot take a request back, so a reply or
+        // a delay that comes back to a newer token is stale and does nothing.
+        private int _rewriteToken;
+        private bool _rewriting;
+
+        // The text the rewrite is for, as the box reads it. Compared rather than trusting a flag
+        // alone, because a box may raise ContentChanged for its own SetText after the call returns.
+        private string _rewriteText;
+        private bool _replacing;
+
+        /// <summary>
+        /// A chat with text composition settings has every message rewritten before it goes out. The
+        /// text stays in the field, editable, while the request is in flight, and any edit to it
+        /// cancels the send; the reply replaces it, and it is sent once the transition is over.
+        /// </summary>
+        private bool TryRewrite(DialogViewModel viewModel, bool silent)
+        {
+            var parameters = viewModel.Chat?.TextCompositionParameters;
+            if (parameters == null || viewModel.ComposerHeader?.Editing != null)
+            {
+                return false;
+            }
+
+            var text = _input.GetFormattedText(false, true);
+
+            // A command is read by a bot, which needs it exactly as typed.
+            if (string.IsNullOrWhiteSpace(text.Text) || text.Text.TrimStart()[0] == '/')
+            {
+                return false;
+            }
+
+            Rewrite(viewModel, text, parameters, silent, Effect?.Id ?? 0);
+            return true;
+        }
+
+        private async void Rewrite(DialogViewModel viewModel, FormattedText text, TextCompositionParameters parameters, bool silent, long effectId)
+        {
+            var token = ++_rewriteToken;
+
+            _rewriting = true;
+            _rewriteText = _input.Text;
+            SendButton?.IsRewriting = true;
+
+            Function function = parameters.FixText
+                ? new FixTextWithAi(text)
+                : new ComposeTextWithAi(text, parameters.TranslateToLanguageCode, parameters.StyleName, parameters.AddEmojis);
+
+            var response = await viewModel.ClientService.SendAsync(function);
+            if (token != _rewriteToken)
+            {
+                return;
+            }
+
+            SendButton?.IsRewriting = false;
+
+            var result = response switch
+            {
+                FixedText fixedText => fixedText.Text,
+                FormattedText formattedText => formattedText,
+                _ => null
+            };
+
+            if (result == null)
+            {
+                EndRewrite();
+
+                if (response is Error error && TextEditorPopup.IsLimitError(error))
+                {
+                    viewModel.NavigationService.ShowPromo(new PremiumFeatureTextComposition());
+                }
+                else
+                {
+                    viewModel.ShowToast(Strings.AIEditorSendFailed, ToastPopupIcon.Error);
+                }
+
+                return;
+            }
+
+            var transition = Transition;
+            var animate = transition != null && _element is FrameworkElement field && transition.Capture(field);
+
+            if (animate)
+            {
+                // The snapshot is taken on the next frame, so the field must still hold the old text then.
+                await VisualUtilities.WaitForCompositionRenderedAsync();
+
+                if (token != _rewriteToken)
+                {
+                    return;
+                }
+            }
+
+            _replacing = true;
+            _input.SetText(result);
+            _input.MoveCaretToEnd();
+            _replacing = false;
+
+            _rewriteText = _input.Text;
+
+            var duration = animate ? transition.Play() : TimeSpan.Zero;
+
+            await Task.Delay(duration + TimeSpan.FromMilliseconds(140));
+
+            if (token != _rewriteToken)
+            {
+                return;
+            }
+
+            EndRewrite();
+
+            await viewModel.SendComposerTextAsync(_input.GetPreparedText(), SchedulingState.Auto, silent, effectId);
+        }
+
+        private void CancelRewrite()
+        {
+            if (_rewriting)
+            {
+                _rewriteToken++;
+
+                EndRewrite();
+                Transition?.Stop();
+            }
+        }
+
+        private void EndRewrite()
+        {
+            _rewriting = false;
+            _rewriteText = null;
+
+            SendButton?.IsRewriting = false;
+        }
+
+        // =====================================================================================
         // Typing
         // =====================================================================================
 
@@ -168,6 +318,11 @@ namespace Telegram.Controls.Chats
 
         private void OnContentChanged(object sender, EventArgs e)
         {
+            if (_rewriting && !_replacing && _input.Text != _rewriteText)
+            {
+                CancelRewrite();
+            }
+
             if (_pendingOffer != null || _shownOffer != null)
             {
                 UpdateOffer();
@@ -481,7 +636,7 @@ namespace Telegram.Controls.Chats
 
             offer.Cancellation.Dispose();
 
-            if (confirm != ContentDialogResult.Primary || _viewModel != viewModel)
+            if (confirm != ModalPopupResult.Primary || _viewModel != viewModel)
             {
                 return;
             }

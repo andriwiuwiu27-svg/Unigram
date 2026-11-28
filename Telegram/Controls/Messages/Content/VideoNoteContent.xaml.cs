@@ -325,8 +325,11 @@ namespace Telegram.Controls.Messages.Content
                         Button.SetGlyph(file.Id, MessageContentState.Play);
                         Button.Progress = 1;
 
-                        Player.Source = new LocalFileSource(file);
-                        message.Delegate.ViewVisibleMessages();
+                        if (Player.Source is not LocalFileSource local || local.Id != file.Id)
+                        {
+                            Player.Source = new LocalFileSource(file);
+                            message.Delegate.ViewVisibleMessages();
+                        }
                     }
                 }
             }
@@ -448,11 +451,12 @@ namespace Telegram.Controls.Messages.Content
             return null;
         }
 
+        // The holder's circle drawn again rather than its own alpha mask: see OutlineMask.
         public CompositionBrush GetAlphaMask()
         {
-            if (Holder is Shape shape)
+            if (Holder != null && Holder.ActualSize is { X: > 0, Y: > 0 } size)
             {
-                return shape.GetAlphaMask();
+                return OutlineMask.FromEllipse(size);
             }
 
             return null;

@@ -54,9 +54,9 @@ namespace Telegram.Controls
         private void Update(float avatarTransitionFraction, UIElement titleRoot)
         {
             var newSize = new Vector2(ActualSize.X + 36, ActualSize.Y);
-            var seed = _seed;
 
-            var gifts = GetPinnedGifts(out long hash);
+            // Runs for every scroll step: hashing reads the list in place, and only a change builds it.
+            var hash = GetHash(GetSource(), GetWornGiftId());
 
             var avatarSize = new Vector2(120, 120);
             var centerFrame = new RectangleF((-72 + newSize.X - avatarSize.X) / 2f, (-36 + 204 - avatarSize.Y) / 2f, avatarSize.X, avatarSize.Y);
@@ -99,7 +99,7 @@ namespace Telegram.Controls
             var newSize = new Vector2(ActualSize.X + 36, ActualSize.Y);
             var seed = _seed;
 
-            var gifts = GetPinnedGifts(out long hash);
+            var gifts = GetShownGifts(GetSource(), GetWornGiftId(), out long hash);
 
             var avatarSize = new Vector2(120, 120);
             var centerFrame = new RectangleF((-72 + newSize.X - avatarSize.X) / 2f, (-36 + 204 - avatarSize.Y) / 2f, avatarSize.X, avatarSize.Y);
@@ -143,10 +143,12 @@ namespace Telegram.Controls
 
             for (int i = 0; i < Math.Max(iconPositions.Count, gifts.Count); i++)
             {
-                if (i >= gifts.Count || i >= iconPositions.Count || gifts[i].Gift is not SentGiftUpgraded upgraded)
+                if (i >= gifts.Count || i >= iconPositions.Count)
                 {
                     continue;
                 }
+
+                var upgraded = gifts[i];
 
                 OrbitGenerator.Position iconPosition = iconPositions[i];
                 var itemDistanceFraction = Math.Max(0.0f, Math.Min(0.5f, (iconPosition.Distance - avatarSize.X / 2.0f) / 144.0f));
@@ -159,7 +161,7 @@ namespace Telegram.Controls
 
                 var absolutePosition = effectivePosition.GetAbsolutePosition(centerFrame.Center);
 
-                var centerColor = upgraded.Gift.Backdrop.Colors.CenterColor.ToColor().WithBrightness(0.3f);
+                var centerColor = upgraded.Backdrop.Colors.CenterColor.ToColor().WithBrightness(0.3f);
 
                 var gradient = new RadialGradientBrush();
                 gradient.Center = new Point(0.5f, 0.5f);
@@ -181,7 +183,7 @@ namespace Telegram.Controls
 
                 var icon = new CustomEmojiIcon
                 {
-                    Source = DelayedFileSource.FromSticker(ViewModel.ClientService, upgraded.Gift.Model.Sticker),
+                    Source = DelayedFileSource.FromSticker(ViewModel.ClientService, upgraded.Model.Sticker),
                     Width = 28,
                     Height = 28,
                     FrameSize = new Size(28, 28),
@@ -241,28 +243,59 @@ namespace Telegram.Controls
             visual.StartAnimation("Scale", scale);
         }
 
-        private IList<ReceivedGift> GetPinnedGifts(out long hash)
+        // The profile's pins, never the tab's list, which a collection or a filter changes.
+        private IList<ReceivedGift> GetSource()
         {
-            hash = 0;
+            return ViewModel?.GiftsTab?.PinnedGifts ?? Array.Empty<ReceivedGift>();
+        }
 
-            var itemsView = ViewModel?.GiftsTab?.Items;
-            if (itemsView == null)
+        private long GetWornGiftId()
+        {
+            var viewModel = ViewModel;
+            if (viewModel?.Chat is not Chat chat)
             {
-                return Array.Empty<ReceivedGift>();
+                return 0;
             }
 
-            var items = new List<ReceivedGift>();
+            var status = viewModel.ClientService.TryGetUser(chat, out User user)
+                ? user.EmojiStatus
+                : chat.EmojiStatus;
 
-            foreach (var gift in itemsView)
+            return status?.Type is EmojiStatusTypeUpgradedGift upgradedGift
+                ? upgradedGift.UpgradedGiftId
+                : 0;
+        }
+
+        private static long GetHash(IList<ReceivedGift> source, long wornGiftId)
+        {
+            var hash = 0L;
+
+            for (int i = 0; i < source.Count; i++)
             {
-                if (gift.IsPinned && gift.Gift is SentGiftUpgraded upgraded)
+                if (source[i].Gift is SentGiftUpgraded upgraded && upgraded.Gift.Id != wornGiftId)
                 {
-                    items.Add(gift);
                     hash = ((hash * 20261) + 0x80000000L + upgraded.Gift.Id) % 0x80000000L;
                 }
             }
 
-            return items;
+            return hash;
+        }
+
+        private static IList<UpgradedGift> GetShownGifts(IList<ReceivedGift> source, long wornGiftId, out long hash)
+        {
+            hash = GetHash(source, wornGiftId);
+
+            var gifts = new List<UpgradedGift>(source.Count);
+
+            for (int i = 0; i < source.Count; i++)
+            {
+                if (source[i].Gift is SentGiftUpgraded upgraded && upgraded.Gift.Id != wornGiftId)
+                {
+                    gifts.Add(upgraded.Gift);
+                }
+            }
+
+            return gifts;
         }
     }
 

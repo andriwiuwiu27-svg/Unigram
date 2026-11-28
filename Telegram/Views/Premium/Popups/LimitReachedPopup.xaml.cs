@@ -515,7 +515,7 @@ namespace Telegram.Views.Premium.Popups
             }
 
             var confirm = await _navigationService.ShowPopupAsync(message, title, Strings.VoipGroupLeave, Strings.Cancel, destructive: true);
-            if (confirm != ContentDialogResult.Primary)
+            if (confirm != ModalPopupResult.Primary)
             {
                 args.Cancel = true;
                 deferral.Complete();

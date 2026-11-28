@@ -92,12 +92,29 @@ namespace Telegram.Composition
                 return false;
             }
 
-            var size = source.ActualSize;
+            var surface = CreateSnapshot(source, out Vector2 size);
+            if (surface == null)
+            {
+                return false;
+            }
+
+            Discard(id);
+            _snapshots[id] = new Snapshot(surface, size);
+            return true;
+        }
+
+        /// <summary>
+        /// A frozen snapshot of <paramref name="source"/> at one texel per device pixel, or null when
+        /// it cannot be taken. The pixels are whatever the compositor draws on its next pass.
+        /// </summary>
+        public static CompositionVisualSurface CreateSnapshot(FrameworkElement source, out Vector2 size)
+        {
+            size = source.ActualSize;
             var scale = source.XamlRoot?.RasterizationScale ?? 0;
 
             if (size.X < 1 || size.Y < 1 || scale < 1)
             {
-                return false;
+                return null;
             }
 
             var compositor = BootStrapper.Current.Compositor;
@@ -110,7 +127,7 @@ namespace Telegram.Composition
             if (!surface.TryGetPartner(out var partner))
             {
                 surface.Dispose();
-                return false;
+                return null;
             }
 
             // Scaled component by component because the vector spelling does not survive .NET Native
@@ -137,14 +154,11 @@ namespace Telegram.Composition
                 Logger.Error(string.Format("Realization size {0} applied as {1}", realization, applied));
 
                 surface.Dispose();
-                return false;
+                return null;
             }
 
             partner.Freeze();
-
-            Discard(id);
-            _snapshots[id] = new Snapshot(surface, size);
-            return true;
+            return surface;
         }
 
         /// <summary>

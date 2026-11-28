@@ -347,7 +347,7 @@ namespace Telegram.Controls.Gallery
             OnBackRequested(new BackRequestedRoutedEventArgs());
         }
 
-        public static Task<ContentDialogResult> ShowAsync(ViewModelBase viewModelBase, IStorageService storageService, Chat chat, FrameworkElement closing = null)
+        public static Task<ModalPopupResult> ShowAsync(ViewModelBase viewModelBase, IStorageService storageService, Chat chat, FrameworkElement closing = null)
         {
             var clientService = viewModelBase.ClientService;
             var aggregator = viewModelBase.Aggregator;
@@ -358,13 +358,13 @@ namespace Telegram.Controls.Gallery
                 var user = clientService.GetUser(chat);
                 if (user == null)
                 {
-                    return Task.FromResult(ContentDialogResult.None);
+                    return Task.FromResult(ModalPopupResult.None);
                 }
 
                 var userFull = clientService.GetUserFull(user.Id);
                 if (userFull?.Photo == null && userFull?.PublicPhoto == null && userFull?.PersonalPhoto == null)
                 {
-                    return Task.FromResult(ContentDialogResult.None);
+                    return Task.FromResult(ModalPopupResult.None);
                 }
 
                 var viewModel = new UserPhotosViewModel(clientService, storageService, aggregator, user, userFull);
@@ -376,7 +376,7 @@ namespace Telegram.Controls.Gallery
                 var basicGroupFull = clientService.GetBasicGroupFull(chat);
                 if (basicGroupFull?.Photo == null)
                 {
-                    return Task.FromResult(ContentDialogResult.None);
+                    return Task.FromResult(ModalPopupResult.None);
                 }
 
                 var viewModel = new ChatPhotosViewModel(clientService, storageService, aggregator, chat, basicGroupFull.Photo);
@@ -388,7 +388,7 @@ namespace Telegram.Controls.Gallery
                 var supergroupFull = clientService.GetSupergroupFull(chat);
                 if (supergroupFull?.Photo == null)
                 {
-                    return Task.FromResult(ContentDialogResult.None);
+                    return Task.FromResult(ModalPopupResult.None);
                 }
 
                 var viewModel = new ChatPhotosViewModel(clientService, storageService, aggregator, chat, supergroupFull.Photo);
@@ -396,10 +396,10 @@ namespace Telegram.Controls.Gallery
                 return ShowAsync(navigationService.XamlRoot, viewModel, closing);
             }
 
-            return Task.FromResult(ContentDialogResult.None);
+            return Task.FromResult(ModalPopupResult.None);
         }
 
-        public static Task<ContentDialogResult> ShowAsync(ViewModelBase viewModelBase, IStorageService storageService, User user, FrameworkElement closing = null)
+        public static Task<ModalPopupResult> ShowAsync(ViewModelBase viewModelBase, IStorageService storageService, User user, FrameworkElement closing = null)
         {
             var clientService = viewModelBase.ClientService;
             var aggregator = viewModelBase.Aggregator;
@@ -408,7 +408,7 @@ namespace Telegram.Controls.Gallery
             var userFull = clientService.GetUserFull(user.Id);
             if (userFull?.Photo == null && userFull?.PublicPhoto == null && userFull?.PersonalPhoto == null)
             {
-                return Task.FromResult(ContentDialogResult.None);
+                return Task.FromResult(ModalPopupResult.None);
             }
 
             var viewModel = new UserPhotosViewModel(clientService, storageService, aggregator, user, userFull);
@@ -416,7 +416,7 @@ namespace Telegram.Controls.Gallery
             return ShowAsync(navigationService.XamlRoot, viewModel, closing);
         }
 
-        public static Task<ContentDialogResult> ShowAsync(XamlRoot xamlRoot, GalleryViewModelBase parameter, FrameworkElement closing = null, double timestamp = 0, VideoPlayerBase player = null)
+        public static Task<ModalPopupResult> ShowAsync(XamlRoot xamlRoot, GalleryViewModelBase parameter, FrameworkElement closing = null, double timestamp = 0, VideoPlayerBase player = null)
         {
             var popup = new GalleryWindow(xamlRoot)
             {
@@ -426,7 +426,7 @@ namespace Telegram.Controls.Gallery
             return popup.ShowAsyncInternal(parameter, closing, player);
         }
 
-        private Task<ContentDialogResult> ShowAsyncInternal(GalleryViewModelBase parameter, FrameworkElement closing = null, VideoPlayerBase player = null)
+        private Task<ModalPopupResult> ShowAsyncInternal(GalleryViewModelBase parameter, FrameworkElement closing = null, VideoPlayerBase player = null)
         {
             if (closing != null && closing.IsConnected() && !AppSettings.FullScreenGallery)
             {

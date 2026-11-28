@@ -9,6 +9,7 @@ using System;
 using System.Threading.Tasks;
 using Telegram.Collections;
 using Telegram.Common;
+using Telegram.Controls;
 using Telegram.Navigation;
 using Telegram.Navigation.Services;
 using Telegram.Services;
@@ -85,7 +86,7 @@ namespace Telegram.ViewModels.Business
             };
 
             var confirm = await ShowPopupAsync(popup);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 chatLink.Title = popup.Text;
 
@@ -105,7 +106,7 @@ namespace Telegram.ViewModels.Business
         public async void Delete(BusinessChatLink chatLink)
         {
             var confirm = await ShowPopupAsync(Strings.BusinessLinksDeleteMessage, Strings.BusinessLinksDeleteTitle, Strings.Remove, Strings.Cancel, destructive: true);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 ClientService.Send(new DeleteBusinessChatLink(chatLink.Link));
                 Items.Remove(chatLink);
@@ -119,7 +120,7 @@ namespace Telegram.ViewModels.Business
             var popup = new BusinessChatLinkPopup(this, chatLink);
 
             var confirm = await ShowPopupAsync(popup);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
 
             }

@@ -1054,6 +1054,8 @@ namespace Telegram.Common
                     return "The specified procedure could not be found.";
 
                 case "El administrador de estados no pudo consultar la configuración.":
+                case "Falha do Gerenciador de Estado ao consultar a configuração.":
+                case "Fehler beim Abfragen der Einstellung.":
                     return "State Manager failed to query the setting.";
 
                 case "Le processus ne peut pas accéder au fichier car ce fichier est utilisé par un autre processus.":

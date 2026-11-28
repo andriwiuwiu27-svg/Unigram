@@ -4,7 +4,6 @@
 #include "VoipVideoCapture.h"
 #include "VoipScreenCapture.h"
 #include "Instance.h"
-#include "InstanceImpl.h"
 #include "v2/InstanceV2Impl.h"
 #include "v2/InstanceV2CompatImpl.h"
 #include "v2/InstanceV2ReferenceImpl.h"

@@ -368,7 +368,7 @@ namespace Telegram.Views.Calls
                 };
 
                 var confirm = await popup.ShowQueuedAsync(XamlRoot);
-                if (confirm == ContentDialogResult.Primary)
+                if (confirm == ModalPopupResult.Primary)
                 {
                     _call.Discard(popup.IsChecked == true);
                 }
@@ -389,7 +389,7 @@ namespace Telegram.Views.Calls
             popup.SecondaryButtonText = Strings.Cancel;
 
             var confirm = await popup.ShowQueuedAsync(XamlRoot);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 _call.Discard(true);
                 Window.Close();
@@ -529,7 +529,7 @@ namespace Telegram.Views.Calls
             input.MinLength = 0;
 
             var confirm = await input.ShowQueuedAsync(XamlRoot);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 _call.ClientService.Send(new SetVideoChatTitle(_call.Id, input.Text));
             }
@@ -541,7 +541,7 @@ namespace Telegram.Views.Calls
             input.RequestedTheme = ElementTheme.Dark;
 
             var confirm = await input.ShowQueuedAsync(XamlRoot);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 _call.ClientService.Send(new StartGroupCallRecording(_call.Id, input.FileName, input.RecordVideo, input.UsePortraitOrientation));
             }
@@ -557,7 +557,7 @@ namespace Telegram.Views.Calls
             popup.SecondaryButtonText = Strings.Cancel;
 
             var confirm = await popup.ShowQueuedAsync(XamlRoot);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 _call.ClientService.Send(new EndGroupCallRecording(_call.Id));
             }

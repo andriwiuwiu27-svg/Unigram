@@ -213,7 +213,7 @@ namespace Telegram.Views.Popups
                 if (sender.SelectedDates.Count == 1)
                 {
                     _programmaticChange = true;
-                    Hide(ContentDialogResult.Primary);
+                    Hide(ModalPopupResult.Primary);
                 }
             }
         }
@@ -243,7 +243,7 @@ namespace Telegram.Views.Popups
                 PrimaryButtonText = Strings.ClearHistory;
                 SecondaryButtonText = Strings.Cancel;
 
-                DefaultButton = ContentDialogButton.None;
+                DefaultButton = ModalPopupButton.None;
 
                 View.SelectedDates.Clear();
                 View.SelectionMode = CalendarViewSelectionMode.Multiple;
@@ -264,7 +264,7 @@ namespace Telegram.Views.Popups
                 PrimaryButtonText = Strings.SelectDays;
                 SecondaryButtonText = Strings.Close;
 
-                DefaultButton = ContentDialogButton.Primary;
+                DefaultButton = ModalPopupButton.Primary;
 
                 View.SelectionMode = CalendarViewSelectionMode.Single;
                 View.SelectedDates.Clear();

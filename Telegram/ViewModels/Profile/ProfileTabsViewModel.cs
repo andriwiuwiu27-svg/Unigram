@@ -427,56 +427,67 @@ namespace Telegram.ViewModels.Profile
                 savedMessagesTopicId = savedMessagesTopic.SavedMessagesTopicId;
             }
 
-            async Task<Count> GetMessageCountAsync(SearchMessagesFilter filter, bool returnLocal)
+            // A local answer is -1 when TDLib does not know the count.
+            async Task<IReadOnlyList<int>> GetMessageCountsAsync(SearchMessagesFilter[] query, bool returnLocal)
             {
-                var countTask = ClientService.SendAsync(new GetChatMessageCount(chat.Id, Topic, filter, returnLocal));
+                var countsTask = ClientService.SendAsync(new GetChatMessageCounts(chat.Id, Topic, query, returnLocal));
 
-                // Polls open in their own chat history, which does not merge.
-                if (_upgradedFromChatId == 0 || filter is SearchMessagesFilterPoll)
+                if (_upgradedFromChatId == 0)
                 {
-                    return await countTask as Count;
+                    return await countsTask is ChatMessageCounts only ? only.Counts : null;
                 }
 
-                var upgradedFromTask = ClientService.SendAsync(new GetChatMessageCount(_upgradedFromChatId, null, filter, returnLocal));
+                var upgradedFromTask = ClientService.SendAsync(new GetChatMessageCounts(_upgradedFromChatId, null, query, returnLocal));
 
-                var count = await countTask as Count;
-                if (count != null && await upgradedFromTask is Count upgradedFrom)
+                if (await countsTask is not ChatMessageCounts counts)
                 {
-                    if (count.CountValue < 0 || upgradedFrom.CountValue < 0)
+                    return null;
+                }
+
+                if (await upgradedFromTask is not ChatMessageCounts upgradedFrom)
+                {
+                    return counts.Counts;
+                }
+
+                var merged = new int[query.Length];
+
+                for (int i = 0; i < merged.Length; i++)
+                {
+                    var count = counts.Counts[i];
+                    var upgradedFromCount = upgradedFrom.Counts[i];
+
+                    // Polls open in their own chat history, which does not merge.
+                    if (query[i] is SearchMessagesFilterPoll)
                     {
-                        return new Count(-1);
+                        merged[i] = count;
                     }
-
-                    return new Count(count.CountValue + upgradedFrom.CountValue);
+                    else if (count < 0 || upgradedFromCount < 0)
+                    {
+                        merged[i] = -1;
+                    }
+                    else
+                    {
+                        merged[i] = count + upgradedFromCount;
+                    }
                 }
 
-                return count;
+                return merged;
             }
 
-            // A local answer is -1 when TDLib does not know the count.
-            async Task<Count> GetCountAsync(SearchMessagesFilter filter, bool returnLocal)
+            async Task<int> GetCountAtAsync(Task<IReadOnlyList<int>> request, int index)
             {
-                if (filter is SearchMessagesFilterEmpty)
+                return await request is IReadOnlyList<int> counts ? counts[index] : 0;
+            }
+
+            async Task<int> GetSavedMessagesCountAsync()
+            {
+                var response = await ClientService.SendAsync(new GetSavedMessagesTopicHistory(chat.Id, 0, 0, 1));
+                if (response is Messages messages)
                 {
-                    if (IsSavedMessages || MyProfile)
-                    {
-                        return new Count(0);
-                    }
-                    else if (returnLocal)
-                    {
-                        return new Count(-1);
-                    }
-
-                    var response = await ClientService.SendAsync(new GetSavedMessagesTopicHistory(chat.Id, 0, 0, 1));
-                    if (response is Messages messages)
-                    {
-                        return new Count(messages.TotalCount);
-                    }
-
-                    return new Count(0);
+                    return messages.TotalCount;
                 }
 
-                return await GetMessageCountAsync(filter, returnLocal);
+                return 0;
             }
 
             void UpdateDataSource(SearchMessagesFilter filter, int count)
@@ -524,16 +535,14 @@ namespace Telegram.ViewModels.Profile
                 };
             }
 
-            async Task<ProfileTabItem> LoadTabAsync(SearchMessagesFilter filter)
+            async Task<ProfileTabItem> LoadTabAsync(SearchMessagesFilter filter, Task<int> request)
             {
-                if (await GetCountAsync(filter, false) is Count count)
-                {
-                    UpdateDataSource(filter, count.CountValue);
+                var count = await request;
+                UpdateDataSource(filter, count);
 
-                    if (count.CountValue > 0)
-                    {
-                        return CreateTab(filter, count.CountValue);
-                    }
+                if (count > 0)
+                {
+                    return CreateTab(filter, count);
                 }
 
                 return null;
@@ -552,23 +561,48 @@ namespace Telegram.ViewModels.Profile
                 };
             }
 
-            var local = new Task<Count>[filters.Length];
+            // searchMessagesFilterEmpty fails the whole batch, and here it stands for the saved messages tab, which is counted apart.
+            var messageFilters = Array.FindAll(filters, x => x is not SearchMessagesFilterEmpty);
+            var local = await GetMessageCountsAsync(messageFilters, true);
 
-            for (int i = 0; i < filters.Length; i++)
+            var counts = new int[filters.Length];
+            var unknown = new List<SearchMessagesFilter>();
+
+            for (int i = 0, j = 0; i < filters.Length; i++)
             {
-                local[i] = GetCountAsync(filters[i], true);
+                if (filters[i] is SearchMessagesFilterEmpty)
+                {
+                    counts[i] = IsSavedMessages || MyProfile ? 0 : -1;
+                }
+                else
+                {
+                    counts[i] = local != null ? local[j] : 0;
+                    j++;
+
+                    if (counts[i] < 0)
+                    {
+                        unknown.Add(filters[i]);
+                    }
+                }
             }
 
-            var counts = await Task.WhenAll(local);
-
             // Sent before anything waits on one, as each is a server round trip.
+            var server = unknown.Count > 0 ? GetMessageCountsAsync(unknown.ToArray(), false) : null;
             var requests = new Task<ProfileTabItem>[filters.Length];
 
-            for (int i = 0; i < filters.Length; i++)
+            for (int i = 0, j = 0; i < filters.Length; i++)
             {
-                if (counts[i]?.CountValue < 0)
+                if (counts[i] >= 0)
                 {
-                    requests[i] = LoadTabAsync(filters[i]);
+                    continue;
+                }
+                else if (filters[i] is SearchMessagesFilterEmpty)
+                {
+                    requests[i] = LoadTabAsync(filters[i], GetSavedMessagesCountAsync());
+                }
+                else
+                {
+                    requests[i] = LoadTabAsync(filters[i], GetCountAtAsync(server, j++));
                 }
             }
 
@@ -576,14 +610,11 @@ namespace Telegram.ViewModels.Profile
             {
                 if (requests[i] == null)
                 {
-                    if (counts[i] is Count count)
-                    {
-                        UpdateDataSource(filters[i], count.CountValue);
+                    UpdateDataSource(filters[i], counts[i]);
 
-                        if (count.CountValue > 0)
-                        {
-                            tabs.Add(CreateTab(filters[i], count.CountValue));
-                        }
+                    if (counts[i] > 0)
+                    {
+                        tabs.Add(CreateTab(filters[i], counts[i]));
                     }
                 }
                 else if (IsMainTab(filters[i]))

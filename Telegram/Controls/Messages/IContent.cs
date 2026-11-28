@@ -36,4 +36,16 @@ namespace Telegram.Controls.Messages
     {
         IPlayerView GetPlaybackElement();
     }
+
+    /// <summary>
+    /// Content whose last line the footer can share when it fits beside it, and goes under otherwise.
+    /// </summary>
+    public interface IContentWithWrap
+    {
+        /// <summary>
+        /// Where the last line ends, inside the content's padding, or -1 when the footer cannot share
+        /// it. Asked during the bubble's measure, so it can only answer from desired sizes.
+        /// </summary>
+        float ContentEnd();
+    }
 }

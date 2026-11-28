@@ -28,7 +28,7 @@ namespace Telegram.Views.Chats.Popups
         }
     }
 
-    public sealed partial class ChatInviteLinkPopup : ContentPopup
+    public sealed partial class ChatInviteLinkPopup : ModalPopup
     {
         private readonly IClientService _clientService;
         private readonly long _chatId;
@@ -120,7 +120,7 @@ namespace Telegram.Views.Chats.Popups
 
         public Function Request { get; private set; }
 
-        private void ContentDialog_PrimaryButtonClick(ContentDialog sender, ContentDialogButtonClickEventArgs args)
+        private void OnPrimaryButtonClick(ModalPopup sender, ModalPopupButtonClickEventArgs args)
         {
             var name = LinkName.Text;
             var expirationDate = 0;
@@ -273,7 +273,7 @@ namespace Telegram.Views.Chats.Popups
                     };
 
                     var confirm = await popup.ShowAsync(XamlRoot);
-                    if (confirm == ContentDialogResult.Primary)
+                    if (confirm == ModalPopupResult.Primary)
                     {
                         InsertLimitByPeriod((int)popup.Value.ToUnixTimeSeconds());
                     }
@@ -334,7 +334,7 @@ namespace Telegram.Views.Chats.Popups
                     };
 
                     var confirm = await popup.ShowAsync(XamlRoot);
-                    if (confirm == ContentDialogResult.Primary)
+                    if (confirm == ModalPopupResult.Primary)
                     {
                         InsertLimitNumberOfUses((int)popup.Value);
                     }

@@ -30,7 +30,7 @@ namespace Telegram.Views.Popups
             Title = Strings.BotShareMessage;
 
             PrimaryButtonText = Strings.BotShareMessageShare;
-            ButtonsLayout = ContentPopupButtonsLayout.Vertical;
+            ButtonsLayout = ModalPopupButtonsLayout.Vertical;
 
             message.IsOutgoing = false;
             clientService.TryGetChatFromUser(clientService.Options.MyId, out Chat chat);
@@ -48,7 +48,7 @@ namespace Telegram.Views.Popups
 
         private void Purchase_Click(object sender, RoutedEventArgs e)
         {
-            Hide(ContentDialogResult.Primary);
+            Hide(ModalPopupResult.Primary);
         }
     }
 }

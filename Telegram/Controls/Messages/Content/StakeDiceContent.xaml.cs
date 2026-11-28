@@ -190,7 +190,7 @@ namespace Telegram.Controls.Messages.Content
             Grid.SetColumn(button, 1);
 
             var confirm = await ToastPopup.ShowActionAsync(XamlRoot, grid, Strings.StakeDiceButton, null, ToastPlacementMode.Center, cancellationToken: cancellationToken.Token);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 _message.Delegate.SendMessage(new InputMessageStakeDice(_message.ClientService.StakeDiceState.StateHash, _message.ClientService.StakeDiceState.StakeGramAmount, false));
             }

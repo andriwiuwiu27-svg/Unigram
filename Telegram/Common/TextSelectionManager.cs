@@ -234,16 +234,24 @@ namespace Telegram.Common
 
             ReleaseCursor(null);
 
-            _root.RemoveHandler(UIElement.PointerPressedEvent, _pointerPressed);
-            _root.RemoveHandler(UIElement.PointerMovedEvent, _pointerMoved);
-            _root.RemoveHandler(UIElement.PointerReleasedEvent, _pointerReleased);
-            _root.RemoveHandler(UIElement.PointerCaptureLostEvent, _pointerCaptureLost);
-            _root.ContextRequested -= OnContextRequested;
-            _root.ProcessKeyboardAccelerators -= OnProcessKeyboardAccelerators;
+            // Claimed before the calls into XAML below: a Detach can re-enter inside one of them,
+            // and it has to find nothing left to do rather than null the root mid-removal.
+            var root = _root;
+            _root = null;
+
+            if (root == null)
+            {
+                return;
+            }
+
             _owner.KeyDown -= OnKeyDown;
             _owner.Unloaded -= OnUnloaded;
-
-            _root = null;
+            root.RemoveHandler(UIElement.PointerPressedEvent, _pointerPressed);
+            root.RemoveHandler(UIElement.PointerMovedEvent, _pointerMoved);
+            root.RemoveHandler(UIElement.PointerReleasedEvent, _pointerReleased);
+            root.RemoveHandler(UIElement.PointerCaptureLostEvent, _pointerCaptureLost);
+            root.ContextRequested -= OnContextRequested;
+            root.ProcessKeyboardAccelerators -= OnProcessKeyboardAccelerators;
         }
 
         // The per-window coordinator that keeps a single selection across bubbles. Resolved

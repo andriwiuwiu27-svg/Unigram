@@ -127,7 +127,7 @@ namespace Telegram.Controls.Messages.Content
 
         public bool IsValid(MessageContent content, bool primary)
         {
-            return content is MessageCall;
+            return content is MessageCall or MessageGroupCall;
         }
 
         private void ToolTip_Opened(object sender, RoutedEventArgs e)

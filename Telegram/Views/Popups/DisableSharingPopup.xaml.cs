@@ -17,7 +17,7 @@ namespace Telegram.Views.Popups
             InitializeComponent();
 
             PrimaryButtonText = clientService.IsPremium ? Strings.DisableSharingInfoButton : Strings.PrivateMessagesChargePremiumLocked;
-            ButtonsLayout = ContentPopupButtonsLayout.Vertical;
+            ButtonsLayout = ModalPopupButtonsLayout.Vertical;
         }
     }
 }

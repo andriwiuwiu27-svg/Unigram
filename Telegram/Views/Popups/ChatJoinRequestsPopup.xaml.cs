@@ -19,7 +19,7 @@ using Windows.UI.Xaml.Controls;
 
 namespace Telegram.Views.Popups
 {
-    public sealed partial class ChatJoinRequestsPopup : ContentPopup
+    public sealed partial class ChatJoinRequestsPopup : ModalPopup
     {
         public ChatJoinRequestsViewModel ViewModel => DataContext as ChatJoinRequestsViewModel;
 

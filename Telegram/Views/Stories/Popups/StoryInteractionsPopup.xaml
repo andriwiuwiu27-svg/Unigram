@@ -153,12 +153,17 @@
                        BasedOn="{StaticResource DefaultListViewItemStyle}" />
             </ListView.ItemContainerStyle>
             <ListView.Footer>
-                <Border>
+                <StackPanel>
                     <TextBlock x:Name="ExpiredFooter"
                                common:TextBlockHelper.Markdown="{CustomResource ExpiredViewsStubPremiumDescription}"
                                Style="{StaticResource InfoCaptionTextBlockStyle}"
                                Margin="12,8,12,0" />
-                </Border>
+                    <TextBlock Text="{CustomResource ServerErrorViewersFull}"
+                               Visibility="{x:Bind ViewModel.IsPartial, Mode=OneWay}"
+                               Style="{StaticResource InfoCaptionTextBlockStyle}"
+                               TextAlignment="Center"
+                               Margin="12,8,12,0" />
+                </StackPanel>
             </ListView.Footer>
             <ListView.ItemContainerTransitions>
                 <TransitionCollection />
@@ -169,6 +174,21 @@
                                     ScrollingHost="{x:Bind ScrollingHost}"
                                     BottomInset="0"
                                     Grid.Row="2" />
+
+        <StackPanel Visibility="{x:Bind ConvertEmptyVisibility(ViewModel.EmptyState), Mode=OneWay}"
+                    VerticalAlignment="Center"
+                    Padding="24,24,24,48"
+                    Grid.Row="2">
+            <TextBlock Text="{x:Bind ConvertEmptyTitle(ViewModel.EmptyState), Mode=OneWay}"
+                       Visibility="{x:Bind ConvertEmptyTitleVisibility(ViewModel.EmptyState), Mode=OneWay}"
+                       Style="{StaticResource BaseTextBlockStyle}"
+                       TextAlignment="Center"
+                       TextWrapping="Wrap"
+                       Margin="0,0,0,4" />
+            <TextBlock Text="{x:Bind ConvertEmptySubtitle(ViewModel.EmptyState), Mode=OneWay}"
+                       Style="{StaticResource InfoCaptionTextBlockStyle}"
+                       TextAlignment="Center" />
+        </StackPanel>
 
         <Grid x:Name="ExpiredRoot"
               x:Load="False"

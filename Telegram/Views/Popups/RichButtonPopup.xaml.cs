@@ -194,7 +194,7 @@ namespace Telegram.Views.Popups
         private void DeleteButton_Click(object sender, RoutedEventArgs e)
         {
             _result = RichButtonPopupResult.Delete;
-            Hide(ContentDialogResult.Secondary);
+            Hide(ModalPopupResult.Secondary);
         }
 
         private void OnPrimaryButtonClick(ModalPopup sender, ModalPopupButtonClickEventArgs args)
@@ -271,7 +271,7 @@ namespace Telegram.Views.Popups
                 }
                 else if (Validate())
                 {
-                    Hide(ContentDialogResult.Primary);
+                    Hide(ModalPopupResult.Primary);
                 }
 
                 e.Handled = true;
@@ -284,7 +284,7 @@ namespace Telegram.Views.Popups
             {
                 if (Validate())
                 {
-                    Hide(ContentDialogResult.Primary);
+                    Hide(ModalPopupResult.Primary);
                 }
 
                 e.Handled = true;

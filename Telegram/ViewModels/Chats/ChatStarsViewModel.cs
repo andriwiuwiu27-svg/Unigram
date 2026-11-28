@@ -220,13 +220,13 @@ namespace Telegram.ViewModels.Chats
             };
 
             var confirm = await ShowPopupAsync(popup);
-            if (confirm != ContentDialogResult.Primary)
+            if (confirm != ModalPopupResult.Primary)
             {
                 return;
             }
 
             var result = await ShowInputAsync(InputPopupType.Password, Strings.PleaseEnterCurrentPasswordWithdraw, Strings.TwoStepVerification, Strings.LoginPassword, Strings.OK, Strings.Cancel);
-            if (result.Result != ContentDialogResult.Primary)
+            if (result.Result != ModalPopupResult.Primary)
             {
                 return;
             }

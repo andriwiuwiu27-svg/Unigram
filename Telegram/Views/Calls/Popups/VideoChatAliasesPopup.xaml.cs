@@ -29,8 +29,6 @@ namespace Telegram.Views.Calls.Popups
             _canSchedule = canSchedule;
             _channel = chat.Type is ChatTypeSupergroup super && super.IsChannel;
 
-            CloseButtonClick += Schedule_Click;
-
             var already = senders.FirstOrDefault(x => x.AreTheSame(chat.VideoChat.DefaultParticipantId));
 
             Title = chat.VideoChat.GroupCallId != 0
@@ -74,8 +72,6 @@ namespace Telegram.Views.Calls.Popups
                 StartWith.Visibility = Visibility.Collapsed;
             }
         }
-
-        public bool IsScheduleSelected { get; private set; }
 
         public bool IsStartWithSelected { get; private set; }
 
@@ -131,15 +127,10 @@ namespace Telegram.Views.Calls.Popups
             }
         }
 
-        private void Schedule_Click(ModalPopup sender, ModalPopupButtonClickEventArgs args)
-        {
-            IsScheduleSelected = true;
-        }
-
         private void StartWith_Click(object sender, TextUrlClickEventArgs e)
         {
             IsStartWithSelected = true;
-            Hide(ContentDialogResult.Primary);
+            Hide(ModalPopupResult.Primary);
         }
     }
 }

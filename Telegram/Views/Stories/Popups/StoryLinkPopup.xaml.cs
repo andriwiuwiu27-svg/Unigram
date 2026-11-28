@@ -300,7 +300,7 @@ namespace Telegram.Views.Stories.Popups
             if (e.Key == Windows.System.VirtualKey.Enter && ContainsUrl(UrlField.Text))
             {
                 e.Handled = true;
-                Hide(ContentDialogResult.Primary);
+                Hide(ModalPopupResult.Primary);
             }
         }
 

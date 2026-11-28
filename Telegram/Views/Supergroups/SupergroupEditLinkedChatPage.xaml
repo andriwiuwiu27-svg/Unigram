@@ -9,22 +9,14 @@
                   xmlns:local="using:Telegram.Views"
                   mc:Ignorable="d">
 
-    <Page.Resources>
+    <UserControl.Resources>
         <DataTemplate x:Key="ChatTemplate">
             <Button Style="{StaticResource EmptyButtonStyle}"
                     BorderThickness="0,1,0,0">
                 <cells:ProfileCell />
             </Button>
         </DataTemplate>
-    </Page.Resources>
-
-    <Page.Transitions>
-        <TransitionCollection>
-            <NavigationThemeTransition>
-                <SlideNavigationTransitionInfo Effect="FromRight" />
-            </NavigationThemeTransition>
-        </TransitionCollection>
-    </Page.Transitions>
+    </UserControl.Resources>
 
     <Grid Background="{ThemeResource SettingsPageBackground}">
         <controls:TableListView x:Name="ScrollingHost"

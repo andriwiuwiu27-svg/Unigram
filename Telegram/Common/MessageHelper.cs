@@ -35,6 +35,7 @@ using Telegram.Views.Popups;
 using Telegram.Views.Premium.Popups;
 using Telegram.Views.Settings;
 using Telegram.Views.Stars.Popups;
+using Telegram.Views.Wallet;
 using Telegram.Views.Wallet.Popups;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Foundation;
@@ -316,10 +317,10 @@ namespace Telegram.Common
 
                 try
                 {
-                    var item = await StorageFile.GetFileFromPathAsync(file.Local.Path);
+                    var item = await FileItem.GetFileFromPathAsync(file.Local.Path);
 
                     args.Data.RequestedOperation = DataPackageOperation.Copy;
-                    args.Data.SetStorageItems(new[] { item });
+                    args.Data.SetStorageItems(new[] { await item.ToStorageFileAsync() });
 
                     using (var stream = new InMemoryRandomAccessStream())
                     {
@@ -556,7 +557,7 @@ namespace Telegram.Common
                 var popup = new LoginUrlInfoPopup(clientService, requestConfirmation);
 
                 var confirm = await navigation.ShowPopupAsync(popup);
-                if (confirm != ContentDialogResult.Primary)
+                if (confirm != ModalPopupResult.Primary)
                 {
                     return;
                 }
@@ -713,6 +714,9 @@ namespace Telegram.Common
                     break;
                 case InternalLinkTypeBotAddToChannel botAddToChannel:
                     NavigateToBotAddToChannel(clientService, navigation, botAddToChannel.BotUsername, botAddToChannel.AdministratorRights);
+                    break;
+                case InternalLinkTypeBotInvite botInvite:
+                    NavigateToBotInvite(clientService, navigation, botInvite.BotUsername);
                     break;
                 case InternalLinkTypeDirectMessagesChat directMessagesChat:
                     NavigateToDirectMessagesChat(clientService, navigation, directMessagesChat.ChannelUsername);
@@ -1424,13 +1428,33 @@ namespace Telegram.Common
             }
         }
 
+        private static async void NavigateToBotInvite(IClientService clientService, INavigationService navigation, string botUsername)
+        {
+            var response = await clientService.SendAsync(new SearchPublicChat(botUsername));
+            if (response is Chat chat && clientService.TryGetUser(chat, out User botUser) && botUser.Type is UserTypeBot bot)
+            {
+                if (bot.CanBeEdited)
+                {
+                    navigation.ShowPopup(new ChooseChatsPopup(), new ChooseChatsConfigurationInviteToBot(botUser.Id));
+                }
+                else
+                {
+                    navigation.ShowToast(string.Format(Strings.BotInviteErrorNotOwner, chat.Title), ToastPopupIcon.Info);
+                }
+            }
+            else
+            {
+                navigation.ShowToast(Strings.NoUsernameFound, ToastPopupIcon.Info);
+            }
+        }
+
         public static async void NavigateToGroupCall(IClientService clientService, INavigationService navigation, InputGroupCall inputGroupCall)
         {
             var response = await clientService.SendAsync(new GetGroupCallParticipants(inputGroupCall, 3));
             if (response is GroupCallParticipants participants)
             {
                 var confirm = await navigation.ShowPopupAsync(new JoinGroupCallPopup(clientService, participants));
-                if (confirm == ContentDialogResult.Primary)
+                if (confirm == ModalPopupResult.Primary)
                 {
                     clientService.Session.Resolve<IVoipService>().JoinGroupCall(navigation, inputGroupCall);
                 }
@@ -1441,15 +1465,27 @@ namespace Telegram.Common
             }
         }
 
-        public static async void NavigateToUpgradedGift(IClientService clientService, INavigationService navigation, string name)
+        /// <summary>
+        /// Opens the gift sheet for <paramref name="name"/>; for a <paramref name="collectible"/> in the
+        /// wallet, with the wallet's actions on it.
+        /// </summary>
+        public static async void NavigateToUpgradedGift(IClientService clientService, INavigationService navigation, string name, TonNft collectible = null, IWalletCollectibleHost host = null)
         {
             var response = await clientService.SendAsync(new GetUpgradedGift(name));
-            if (response is UpgradedGift gift)
+            if (response is UpgradedGift { IsBurned: true } || response is Error { Message: "STARGIFT_ALREADY_BURNED" })
             {
-                var text = gift.OriginalDetails?.Text ?? string.Empty.AsFormattedText();
-                var receivedGift = new ReceivedGift(string.Empty, null, text, 0, true, false, false, false, false, false, false, 0, new SentGiftUpgraded(gift), Array.Empty<int>(), 0, 0, false, 0, 0, 0, 0, 0, string.Empty, 0);
+                navigation.ShowToast(Strings.UniqueGiftNotFoundBurned, ToastPopupIcon.Error);
+            }
+            else if (response is UpgradedGift gift)
+            {
+                var popup = new ReceivedGiftPopup(clientService, navigation, ReceivedGiftPopup.Wrap(gift), null, null);
 
-                navigation.ShowPopup(new ReceivedGiftPopup(clientService, navigation, receivedGift, null, null));
+                if (collectible != null)
+                {
+                    popup.ShowAsCollectible(collectible, host);
+                }
+
+                navigation.ShowPopup(popup);
             }
             else
             {
@@ -1523,7 +1559,7 @@ namespace Telegram.Common
                 };
 
                 var confirm = await navigation.ShowPopupAsync(popup);
-                if (confirm != ContentDialogResult.Primary)
+                if (confirm != ModalPopupResult.Primary)
                 {
                     continuation?.Invoke(false);
                     return;
@@ -1659,7 +1695,7 @@ namespace Telegram.Common
                     }
 
                     var confirm = await navigation.ShowPopupAsync(popup);
-                    if (confirm != ContentDialogResult.Primary)
+                    if (confirm != ModalPopupResult.Primary)
                     {
                         return;
                     }
@@ -1741,7 +1777,7 @@ namespace Telegram.Common
                 popup.CheckBoxLabel = textBlock;
 
                 var confirm = await navigation.ShowPopupAsync(popup);
-                if (confirm != ContentDialogResult.Primary)
+                if (confirm != ModalPopupResult.Primary)
                 {
                     return;
                 }
@@ -1812,7 +1848,7 @@ namespace Telegram.Common
             if (response is DeepLinkInfo info)
             {
                 var confirm = await navigation.ShowPopupAsync(info.Text, Strings.AppName, Strings.OK, info.NeedUpdateApplication ? Strings.UpdateApp : null);
-                if (confirm == ContentDialogResult.Secondary)
+                if (confirm == ModalPopupResult.Secondary)
                 {
                     await Launcher.LaunchUriAsync(new Uri("ms-windows-store://pdp/?PFN=" + AppIdentity.FamilyName));
                 }
@@ -1899,7 +1935,7 @@ namespace Telegram.Common
                 if (info.Id == AppSettings.LanguagePackId)
                 {
                     var confirm = await navigation.ShowPopupAsync(string.Format(Strings.LanguageSame, info.Name), Strings.Language, Strings.OK, Strings.Settings);
-                    if (confirm != ContentDialogResult.Secondary)
+                    if (confirm != ModalPopupResult.Secondary)
                     {
                         return;
                     }
@@ -1924,7 +1960,7 @@ namespace Telegram.Common
                     }
 
                     var confirm = await navigation.ShowPopupAsync(string.Format(message, info.Name, (int)Math.Ceiling(info.TranslatedStringCount / (float)info.TotalStringCount * 100)), Strings.LanguageTitle, Strings.Change, Strings.Cancel);
-                    if (confirm != ContentDialogResult.Primary)
+                    if (confirm != ModalPopupResult.Primary)
                     {
                         return;
                     }
@@ -2025,7 +2061,7 @@ namespace Telegram.Common
             }
 
             var confirm = await navigation.ShowPopupAsync(new AddProxyPopup(clientService, navigation, proxy));
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 LifetimeService.Current.Proxy.AddProxy(proxy, Constants.RELEASE);
             }
@@ -2234,7 +2270,7 @@ namespace Telegram.Common
                     var popup = new JoinChatPopup(clientService, info);
 
                     var confirm = await navigation.ShowPopupAsync(popup);
-                    if (confirm != ContentDialogResult.Primary)
+                    if (confirm != ModalPopupResult.Primary)
                     {
                         return;
                     }
@@ -2275,7 +2311,7 @@ namespace Telegram.Common
             var popup = new SubscribeChannelPopup(clientService, link, info);
 
             var confirm = await navigation.ShowPopupAsync(popup);
-            if (confirm == ContentDialogResult.Primary)
+            if (confirm == ModalPopupResult.Primary)
             {
                 // A successful payment joins the channel, but returns no chat: checking the link
                 // again does, now that the user is a member.
@@ -2304,7 +2340,7 @@ namespace Telegram.Common
                 };
 
                 var confirm = await navigation.ShowPopupAsync(popup);
-                if (confirm != ContentDialogResult.Primary)
+                if (confirm != ModalPopupResult.Primary)
                 {
                     return;
                 }
@@ -2360,7 +2396,7 @@ namespace Telegram.Common
                 var popup = new AddFolderPopup();
 
                 var confirm = await navigation.ShowPopupAsync(popup, info);
-                if (confirm == ContentDialogResult.Primary)
+                if (confirm == ModalPopupResult.Primary)
                 {
                     if (info.ChatFolderInfo.Id == 0)
                     {
@@ -2452,7 +2488,7 @@ namespace Telegram.Common
                     if (untrust)
                     {
                         var confirm = await navigationService.ShowPopupAsync(string.Format(Strings.OpenUrlAlert, string.Format("[{0}]({0})", url)), Strings.OpenUrlTitle, Strings.Open, Strings.Cancel);
-                        if (confirm != ContentDialogResult.Primary)
+                        if (confirm != ModalPopupResult.Primary)
                         {
                             return;
                         }

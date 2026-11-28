@@ -17,6 +17,7 @@ using Telegram.Services.Wallet;
 using Telegram.Td;
 using Telegram.Td.Api;
 using Telegram.ViewModels;
+using Telegram.Views.Popups;
 
 namespace Telegram.Controls.Messages
 {
@@ -38,6 +39,7 @@ namespace Telegram.Controls.Messages
             {
                 MessageBasicGroupChatCreate basicGroupChatCreate => UpdateBasicGroupChatCreate(message, basicGroupChatCreate, history),
                 MessageBotWriteAccessAllowed botWriteAccessAllowed => UpdateBotWriteAccessAllowed(message, botWriteAccessAllowed, history),
+                MessageBotInvite botInvite => UpdateBotInvite(message, botInvite, history),
                 MessageChatAddMembers chatAddMembers => UpdateChatAddMembers(message, chatAddMembers, history),
                 MessageChatAddedToCommunity chatAddedToCommunity => UpdateChatAddedToCommunity(message, chatAddedToCommunity, history),
                 MessageChatRemovedFromCommunity chatRemovedFromCommunity => UpdateChatRemovedFromCommunity(message, chatRemovedFromCommunity, history),
@@ -88,6 +90,7 @@ namespace Telegram.Controls.Messages
                 MessageTonConnectRequest tonConnectRequest => UpdateTonConnectRequest(tonConnectRequest),
                 MessageUpgradedGift upgradedGift => UpdateUpgradedGift(message, upgradedGift, history),
                 MessageUpgradedGiftPurchaseOffer upgradedGiftPurchaseOffer => UpdateUpgradedGiftPurchaseOffer(message, upgradedGiftPurchaseOffer, history),
+                MessageUpgradedGiftOnChainPurchaseOffer onChainPurchaseOffer => UpdateUpgradedGiftOnChainPurchaseOffer(message, onChainPurchaseOffer, history),
                 MessageUpgradedGiftPurchaseOfferRejected upgradedGiftPurchaseOfferRejected => UpdateUpgradedGiftPurchaseOfferRejected(message, upgradedGiftPurchaseOfferRejected, history),
                 MessageUsersShared usersShared => UpdateUsersShared(message, usersShared, history),
                 MessageVideoChatEnded videoChatEnded => UpdateVideoChatEnded(message, videoChatEnded, history),
@@ -829,6 +832,16 @@ namespace Telegram.Controls.Messages
             }
 
             return Strings.ActionBotAllowedWebapp.AsFormattedText();
+        }
+
+        private static FormattedText UpdateBotInvite(MessageWithOwner message, MessageBotInvite botInvite, bool history)
+        {
+            if (message.ClientService.TryGetUser(botInvite.InviterUserId, out User inviter))
+            {
+                return ReplaceWithLink(Strings.ActionBotInvite, inviter);
+            }
+
+            return Strings.ActionBotInviteUnknown.AsFormattedText();
         }
 
         private static FormattedText UpdateChatAddMembers(MessageWithOwner message, MessageChatAddMembers chatAddMembers, bool history)
@@ -2058,6 +2071,12 @@ namespace Telegram.Controls.Messages
             {
                 return ReplaceWithLink(string.Format(Strings.WalletActionSentGrams, amount), message.ClientService.GetUser(message.Chat));
             }
+            else if (tonWalletTransfer.OnRampProviderName.Length > 0 && message.ChatId is 777000 or 333000 or 42777)
+            {
+                // Only Telegram's own accounts report top-ups; anywhere else the name is not trusted.
+                var provider = char.ToUpper(tonWalletTransfer.OnRampProviderName[0]) + tonWalletTransfer.OnRampProviderName.Substring(1);
+                return ClientEx.ParseMarkdown(string.Format(Strings.WalletActionReceivedGramsOnramp, amount, provider));
+            }
             else if (message.ClientService.TryGetUser(tonWalletTransfer.SenderUserId, out User user))
             {
                 return ReplaceWithLink(string.Format(Strings.WalletActionReceivedGrams, amount), user);
@@ -2101,7 +2120,11 @@ namespace Telegram.Controls.Messages
 
         private static FormattedText UpdateUpgradedGift(MessageWithOwner message, MessageUpgradedGift upgradedGift, bool history)
         {
-            if (upgradedGift.Origin is UpgradedGiftOriginUpgrade)
+            if (TryGetResalePrice(upgradedGift.Origin, out long starCount, out string grams, out bool offer))
+            {
+                return UpdateUpgradedGiftResale(message, upgradedGift, starCount, grams, offer);
+            }
+            else if (upgradedGift.Origin is UpgradedGiftOriginUpgrade)
             {
                 if (upgradedGift.ReceiverId.IsUser(message.ClientService.Options.MyId))
                 {
@@ -2137,6 +2160,260 @@ namespace Telegram.Controls.Messages
             }
 
             return _emptyString;
+        }
+
+        /// <summary>
+        /// What a bought gift cost: a number of Stars, or Grams already written out to the last
+        /// digit, and whether it was bought through an offer. The on-chain origins read as the
+        /// Gram ones: on the message, a purchase is a purchase wherever it was signed.
+        /// </summary>
+        private static bool TryGetResalePrice(UpgradedGiftOrigin origin, out long starCount, out string grams, out bool offer)
+        {
+            starCount = 0;
+            grams = null;
+            offer = origin is UpgradedGiftOriginOffer or UpgradedGiftOriginOnChainOffer;
+
+            var price = origin switch
+            {
+                UpgradedGiftOriginResale resale => resale.Price,
+                UpgradedGiftOriginOffer purchaseOffer => purchaseOffer.Price,
+                _ => null
+            };
+
+            if (price is GiftResalePriceStar star)
+            {
+                starCount = star.StarCount;
+                return true;
+            }
+            else if (price is GiftResalePriceGram gram)
+            {
+                grams = TransferGiftPopup.FormatGram(gram.GramCentCount);
+                return true;
+            }
+            else if (origin is UpgradedGiftOriginOnChainResale onChainResale)
+            {
+                grams = Formatter.GramExact(onChainResale.GramAmount).Join();
+                return true;
+            }
+            else if (origin is UpgradedGiftOriginOnChainOffer onChainOffer)
+            {
+                grams = Formatter.GramExact(onChainOffer.GramAmount).Join();
+                return true;
+            }
+
+            return false;
+        }
+
+        private static FormattedText UpdateUpgradedGiftResale(MessageWithOwner message, MessageUpgradedGift upgradedGift, long starCount, string grams, bool offer)
+        {
+            var clientService = message.ClientService;
+            var myId = clientService.Options.MyId;
+
+            if (offer)
+            {
+                // An offer is answered by the owner, so whoever didn't receive the gift sold it.
+                var bought = upgradedGift.ReceiverId.IsUser(myId);
+                return ClientEx.ParseMarkdown(grams != null
+                    ? string.Format(bought ? Strings.ActionUniqueGiftResaleOutboundTON : Strings.ActionUniqueGiftResaleSoldOutboundTON, grams)
+                    : Locale.Declension(bought ? Strings.R.ActionUniqueGiftResaleOutbound : Strings.R.ActionUniqueGiftResaleSoldOutbound, starCount));
+            }
+
+            // Bought for a third party - a channel, or someone this chat is not with - it reads as
+            // one peer sending it to the other.
+            var withReceiver = clientService.TryGetUser(message.Chat, out User peer) && upgradedGift.ReceiverId.IsUser(peer.Id);
+            if (!upgradedGift.ReceiverId.IsUser(myId) && !withReceiver
+                && clientService.TryGetMessageSender(upgradedGift.SenderId, out Object sender)
+                && clientService.TryGetMessageSender(upgradedGift.ReceiverId, out Object receiver))
+            {
+                return ReplaceWithLink(grams != null
+                    ? string.Format(Strings.ActionUniqueGiftResaleServiceTON, grams)
+                    : Locale.Declension(Strings.R.ActionUniqueGiftResaleService, starCount), sender, receiver);
+            }
+
+            if (upgradedGift.SenderId.IsUser(myId))
+            {
+                return ClientEx.ParseMarkdown(grams != null
+                    ? string.Format(Strings.ActionUniqueGiftResaleOutboundTON, grams)
+                    : Locale.Declension(Strings.R.ActionUniqueGiftResaleOutbound, starCount));
+            }
+            else if (clientService.TryGetMessageSender(upgradedGift.SenderId, out Object buyer))
+            {
+                return ReplaceWithLink(grams != null
+                    ? string.Format(Strings.ActionUniqueGiftResaleInboundTON, grams)
+                    : Locale.Declension(Strings.R.ActionUniqueGiftResaleInbound, starCount), buyer);
+            }
+
+            return _emptyString;
+        }
+
+        private static FormattedText UpdateUpgradedGiftOnChainPurchaseOffer(MessageWithOwner message, MessageUpgradedGiftOnChainPurchaseOffer offer, bool history)
+        {
+            var amount = GiftHelper.FormatGrams(offer.GramAmount);
+            var gift = GiftHelper.NoBreak(offer.Gift.ToName());
+
+            // The offer itself is drawn as a card; every later message about it replies to it and
+            // says only what changed.
+            if (history && offer.OfferMessageId == 0)
+            {
+                var status = GetOnChainOfferStatus(offer);
+                var body = GetOnChainOfferBody(message.ClientService, offer, amount, gift);
+
+                return ClientEx.ParseMarkdown(status != null ? body + "\n\n" + status : body);
+            }
+            else if (history)
+            {
+                var notes = GetOnChainOfferNotes(offer, amount, gift);
+                if (notes != null)
+                {
+                    return ClientEx.ParseMarkdown(notes);
+                }
+            }
+
+            return ClientEx.ParseMarkdown(GetOnChainOfferSummary(message.ClientService, offer, amount, gift));
+        }
+
+        private static string GetOnChainOfferBody(IClientService clientService, MessageUpgradedGiftOnChainPurchaseOffer offer, string amount, string gift)
+        {
+            if (offer.IsBuyer)
+            {
+                return string.Format(Strings.GiftOnchainOfferOut, amount, gift);
+            }
+
+            var usd = GiftHelper.FormatUsd(clientService, offer.GramAmount);
+            return usd != null
+                ? string.Format(Strings.GiftOnchainOfferIn, amount, GiftHelper.NoBreak(usd), gift)
+                : string.Format(Strings.GiftOnchainOfferInNoUsd, amount, gift);
+        }
+
+        /// <summary>
+        /// The line under the offer card: how long is left while it is open, what is happening to
+        /// it while it settles, and nothing once it was answered, because the reply says so.
+        /// </summary>
+        public static string GetOnChainOfferStatus(MessageUpgradedGiftOnChainPurchaseOffer offer)
+        {
+            switch (offer.State)
+            {
+                case GiftOnChainPurchaseOfferStateSettled:
+                    return Strings.GiftOnchainOfferStatusSettled;
+                case GiftOnChainPurchaseOfferStateAccepted:
+                case GiftOnChainPurchaseOfferStateDeclined:
+                    return null;
+                case GiftOnChainPurchaseOfferStateCanceled:
+                    return Strings.GiftOnchainOfferStatusWithdrawn;
+                case GiftOnChainPurchaseOfferStateCanceling:
+                    return Strings.GiftOnchainOfferStatusCancelling;
+                case GiftOnChainPurchaseOfferStateExpired:
+                    return Strings.GiftOnchainOfferStatusExpired;
+            }
+
+            var left = offer.ExpirationDate - DateTime.Now.ToUnixTimeSeconds();
+            if (left <= 0)
+            {
+                return Strings.GiftOnchainOfferStatusExpiring;
+            }
+
+            var time = string.Format("{0:00}:{1:00}:{2:00}", left / 3600, left / 60 % 60, left % 60);
+            return string.Format(Strings.GiftOnchainOfferExpiresIn, time);
+        }
+
+        private static string GetOnChainOfferNotes(MessageUpgradedGiftOnChainPurchaseOffer offer, string amount, string gift)
+        {
+            var sold = offer.State is GiftOnChainPurchaseOfferStateAccepted or GiftOnChainPurchaseOfferStateSettled;
+            var builder = new StringBuilder();
+
+            void Add(string line)
+            {
+                if (builder.Length > 0)
+                {
+                    builder.Append('\n');
+                }
+
+                builder.Append(line);
+            }
+
+            if (offer.IsBuyer)
+            {
+                if (sold)
+                {
+                    Add(string.Format(Strings.GiftOnchainOfferNoteAccepted, amount, gift));
+                }
+                else if (offer.State is GiftOnChainPurchaseOfferStateDeclined)
+                {
+                    Add(string.Format(Strings.GiftOnchainOfferNoteDeclined, amount, gift));
+                }
+                else if (offer.State is GiftOnChainPurchaseOfferStateCanceled)
+                {
+                    Add(string.Format(Strings.GiftOnchainOfferNoteWithdrawn, amount, gift));
+                }
+
+                // -1 is an amount TDLib doesn't know, which is not the same as nothing returned.
+                var refund = offer.State switch
+                {
+                    GiftOnChainPurchaseOfferStateDeclined declined => declined.RefundAmount,
+                    GiftOnChainPurchaseOfferStateCanceled canceled => canceled.RefundAmount,
+                    GiftOnChainPurchaseOfferStateExpired expired => expired.RefundAmount,
+                    _ => 0
+                };
+
+                if (!sold && refund > 0)
+                {
+                    Add(string.Format(Strings.GiftOnchainOfferNoteRefunded, GiftHelper.FormatGrams(refund)));
+                }
+
+                if (offer.State is GiftOnChainPurchaseOfferStateCanceled { FineAmount: > 0 } withFine)
+                {
+                    Add(string.Format(Strings.GiftOnchainOfferNoteFine, GiftHelper.FormatGrams(withFine.FineAmount)));
+                }
+            }
+            else if (sold)
+            {
+                Add(Strings.GiftOnchainOfferNoteYouAccepted);
+                Add(string.Format(Strings.GiftOnchainOfferNoteYouSold, gift, amount));
+            }
+            else if (offer.State is GiftOnChainPurchaseOfferStateDeclined)
+            {
+                Add(Strings.GiftOnchainOfferNoteYouDeclined);
+            }
+
+            return builder.Length > 0
+                ? builder.ToString()
+                : null;
+        }
+
+        /// <summary>
+        /// One line for the chat list, replies and notifications.
+        /// </summary>
+        private static string GetOnChainOfferSummary(IClientService clientService, MessageUpgradedGiftOnChainPurchaseOffer offer, string amount, string gift)
+        {
+            var sold = offer.State is GiftOnChainPurchaseOfferStateAccepted or GiftOnChainPurchaseOfferStateSettled;
+
+            if (offer.IsBuyer)
+            {
+                if (sold)
+                {
+                    return string.Format(Strings.GiftOnchainOfferNoteAccepted, amount, gift);
+                }
+                else if (offer.State is GiftOnChainPurchaseOfferStateDeclined)
+                {
+                    return string.Format(Strings.GiftOnchainOfferNoteDeclined, amount, gift);
+                }
+                else if (offer.State is GiftOnChainPurchaseOfferStateCanceled)
+                {
+                    return string.Format(Strings.GiftOnchainOfferNoteWithdrawn, amount, gift);
+                }
+            }
+            else if (sold)
+            {
+                return string.Format(Strings.GiftOnchainOfferNoteYouSold, gift, amount);
+            }
+
+            return offer.State switch
+            {
+                GiftOnChainPurchaseOfferStateDeclined => string.Format(Strings.GiftOnchainOfferSummaryYouDeclined, amount, gift),
+                GiftOnChainPurchaseOfferStateCanceled => string.Format(Strings.GiftOnchainOfferSummaryWithdrawn, amount, gift),
+                GiftOnChainPurchaseOfferStateExpired => string.Format(offer.IsBuyer ? Strings.GiftOnchainOfferSummaryYourExpired : Strings.GiftOnchainOfferSummaryExpired, amount, gift),
+                _ => GetOnChainOfferBody(clientService, offer, amount, gift)
+            };
         }
 
         private static FormattedText UpdateUpgradedGiftPurchaseOffer(MessageWithOwner message, MessageUpgradedGiftPurchaseOffer upgradedGift, bool history)
@@ -2514,7 +2791,7 @@ namespace Telegram.Controls.Messages
                     }
                     else if (replyTo.SuggestedPostInfo.Price is SuggestedPostPriceGram priceGram)
                     {
-                        return string.Format(Strings.SuggestedOfferRefundByAdminAmountF.ReplaceStar(Icons.Ton), sender, message.Chat.Title, priceGram.GramCentCount).AsFormattedText();
+                        return string.Format(Strings.SuggestedOfferRefundByAdminAmountF.ReplaceStar(Icons.Ton), sender, message.Chat.Title, TransferGiftPopup.FormatGram(priceGram.GramCentCount)).AsFormattedText();
                     }
                 }
                 else
@@ -2530,7 +2807,7 @@ namespace Telegram.Controls.Messages
                 }
                 else if (replyTo.SuggestedPostInfo.Price is SuggestedPostPriceGram priceGram)
                 {
-                    return string.Format(Strings.SuggestedOfferRefundByUserAmountF.ReplaceStar(Icons.Ton), sender, message.Chat.Title, priceGram.GramCentCount).AsFormattedText();
+                    return string.Format(Strings.SuggestedOfferRefundByUserAmountF.ReplaceStar(Icons.Ton), sender, message.Chat.Title, TransferGiftPopup.FormatGram(priceGram.GramCentCount)).AsFormattedText();
                 }
             }
             else

@@ -1,12 +1,12 @@
-﻿<controls:ContentPopup x:Class="Telegram.Views.Stars.Popups.SubscriptionPopup"
-                       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-                       xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-                       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-                       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-                       xmlns:controls="using:Telegram.Controls"
-                       mc:Ignorable="d"
-                       Padding="0"
-                       IsDismissButtonVisible="True">
+﻿<controls:ModalPopup x:Class="Telegram.Views.Stars.Popups.SubscriptionPopup"
+                     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+                     xmlns:controls="using:Telegram.Controls"
+                     mc:Ignorable="d"
+                     Padding="0"
+                     IsDismissButtonVisible="True">
 
     <Grid>
         <ScrollViewer x:Name="ScrollingHost"
@@ -34,19 +34,12 @@
                                TextAlignment="Center"
                                VerticalAlignment="Top"
                                Grid.Row="1" />
-                    <StackPanel HorizontalAlignment="Center"
-                                Orientation="Horizontal"
-                                Margin="0,-2,0,0"
-                                Grid.Row="2">
-                        <controls:PremiumStarCount Width="24"
-                                                   Height="24"
-                                                   Grid.Column="4"
-                                                   Grid.RowSpan="2" />
-
-                        <TextBlock x:Name="StarCount"
-                                   Style="{StaticResource InfoBodyTextBlockStyle}"
-                                   VerticalAlignment="Center" />
-                    </StackPanel>
+                    <TextBlock x:Name="StarCount"
+                               Style="{StaticResource InfoBodyTextBlockStyle}"
+                               FontFamily="{StaticResource EmojiThemeFontFamilyWithSymbols}"
+                               HorizontalAlignment="Center"
+                               Margin="0,-2,0,0"
+                               Grid.Row="2" />
                 </Grid>
 
                 <Grid BorderBrush="{ThemeResource ButtonBorderBrush}"
@@ -163,4 +156,4 @@
                     Style="{StaticResource DangerTextButtonStyle}" />
         </Grid>
     </Grid>
-</controls:ContentPopup>
+</controls:ModalPopup>

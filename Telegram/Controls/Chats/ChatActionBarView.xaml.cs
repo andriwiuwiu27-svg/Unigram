@@ -81,6 +81,19 @@ namespace Telegram.Controls.Chats
             {
 
             }
+            else if (chat.ActionBar is ChatActionBarBotInvite botInvite)
+            {
+                // ReportSpam reports the chat, which reports the user who sent the invitation, and blocks the bot.
+                if (botInvite.CanUnarchive)
+                {
+                    CreateButton(Strings.Unarchive.ToUpper(), ViewModel.Unarchive);
+                    CreateButton(Strings.BotStop.ToUpper(), ViewModel.ReportSpam, column: 1, danger: true);
+                }
+                else
+                {
+                    CreateButton(Strings.BotStop.ToUpper(), ViewModel.ReportSpam, danger: true);
+                }
+            }
             else if (chat.ActionBar is ChatActionBarReportAddBlock reportAddBlock)
             {
                 if (reportAddBlock.CanUnarchive)

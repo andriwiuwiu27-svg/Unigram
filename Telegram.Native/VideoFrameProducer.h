@@ -70,7 +70,15 @@ namespace winrt::Telegram::Native::implementation
             // At the end of the file the decoder seeks back and decodes on in the same call, so the
             // frame that comes with completed is the next loop's first. A build that wrote it ended
             // every cached loop on a copy of frame 0, stamped 0.
-            if (!NextFrame(pixels, capacity, timestamp, 0) || m_finished)
+            bool rendered;
+
+            // A build has its own thread and takes the lead-in in one go.
+            do
+            {
+                rendered = NextFrame(pixels, capacity, timestamp, 0);
+            } while (!rendered && !m_finished);
+
+            if (!rendered || m_finished)
             {
                 m_finished = true;
                 return false;
@@ -79,16 +87,21 @@ namespace winrt::Telegram::Native::implementation
             return true;
         }
 
-        /// <summary>For the direct-render path, which skips the frames stamped before skipBefore.</summary>
+        /// <summary>
+        /// For the direct-render path, which skips the frames stamped before skipBefore. False with
+        /// IsFinished unset is no frame yet, and the next call carries on.
+        /// </summary>
         bool NextFrame(uint8_t* pixels, size_t capacity, float& timestamp, double skipBefore) noexcept
         {
-            if (m_finished || m_animation == nullptr || pixels == nullptr)
+            if (m_finished)
             {
                 return false;
             }
 
-            if (capacity < static_cast<size_t>(m_width) * m_height * 4)
+            // Latched, as every final answer is: a caller retries until IsFinished.
+            if (m_animation == nullptr || pixels == nullptr || capacity < static_cast<size_t>(m_width) * m_height * 4)
             {
+                m_finished = true;
                 return false;
             }
 
@@ -97,7 +110,7 @@ namespace winrt::Telegram::Native::implementation
 
             if (!m_animation->RenderSync(pixels, m_width, m_height, false, seconds, completed, skipBefore))
             {
-                m_finished = true;
+                m_finished = completed;
                 return false;
             }
 

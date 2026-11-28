@@ -11,11 +11,15 @@ using Windows.UI.Xaml.Controls;
 
 namespace Telegram.Controls
 {
-    public sealed partial class UnconfirmedSessionCard : UserControl
+    public sealed partial class UnconfirmedSessionCard : UserControl, ISlidePanelChild
     {
+        private readonly SlidePanel.SlideState _slide;
+
         public UnconfirmedSessionCard()
         {
             InitializeComponent();
+
+            _slide = new SlidePanel.SlideState(this, false, 0);
         }
 
         public void Update(UnconfirmedSession session)
@@ -34,6 +38,53 @@ namespace Telegram.Controls
         {
             add => Deny.Click += value;
             remove => Deny.Click -= value;
+        }
+
+        public SlidePanel.SlideState SlideState => _slide;
+
+        private bool _isFirst;
+        public bool IsFirst
+        {
+            get => _isFirst;
+            set
+            {
+                if (_isFirst != value)
+                {
+                    UpdateAttach(_isFirst = value, _isLast);
+                }
+            }
+        }
+
+        private bool _isLast;
+        public bool IsLast
+        {
+            get => _isLast;
+            set
+            {
+                if (_isLast != value)
+                {
+                    UpdateAttach(_isFirst, _isLast = value);
+                }
+            }
+        }
+
+        private double _cardRadius;
+        public double CardRadius
+        {
+            get => _cardRadius;
+            set
+            {
+                if (_cardRadius != value)
+                {
+                    _cardRadius = value;
+                    UpdateAttach(_isFirst, _isLast);
+                }
+            }
+        }
+
+        private void UpdateAttach(bool first, bool last)
+        {
+            Divider.Opacity = last ? 0 : 1;
         }
     }
 }

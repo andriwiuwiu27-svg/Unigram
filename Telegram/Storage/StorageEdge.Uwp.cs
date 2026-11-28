@@ -5,8 +5,10 @@
 // file LICENSE or copy at https://www.gnu.org/licenses/gpl-3.0.txt)
 //
 
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Windows.Foundation;
 using Windows.Storage;
 
 namespace Telegram.Storage
@@ -37,6 +39,16 @@ namespace Telegram.Storage
         public static IReadOnlyList<IFileSystemItem> ToFileSystemItems(this IReadOnlyList<IStorageItem> items)
         {
             return items;
+        }
+
+        public static Task<IReadOnlyList<FileItem>> ToFileItemsAsync(this IAsyncOperation<IReadOnlyList<StorageFile>> operation)
+        {
+            return operation.AsTask();
+        }
+
+        public static Task<IReadOnlyList<IFileSystemItem>> ToFileSystemItemsAsync(this IAsyncOperation<IReadOnlyList<IStorageItem>> operation)
+        {
+            return operation.AsTask();
         }
 
         public static Task<StorageFile> ToStorageFileAsync(this FileItem file)

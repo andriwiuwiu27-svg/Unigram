@@ -132,7 +132,7 @@ namespace Telegram.Views.Popups
             //if (e.Key == VirtualKey.Enter && _diff.Count > 0)
             //{
             //    SelectedItem = _diff[0].Id;
-            //    Hide(ContentDialogResult.Primary);
+            //    Hide(ModalPopupResult.Primary);
             //}
         }
 

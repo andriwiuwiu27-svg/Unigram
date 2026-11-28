@@ -331,6 +331,9 @@ namespace winrt::Telegram::Native::Media::implementation
         // having something to play.
         std::atomic<bool> m_paused{ false };
 
+        // Whether the end was reached paused, by a seek to it, rather than by playing through.
+        std::atomic<bool> m_endedPaused{ false };
+
         std::atomic<double> m_rate{ 1 };
         std::atomic<double> m_volume{ 1 };
         std::atomic<bool> m_mute{ false };

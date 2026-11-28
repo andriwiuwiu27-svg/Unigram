@@ -55,7 +55,7 @@ namespace Telegram.Views.Wallet.Popups
             _words = words;
 
             PrimaryButtonContent = Strings.WalletDone;
-            ButtonsLayout = ContentPopupButtonsLayout.Vertical;
+            ButtonsLayout = ModalPopupButtonsLayout.Vertical;
 
             InitializeWords();
         }
@@ -89,7 +89,7 @@ namespace Telegram.Views.Wallet.Popups
 
         private async void OnDisableBackupClosing(ModalPopup sender, ModalPopupClosingEventArgs args)
         {
-            if (args.Result == ContentDialogResult.Primary)
+            if (args.Result == ModalPopupResult.Primary)
             {
                 return;
             }
@@ -97,7 +97,7 @@ namespace Telegram.Views.Wallet.Popups
             var deferral = args.GetDeferral();
 
             var confirm = await MessagePopup.ShowNestedAsync(XamlRoot, Strings.WalletCancelDisableBackupInfo, Strings.WalletCancelDisableBackupTitle, Strings.WalletCancelDisabling, Strings.WalletContinue);
-            if (confirm != ContentDialogResult.Primary)
+            if (confirm != ModalPopupResult.Primary)
             {
                 args.Cancel = true;
             }

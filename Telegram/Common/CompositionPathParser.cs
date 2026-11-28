@@ -39,7 +39,7 @@ namespace Telegram.Common
 
             using var builder = new CanvasPathBuilder(null);
             ParseAndRender(data, builder);
-            return new CompositionPath(CanvasGeometry.CreatePath(builder));
+            return ToPath(CanvasGeometry.CreatePath(builder));
 
             return null;
         }
@@ -118,18 +118,27 @@ namespace Telegram.Common
         public static CompositionAnimation ParseThumbnail(float width, float height, AnimatedImageOutline outline, out ShapeVisual visual, bool animated = true)
         {
             CompositionPath path = outline.TryGetSvgPath(out var svgPath)
-                ? new CompositionPath(Parse(null, svgPath))
+                ? ToPath(Parse(null, svgPath))
                 : outline.TryGetContours(out var contours)
-                ? new CompositionPath(Parse(null, contours))
-                : new CompositionPath(CanvasGeometry.CreateRoundedRectangle(null, 0, 0, width, height, 80, 80));
+                ? ToPath(Parse(null, contours))
+                : ToPath(CanvasGeometry.CreateRoundedRectangle(null, 0, 0, width, height, 80, 80));
 
             return CreateThumbnail(width, height, path, out visual, animated);
         }
 
         public static CompositionAnimation CreateThumbnail(float width, float height, float cornerRadius, out ShapeVisual visual, bool animated = true)
         {
-            var path = new CompositionPath(CanvasGeometry.CreateRoundedRectangle(null, 0, 0, width, height, cornerRadius, cornerRadius));
+            var path = ToPath(CanvasGeometry.CreateRoundedRectangle(null, 0, 0, width, height, cornerRadius, cornerRadius));
             return CreateThumbnail(width, height, path, out visual, animated);
+        }
+
+        // A CompositionPath copies the geometry when it is made and keeps no reference to it.
+        private static CompositionPath ToPath(CanvasGeometry geometry)
+        {
+            using (geometry)
+            {
+                return new CompositionPath(geometry);
+            }
         }
 
         public static CompositionAnimation CreateThumbnail(float width, float height, CompositionPath path, out ShapeVisual visual, bool animated = true)

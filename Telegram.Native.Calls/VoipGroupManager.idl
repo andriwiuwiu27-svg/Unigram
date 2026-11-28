@@ -24,7 +24,7 @@ namespace Telegram.Native.Calls
 
         void Stop();
 
-        void SetConnectionMode(VoipGroupConnectionMode connectionMode, Boolean keepBroadcastIfWasEnabled, Boolean isUnifiedBroadcast);
+        void SetConnectionMode(VoipGroupConnectionMode connectionMode, Boolean keepBroadcastIfWasEnabled);
 
         void EmitJoinPayload(EmitJsonPayloadDelegate completion);
         void SetJoinResponsePayload(String payload);
@@ -50,6 +50,10 @@ namespace Telegram.Native.Calls
         event Windows.Foundation.TypedEventHandler<VoipGroupManager, BroadcastTimeRequestedEventArgs> BroadcastTimeRequested;
         event Windows.Foundation.TypedEventHandler<VoipGroupManager, AudioBroadcastPartRequestedEventArgs> AudioBroadcastPartRequested;
         event Windows.Foundation.TypedEventHandler<VoipGroupManager, VideoBroadcastPartRequestedEventArgs> VideoBroadcastPartRequested;
+
+        // The broadcast needs the call to join again; it plays on meanwhile, and continues if the call comes back as
+        // a broadcast.
+        event Windows.Foundation.TypedEventHandler<VoipGroupManager, Object> RejoinRequested;
 
         event Windows.Foundation.TypedEventHandler<VoipGroupManager, MediaChannelDescriptionsRequestedEventArgs> MediaChannelDescriptionsRequested;
     }

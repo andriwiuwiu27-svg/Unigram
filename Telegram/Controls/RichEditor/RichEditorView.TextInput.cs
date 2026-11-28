@@ -83,17 +83,30 @@ namespace Telegram.Controls.RichEditor
 
         private InputPane _inputPane;
 
-        // The touch keyboard covers the bottom of the window rather than resizing it: the part of
-        // the editor under it is taken out of the scroll viewport, so the caret can be scrolled
-        // above it and the last lines can still be reached.
+        // Kept from the events because reading the pane's state is a call to another process.
+        private bool _inputPaneShowing;
+
+        // Unless a handler claims EnsuredFocusedElementInView, XAML scrolls the window to bring
+        // the focused element above the touch keyboard, whatever its type. It finds the caret only
+        // in its own text boxes, so an editor taller than the room left keeps the caret in view
+        // itself, by taking the covered part out of its scroll viewport.
         private void OnInputPaneShowing(InputPane sender, InputPaneVisibilityEventArgs args)
         {
-            if (ScrollViewer == null)
+            _inputPaneShowing = true;
+
+            // Every editor in the window hears this; claiming it for one without focus would
+            // stop XAML bringing the focused text box into view.
+            if (ScrollViewer == null || !_hasFocus)
             {
                 return;
             }
 
             var occluded = args.OccludedRect;
+            if (ActualHeight <= occluded.Top)
+            {
+                return;
+            }
+
             var bounds = ScrollViewer.TransformToVisual(null).TransformBounds(new Rect(0, 0, (float)ScrollViewer.ActualWidth, (float)ScrollViewer.ActualHeight));
 
             var overlap = bounds.Bottom - occluded.Top;
@@ -108,6 +121,8 @@ namespace Telegram.Controls.RichEditor
 
         private void OnInputPaneHiding(InputPane sender, InputPaneVisibilityEventArgs args)
         {
+            _inputPaneShowing = false;
+
             if (ScrollViewer != null)
             {
                 ScrollViewer.Margin = new Thickness(0);
@@ -188,6 +203,7 @@ namespace Telegram.Controls.RichEditor
                 _inputPane.Showing -= OnInputPaneShowing;
                 _inputPane.Hiding -= OnInputPaneHiding;
                 _inputPane = null;
+                _inputPaneShowing = false;
             }
 
             ReleaseEditContext();
@@ -271,6 +287,12 @@ namespace Telegram.Controls.RichEditor
             // them raises no LostFocus here.
             _hasFocus = true;
             EnterContext();
+
+            // With the keyboard already up, XAML brings only its own text boxes into view.
+            if (_inputPaneShowing)
+            {
+                StartBringIntoView();
+            }
 
             _placeholderLeaf = null;
             UpdatePlaceholders();
@@ -406,7 +428,15 @@ namespace Telegram.Controls.RichEditor
             if (_editContext != null && _editContext.InputPaneDisplayPolicy == CoreTextInputPaneDisplayPolicy.Manual)
             {
                 _editContext.InputPaneDisplayPolicy = CoreTextInputPaneDisplayPolicy.Automatic;
-                _inputPane?.TryShow();
+
+                try
+                {
+                    _inputPane?.TryShow();
+                }
+                catch
+                {
+                    // All the remote procedure calls must be wrapped in a try-catch block
+                }
             }
         }
 
